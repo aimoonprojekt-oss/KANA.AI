@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { checkAgentAccess, getAgentById, saveSession } from "@/lib/supabase";
+import { checkAgentAccess, saveSession } from "@/lib/supabase";
 import { getAgentById as getAgentDef } from "@/lib/agents";
 
 // Anthropic SDK — API Key NUR hier auf dem Server
