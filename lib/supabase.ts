@@ -129,3 +129,91 @@ export async function saveSession(
     last_message_at: new Date().toISOString(),
   });
 }
+
+// ─── Usage / Verlauf ──────────────────────────────────────────────────────────
+
+export type UsageStat = {
+  agentId:          string;
+  agentName:        string;
+  totalSessions:    number;
+  sessionsThisWeek: number;
+  sessionsLastWeek: number;
+};
+
+export type UsageOverview = {
+  stats:           UsageStat[];
+  totalThisMonth:  number;
+  totalLastMonth:  number;
+  recentSessions:  (Session & { agentName: string })[];
+};
+
+export async function getUserUsageStats(userId: string): Promise<UsageOverview> {
+  // Alle Sessions dieses Users laden
+  const { data: sessions } = await getSupabaseAdmin()
+    .from("sessions")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  // Agent-Namen aus agent_access holen
+  const { data: agents } = await getSupabaseAdmin()
+    .from("agent_access")
+    .select("agent_id, agent_name")
+    .eq("user_id", userId);
+
+  const agentMap = new Map((agents ?? []).map(a => [a.agent_id, a.agent_name]));
+
+  // Datumsgrenzen berechnen
+  const now = new Date();
+
+  const startOfThisWeek = new Date(now);
+  startOfThisWeek.setDate(now.getDate() - now.getDay());
+  startOfThisWeek.setHours(0, 0, 0, 0);
+
+  const startOfLastWeek = new Date(startOfThisWeek);
+  startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
+
+  const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+  // Pro Agent aggregieren
+  const agentStats = new Map<string, UsageStat>();
+
+  for (const s of sessions ?? []) {
+    const created = new Date(s.created_at);
+    if (!agentStats.has(s.agent_id)) {
+      agentStats.set(s.agent_id, {
+        agentId:          s.agent_id,
+        agentName:        agentMap.get(s.agent_id) ?? "Unbekannt",
+        totalSessions:    0,
+        sessionsThisWeek: 0,
+        sessionsLastWeek: 0,
+      });
+    }
+    const stat = agentStats.get(s.agent_id)!;
+    stat.totalSessions++;
+    if (created >= startOfThisWeek)      stat.sessionsThisWeek++;
+    else if (created >= startOfLastWeek) stat.sessionsLastWeek++;
+  }
+
+  const totalThisMonth = (sessions ?? []).filter(s =>
+    new Date(s.created_at) >= startOfThisMonth
+  ).length;
+
+  const totalLastMonth = (sessions ?? []).filter(s => {
+    const d = new Date(s.created_at);
+    return d >= startOfLastMonth && d < startOfThisMonth;
+  }).length;
+
+  const recentSessions = (sessions ?? []).slice(0, 15).map(s => ({
+    ...s,
+    agentName: agentMap.get(s.agent_id) ?? "Unbekannt",
+  }));
+
+  return {
+    stats: Array.from(agentStats.values()),
+    totalThisMonth,
+    totalLastMonth,
+    recentSessions,
+  };
+}

@@ -36,4 +36,9 @@ declare module 'lucide-react' {
   export const X: Icon;
   export const Monitor: Icon;
   export const Mail: Icon;
+  export const BarChart2: Icon;
+  export const TrendingUp: Icon;
+  export const TrendingDown: Icon;
+  export const Zap: Icon;
+  export const Calendar: Icon;
 }

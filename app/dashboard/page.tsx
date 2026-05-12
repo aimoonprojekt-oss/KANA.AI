@@ -1,15 +1,16 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { getUserAgents } from "@/lib/supabase";
+import { getUserAgents, getUserUsageStats } from "@/lib/supabase";
 import PortalDashboard from "@/app/components/PortalDashboard";
 
 export default async function DashboardPage() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
-  const [user, agents] = await Promise.all([
+  const [user, agents, usage] = await Promise.all([
     currentUser(),
     getUserAgents(userId),
+    getUserUsageStats(userId),
   ]);
 
   const initials = user?.firstName && user?.lastName
@@ -28,6 +29,7 @@ export default async function DashboardPage() {
       userName={displayName}
       userInitials={initials}
       userEmail={email}
+      usage={usage}
     />
   );
 }
