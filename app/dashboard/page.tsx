@@ -1,5 +1,5 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { UserButton } from "@clerk/nextjs";
+import { SignOutButton, UserButton } from "@clerk/nextjs";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getUserAgents } from "@/lib/supabase";
@@ -75,13 +75,12 @@ export default async function DashboardPage() {
 
           <div className="nav-section">
             <div className="nav-section-label">Konto</div>
-            <form action="/sign-out" method="post">
-              <button className="nav-item" style={{ color: "var(--red)", width: "100%" }}
-                formAction="/api/auth/signout" type="submit">
+            <SignOutButton redirectUrl="/sign-in">
+              <button className="nav-item" style={{ color: "var(--red)", width: "100%" }} type="button">
                 <span className="nav-icon"><LogoutIcon /></span>
                 Abmelden
               </button>
-            </form>
+            </SignOutButton>
           </div>
         </nav>
 

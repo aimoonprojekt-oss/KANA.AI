@@ -1,26 +1,61 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-// ─── Supabase Client (für Frontend & sichere Server-Calls) ───────────────────
+// ─── Supabase Clients (lazy initialisiert) ───────────────────────────────────
+// Wir initialisieren NICHT auf Modul-Ebene mit `process.env.X!`, weil das
+// während des Vercel-Build-Prerenders sofort wirft, wenn auch nur eine Variable
+// fehlt. Stattdessen erstellen wir den Client beim ersten echten Aufruf.
 
-// Öffentlicher Client (für Frontend - nur lesend, was erlaubt ist)
-export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+let _supabase: SupabaseClient | null = null;
+let _supabaseAdmin: SupabaseClient | null = null;
 
-// Admin Client (nur auf dem Server verwenden! - hat vollen Zugriff)
-export const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function requireEnv(name: string): string {
+  const v = process.env[name];
+  if (!v) {
+    throw new Error(
+      `Environment Variable '${name}' fehlt. In Vercel unter Settings → Environment Variables setzen.`
+    );
+  }
+  return v;
+}
+
+// Öffentlicher Client (Frontend / serverseitig OK)
+export function getSupabase(): SupabaseClient {
+  if (!_supabase) {
+    _supabase = createClient(
+      requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
+      requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+    );
+  }
+  return _supabase;
+}
+
+// Admin Client — NUR auf dem Server verwenden (hat Service-Role-Berechtigung)
+export function getSupabaseAdmin(): SupabaseClient {
+  if (!_supabaseAdmin) {
+    _supabaseAdmin = createClient(
+      requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
+      requireEnv("SUPABASE_SERVICE_ROLE_KEY")
+    );
+  }
+  return _supabaseAdmin;
+}
+
+// Backwards-Kompat: alte Importe `import { supabase, supabaseAdmin } from ...`
+// funktionieren weiter, aber nur, wenn die Env-Vars gesetzt sind.
+export const supabase = new Proxy({} as SupabaseClient, {
+  get: (_t, prop) => Reflect.get(getSupabase(), prop),
+});
+export const supabaseAdmin = new Proxy({} as SupabaseClient, {
+  get: (_t, prop) => Reflect.get(getSupabaseAdmin(), prop),
+});
 
 // ─── Typen für unsere Datenbank ───────────────────────────────────────────────
 
 export type AgentAccess = {
   id: string;
-  user_id: string;       // Clerk User ID
-  agent_id: string;      // Anthropic Managed Agent ID
-  agent_name: string;    // Anzeigename für den Kunden
+  user_id: string;
+  agent_id: string;
+  agent_name: string;
   agent_description: string;
   purchased_at: string;
   is_active: boolean;
@@ -30,22 +65,18 @@ export type Session = {
   id: string;
   user_id: string;
   agent_id: string;
-  anthropic_session_id: string;  // ID von Anthropic
+  anthropic_session_id: string;
   created_at: string;
   last_message_at: string;
 };
 
 // ─── Hilfsfunktionen ─────────────────────────────────────────────────────────
 
-/**
- * Prüft ob ein Benutzer Zugang zu einem bestimmten Agent hat
- * Wird vom Backend aufgerufen bevor ein API-Call gemacht wird
- */
 export async function checkAgentAccess(
   userId: string,
   agentId: string
 ): Promise<boolean> {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await getSupabaseAdmin()
     .from("agent_access")
     .select("id")
     .eq("user_id", userId)
@@ -57,11 +88,8 @@ export async function checkAgentAccess(
   return true;
 }
 
-/**
- * Gibt alle Agents zurück, die ein Benutzer gekauft hat
- */
 export async function getUserAgents(userId: string): Promise<AgentAccess[]> {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await getSupabaseAdmin()
     .from("agent_access")
     .select("*")
     .eq("user_id", userId)
@@ -72,16 +100,13 @@ export async function getUserAgents(userId: string): Promise<AgentAccess[]> {
   return data;
 }
 
-/**
- * Schaltet nach erfolgreichem Stripe-Kauf den Agent-Zugang frei
- */
 export async function grantAgentAccess(
   userId: string,
   agentId: string,
   agentName: string,
   agentDescription: string
 ): Promise<void> {
-  await supabaseAdmin.from("agent_access").upsert({
+  await getSupabaseAdmin().from("agent_access").upsert({
     user_id: userId,
     agent_id: agentId,
     agent_name: agentName,
@@ -91,15 +116,12 @@ export async function grantAgentAccess(
   });
 }
 
-/**
- * Speichert eine neue Agent-Session in der DB
- */
 export async function saveSession(
   userId: string,
   agentId: string,
   anthropicSessionId: string
 ): Promise<void> {
-  await supabaseAdmin.from("sessions").insert({
+  await getSupabaseAdmin().from("sessions").insert({
     user_id: userId,
     agent_id: agentId,
     anthropic_session_id: anthropicSessionId,

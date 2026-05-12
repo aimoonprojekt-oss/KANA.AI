@@ -55,20 +55,31 @@ Dann `.env.local` öffnen und alle Keys eintragen (von Schritt 2).
 
 ---
 
-## SCHRITT 5: Deine Agents eintragen
+## SCHRITT 5: Deine Agents und das Environment eintragen
 
-Öffne `lib/agents.ts` und trage deine Anthropic Agent IDs ein:
+### 5a) Environment-ID besorgen (Pflicht!)
+1. Gehe zu https://platform.claude.com → **Managed Agents** → **Environments**
+2. Lege ein Environment an (oder nimm das vorhandene) → kopiere die `env_…`-ID
+3. Trage sie in `.env.local` und in Vercel ein als `ANTHROPIC_ENVIRONMENT_ID`
+
+### 5b) Agent-IDs eintragen
+Öffne `lib/agents.ts` und ersetze die Platzhalter:
 
 ```typescript
 // Deine Agent IDs findest du hier:
 // platform.claude.com → Managed Agents → Dein Agent → "agent_id" kopieren
+// Aktuelles Format: "agent_…" (das alte "agt_…" ist obsolet!)
 
 {
-  id: "agt_HIER_DEINE_ECHTE_ID",   // ← Das ist der wichtigste Wert
+  id: "agent_HIER_DEINE_ECHTE_ID",   // ← Das ist der wichtigste Wert
   name: "Sales Agent",
+  stripeProductId: "prod_…",         // ← echte Stripe-Product-ID, nicht PLACEHOLDER…
   ...
 }
 ```
+
+Einträge mit IDs, die mit `PLACEHOLDER` beginnen, werden automatisch ausgefiltert
+und tauchen im Dashboard nicht auf — so kannst du nach und nach Agents freischalten.
 
 ---
 
