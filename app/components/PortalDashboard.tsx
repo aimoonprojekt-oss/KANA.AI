@@ -178,7 +178,7 @@ export default function PortalDashboard({ userAgents, userName, userInitials, us
         </nav>
 
         <div className="sidebar-footer">
-          <SignOutButton redirectUrl="/sign-in">
+          <SignOutButton redirectUrl="/">
             <button className="sidebar-logout" type="button">
               <LogOut size={16} /> Abmelden
             </button>
