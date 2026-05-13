@@ -41,6 +41,7 @@ export type DBAgent = {
   price_eur:          number;
   published:          boolean;
   featured:           boolean;
+  stripe_price_id:    string | null;  // Stripe Price ID (price_xxx)
   created_at:         string;
 };
 
@@ -286,37 +287,98 @@ export async function checkAgentAccess(userId: string, anthropicAgentId: string)
 
 /**
  * Schaltet einem User Zugang zu einem Agent frei (z.B. nach Stripe-Kauf).
+ * Speichert die Kunden-spezifische Anthropic Agent-ID für Kostentrennung.
  * Erstellt automatisch eine Organisation falls noch keine vorhanden.
+ *
+ * @param userId                   Clerk user_id
+ * @param masterAnthropicAgentId   anthropic_agent_id des Master-Agents
+ * @param customerAnthropicAgentId anthropic_agent_id der Kundenkopie (nach Kauf erstellt)
  */
 export async function grantAgentAccess(
   userId: string,
-  anthropicAgentId: string,
-  _agentName?: string,      // wird in agent_access1 nicht mehr gespeichert
-  _agentDescription?: string
+  masterAnthropicAgentId: string,
+  customerAnthropicAgentId?: string,
+  _agentName?: string,        // Legacy-Parameter, nicht mehr genutzt
+  _agentDescription?: string  // Legacy-Parameter, nicht mehr genutzt
 ): Promise<void> {
   const db = getSupabaseAdmin();
 
-  // Organisation finden oder erstellen
   const orgId = await getOrCreateOrganization(userId);
 
-  // agents.id (UUID) aus anthropic_agent_id ermitteln
   const { data: agent } = await db
     .from("agents")
     .select("id")
-    .eq("anthropic_agent_id", anthropicAgentId)
+    .eq("anthropic_agent_id", masterAnthropicAgentId)
     .maybeSingle();
 
-  if (!agent) throw new Error(`Agent nicht in DB gefunden: ${anthropicAgentId}`);
+  if (!agent) throw new Error(`Agent nicht in DB gefunden: ${masterAnthropicAgentId}`);
 
-  // Zugang eintragen (idempotent)
-  const { error } = await db
+  // Prüfen ob Zugang schon existiert
+  const { data: existing } = await db
     .from("agent_access1")
-    .upsert(
-      { organization_id: orgId, agent_id: agent.id, active: true, purchased_at: new Date().toISOString() },
-      { onConflict: "organization_id,agent_id" }
-    );
+    .select("id")
+    .eq("organization_id", orgId)
+    .eq("agent_id", agent.id)
+    .maybeSingle();
 
-  if (error) throw new Error(`Zugang konnte nicht gewährt werden: ${error.message}`);
+  if (existing) {
+    // Bestehenden Eintrag aktualisieren (z.B. Kundenkopie nachträglich setzen)
+    const { error } = await db
+      .from("agent_access1")
+      .update({
+        active: true,
+        ...(customerAnthropicAgentId && { customer_anthropic_agent_id: customerAnthropicAgentId }),
+      })
+      .eq("id", existing.id);
+    if (error) throw new Error(`Update fehlgeschlagen: ${error.message}`);
+  } else {
+    // Neuen Zugang anlegen
+    const { error } = await db
+      .from("agent_access1")
+      .insert({
+        organization_id:              orgId,
+        agent_id:                     agent.id,
+        active:                       true,
+        purchased_at:                 new Date().toISOString(),
+        customer_anthropic_agent_id:  customerAnthropicAgentId ?? null,
+      });
+    if (error) throw new Error(`Zugang konnte nicht gewährt werden: ${error.message}`);
+  }
+}
+
+/**
+ * Gibt die Kunden-spezifische Anthropic Agent-ID zurück.
+ * Wird im Chat genutzt damit jeder Kunde seinen eigenen Agent verwendet.
+ */
+export async function getCustomerAgentId(
+  userId: string,
+  masterAnthropicAgentId: string
+): Promise<string | null> {
+  const db = getSupabaseAdmin();
+
+  const { data: org } = await db
+    .from("organizations")
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!org) return null;
+
+  const { data: agent } = await db
+    .from("agents")
+    .select("id")
+    .eq("anthropic_agent_id", masterAnthropicAgentId)
+    .maybeSingle();
+  if (!agent) return null;
+
+  const { data: access } = await db
+    .from("agent_access1")
+    .select("customer_anthropic_agent_id")
+    .eq("organization_id", org.id)
+    .eq("agent_id", agent.id)
+    .eq("active", true)
+    .maybeSingle();
+
+  return access?.customer_anthropic_agent_id ?? null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

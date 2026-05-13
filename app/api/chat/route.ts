@@ -5,6 +5,7 @@ import {
   checkAgentAccess,
   saveSession,
   getDBAgentById,
+  getCustomerAgentId,
   createRun,
   completeRun,
 } from "@/lib/supabase";
@@ -42,14 +43,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── 4. Agent-Definition aus der DB laden ───────────────────────────────────
-  // Gibt Name, Description, Preis etc. zurück — kein hardcoded lib/agents.ts mehr.
+  // ── 4. Agent-Definition + Kundenkopie laden ────────────────────────────────
   const agentDef = await getDBAgentById(agentId);
   const agentName = agentDef?.name ?? "Agent";
 
-  // Environment-ID: zuerst aus der DB, Fallback auf Env-Variable
-  const environmentId =
-    agentDef?.environment_id ?? process.env.ANTHROPIC_ENVIRONMENT_ID;
+  // Kundenkopie verwenden falls vorhanden, sonst Master als Fallback
+  // Jeder Kunde hat nach dem Kauf seinen eigenen anthropic_agent_id
+  const customerAgentId = await getCustomerAgentId(userId, agentId);
+  const activeAgentId   = customerAgentId ?? agentId;
+
+  if (activeAgentId === agentId) {
+    // Kein Kunden-Agent → entweder Admin-Zugang oder noch keine Kopie
+    console.warn(`User ${userId} nutzt Master-Agent ${agentId} (keine Kundenkopie)`);
+  }
+
+  const environmentId = agentDef?.environment_id ?? process.env.ANTHROPIC_ENVIRONMENT_ID;
   if (!environmentId) {
     return NextResponse.json(
       { message: "ANTHROPIC_ENVIRONMENT_ID nicht gesetzt." },
@@ -70,7 +78,7 @@ export async function POST(req: NextRequest) {
     // Neue Session starten wenn noch keine vorhanden
     if (!activeSessionId) {
       const session = await beta.sessions.create({
-        agent: agentId,
+        agent: activeAgentId,   // Kundenkopie statt Master
         environment_id: environmentId,
         title: `${agentName} — ${userId}`,
       });

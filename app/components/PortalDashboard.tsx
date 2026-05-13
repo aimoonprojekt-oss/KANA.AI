@@ -93,6 +93,7 @@ export default function PortalDashboard({
   const [inputError, setInputError]   = useState(false);
   const [syncing, setSyncing]         = useState(false);
   const [syncMsg, setSyncMsg]         = useState<string | null>(null);
+  const [buyingId, setBuyingId]       = useState<string | null>(null);
 
   const firstName    = userName.split(" ")[0];
   const usedThisMonth = usage.totalThisMonth;
@@ -132,6 +133,29 @@ export default function PortalDashboard({
     if (!taskInput.trim()) { setInputError(true); return; }
     if (!trigger) return;
     router.push(`/chat/${trigger.agentId}`);
+  }
+
+  /* Stripe Checkout starten */
+  async function buyAgent(agent: DBAgent) {
+    if (buyingId) return;
+    setBuyingId(agent.anthropic_agent_id);
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ anthropicAgentId: agent.anthropic_agent_id }),
+      });
+      const json = await res.json();
+      if (res.ok && json.url) {
+        window.location.href = json.url;
+      } else {
+        alert(`Checkout fehlgeschlagen: ${json.error ?? "Unbekannter Fehler"}`);
+        setBuyingId(null);
+      }
+    } catch (e) {
+      alert(`Netzwerkfehler: ${e instanceof Error ? e.message : String(e)}`);
+      setBuyingId(null);
+    }
   }
 
   /* Anthropic → Supabase Sync */
@@ -342,8 +366,13 @@ export default function PortalDashboard({
                       <div className="portal-agent-name">{agent.name}</div>
                       <div className="portal-agent-desc">{agent.description ?? ""}</div>
                       <div className="portal-agent-footer">
-                        <button className="btn-buy">
-                          <CreditCard size={13} /> Ab €{agent.price_eur}/Monat
+                        <button
+                          className="btn-buy"
+                          onClick={() => buyAgent(agent)}
+                          disabled={buyingId === agent.anthropic_agent_id}
+                        >
+                          <CreditCard size={13} />
+                          {buyingId === agent.anthropic_agent_id ? "Weiterleitung…" : `Ab €${agent.price_eur}/Monat`}
                         </button>
                       </div>
                     </div>
