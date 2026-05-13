@@ -52,13 +52,8 @@ export async function POST(req: NextRequest) {
       const agent = getAgentByStripeProductId(productId);
 
       if (agent) {
-        // ✅ Zugang in der Datenbank freischalten!
-        await grantAgentAccess(
-          userId,
-          agent.id,
-          agent.name,
-          agent.description
-        );
+        // ✅ Zugang in der Datenbank freischalten (agent_access1 via organization)
+        await grantAgentAccess(userId, agent.id, agent.name, agent.description);
         console.log(`✅ Agent-Zugang freigeschaltet: ${userId} → ${agent.name}`);
       }
     }

@@ -55,41 +55,64 @@ export async function POST(req: NextRequest) {
   try {
     // ── Agents aus Anthropic Console laden ──────────────────────────────────
     const agentsResponse = await beta.agents.list();
-    // SDK kann `{ data: [...] }` oder direkt ein Array zurückgeben
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const agentList: any[] = agentsResponse?.data ?? agentsResponse ?? [];
 
-    const synced: string[] = [];
+    // Zur Diagnose: rohe API-Antwort loggen
+    console.log("Anthropic agents.list() Antwort:", JSON.stringify(agentsResponse, null, 2));
+
+    // SDK kann `{ data: [...] }`, `{ agents: [...] }` oder direkt ein Array zurückgeben
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const agentList: any[] =
+      agentsResponse?.data ??
+      agentsResponse?.agents ??
+      (Array.isArray(agentsResponse) ? agentsResponse : []);
+
+    if (agentList.length === 0) {
+      return NextResponse.json({
+        message: "Keine Agents in der Anthropic Console gefunden.",
+        raw: agentsResponse,   // hilft bei der Diagnose
+        synced: [],
+      });
+    }
+
+    const synced: { id: string; name: string }[] = [];
     const errors: string[] = [];
 
     for (const agent of agentList) {
+      // Anthropic gibt IDs je nach SDK-Version als `id` oder `agent_id` zurück
       const agentId: string = agent.id ?? agent.agent_id ?? "";
-      if (!agentId) continue;
+      const agentName: string = agent.name ?? agent.display_name ?? agentId;
+
+      if (!agentId) {
+        errors.push(`Agent ohne ID übersprungen: ${JSON.stringify(agent)}`);
+        continue;
+      }
 
       try {
         await upsertAgent({
           anthropic_agent_id: agentId,
-          environment_id:     agent.environment_id ?? environmentId,
-          name:               agent.name ?? agentId,
-          slug:               slugify(agent.name ?? agentId),
+          environment_id:     agent.environment_id ?? agent.environmentId ?? environmentId,
+          name:               agentName,
+          slug:               slugify(agentName),
           description:        agent.description ?? undefined,
-          category:           agent.metadata?.category ?? undefined,
+          category:           agent.metadata?.category ?? agent.category ?? undefined,
         });
-        synced.push(agentId);
+        synced.push({ id: agentId, name: agentName });
+        console.log(`✓ Agent gespeichert: ${agentName} (${agentId})`);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        errors.push(`${agentId}: ${msg}`);
+        console.error(`✗ Agent-Fehler ${agentId}:`, msg);
+        errors.push(`${agentName} (${agentId}): ${msg}`);
       }
     }
 
     return NextResponse.json({
-      message: `${synced.length} Agent(en) synchronisiert.`,
+      message: `${synced.length} von ${agentList.length} Agent(en) synchronisiert.`,
       synced,
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error) {
     console.error("Sync-Agents Fehler:", error);
     const msg = error instanceof Error ? error.message : "API-Fehler";
-    return NextResponse.json({ message: msg }, { status: 500 });
+    return NextResponse.json({ message: msg, detail: String(error) }, { status: 500 });
   }
 }

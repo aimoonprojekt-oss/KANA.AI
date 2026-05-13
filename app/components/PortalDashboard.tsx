@@ -138,19 +138,19 @@ export default function PortalDashboard({
   async function syncAgents() {
     setSyncing(true); setSyncMsg(null);
     try {
-      const res = await fetch("/api/admin/sync-agents", {
-        method: "POST",
-      });
+      const res = await fetch("/api/admin/sync-agents", { method: "POST" });
       const json = await res.json();
       if (res.ok) {
-        setSyncMsg(`✓ ${json.message}`);
-        // Seite neu laden damit neue Agents sofort sichtbar sind
-        setTimeout(() => { window.location.reload(); }, 1200);
+        const count = json.synced?.length ?? 0;
+        const errCount = json.errors?.length ?? 0;
+        const errNote = errCount > 0 ? ` (${errCount} Fehler: ${json.errors[0]})` : "";
+        setSyncMsg(`✓ ${count} Agent(en) importiert${errNote}`);
+        if (count > 0) setTimeout(() => { window.location.reload(); }, 1800);
       } else {
-        setSyncMsg(`✗ ${json.message}`);
+        setSyncMsg(`✗ ${json.message}${json.detail ? ` — ${json.detail}` : ""}`);
       }
-    } catch {
-      setSyncMsg("✗ Netzwerkfehler");
+    } catch (e) {
+      setSyncMsg(`✗ Netzwerkfehler: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setSyncing(false);
     }
