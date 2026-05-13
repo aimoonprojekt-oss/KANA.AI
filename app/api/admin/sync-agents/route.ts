@@ -31,13 +31,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: "Nicht eingeloggt" }, { status: 401 });
   }
 
-  // Optionaler Admin-Secret-Check (falls ADMIN_SECRET in Vercel gesetzt ist)
-  const adminSecret = process.env.ADMIN_SECRET;
-  if (adminSecret) {
-    const providedSecret = req.headers.get("x-admin-secret");
-    if (providedSecret !== adminSecret) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 403 });
-    }
+  // Admin-Prüfung: userId muss in ADMIN_USER_IDS stehen
+  const adminIds = (process.env.ADMIN_USER_IDS ?? "").split(",").map((id) => id.trim()).filter(Boolean);
+  if (adminIds.length > 0 && !adminIds.includes(userId)) {
+    return NextResponse.json({ message: "Kein Zugriff — nur Admins dürfen syncen." }, { status: 403 });
   }
 
   const environmentId = process.env.ANTHROPIC_ENVIRONMENT_ID;
