@@ -87,6 +87,13 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
+      // Kundenkopien überspringen — sie werden beim Kauf automatisch angelegt
+      // und gehören NICHT in den Katalog. Erkennungsmuster: " — user_xxxxxxxxx"
+      if (/ — user_\w+/.test(agentName)) {
+        console.log(`↷ Kundenkopie übersprungen: ${agentName} (${agentId})`);
+        continue;
+      }
+
       try {
         await upsertAgent({
           anthropic_agent_id: agentId,
