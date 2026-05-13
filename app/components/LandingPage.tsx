@@ -6,8 +6,37 @@ import {
   Search, Scissors, Send, Lightbulb, Gem, Plus, ArrowRight,
   CheckCircle, LayoutGrid, FileText, Inbox,
 } from "lucide-react";
+import type { DBAgent } from "@/lib/supabase";
 
-export default function LandingPage() {
+/* ── Icon-Mapping für Agents aus der DB ── */
+function getAgentIcon(name: string, category: string | null) {
+  const n = (name + " " + (category ?? "")).toLowerCase();
+  if (n.includes("research"))                   return <Search size={22} />;
+  if (n.includes("video") || n.includes("cut")) return <Scissors size={22} />;
+  if (n.includes("mail") || n.includes("cold") || n.includes("sales")) return <Send size={22} />;
+  if (n.includes("creative") || n.includes("strateg"))                  return <Lightbulb size={22} />;
+  if (n.includes("brand"))                      return <Gem size={22} />;
+  return <LayoutGrid size={22} />;
+}
+
+function getAgentTag(agent: DBAgent): string {
+  if (agent.category) {
+    const c = agent.category.charAt(0).toUpperCase() + agent.category.slice(1);
+    return c;
+  }
+  const n = agent.name.toLowerCase();
+  if (n.includes("research"))                         return "Research";
+  if (n.includes("mail") || n.includes("cold"))       return "Sales";
+  if (n.includes("video") || n.includes("creative"))  return "Marketing";
+  if (n.includes("brand"))                            return "Brand";
+  return "KI-Agent";
+}
+
+interface Props {
+  agents: DBAgent[];
+}
+
+export default function LandingPage({ agents }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wordRefs  = useRef<(HTMLSpanElement | null)[]>([]);
   const wordIdx   = useRef(0);
@@ -221,7 +250,7 @@ export default function LandingPage() {
             <div className="stat-label">Unternehmen vertrauen KANA</div>
           </div>
           <div className="stat-item">
-            <div className="stat-number" data-target="5">5</div>
+            <div className="stat-number" data-target={String(agents.length || 5)}>{agents.length || 5}</div>
             <div className="stat-label">Spezialisierte KI-Agenten</div>
           </div>
           <div className="stat-item">
@@ -246,28 +275,31 @@ export default function LandingPage() {
           </p>
 
           <div className="agents-grid-landing">
-            {[
-              { icon: <Search size={22}/>,   tag: "Research",        name: "Research Agent",     desc: "Analysiert Märkte, Wettbewerber und Trends. Strukturierte Reports auf Knopfdruck — was früher Tage dauerte, jetzt in Minuten.", tasks: "1.240" },
-              { icon: <Scissors size={22}/>, tag: "Content & Video",  name: "Video Cutter",       desc: "Schneidet, kürzt und optimiert Videoinhalte automatisch. Perfekt für Social Media, Ads und Content-Strategie.",              tasks: "876"   },
-              { icon: <Send size={22}/>,     tag: "Sales",            name: "Cold Mailing Agent", desc: "Erstellt personalisierte Cold-Email-Sequenzen. Höhere Öffnungsraten durch KI-gestützte Personalisierung auf Zielgruppen-Ebene.", tasks: "3.450" },
-              { icon: <Lightbulb size={22}/>,tag: "Marketing",        name: "Creative Strategist",desc: "Entwickelt Kampagnenstrategien, Content-Konzepte und Kommunikationsansätze — datenbasiert und zielgruppengerecht.",           tasks: "520"   },
-              { icon: <Gem size={22}/>,      tag: "Brand",            name: "Brand Expert",       desc: "Analysiert Ihre Markenidentität und entwickelt konsistente Markenbotschaften für alle Kanäle — von Positionierung bis Tonalität.", tasks: "312" },
-            ].map(agent => (
-              <div key={agent.name} className="agent-card-full reveal">
-                <div className="agent-full-icon">{agent.icon}</div>
-                <div className="agent-full-tag">{agent.tag}</div>
-                <div className="agent-full-name">{agent.name}</div>
-                <div className="agent-full-desc">{agent.desc}</div>
-                <div className="agent-full-footer">
-                  <div className="agent-tasks">Abgeschlossen: <span>{agent.tasks} Aufgaben</span></div>
-                  <span style={{ fontSize: ".72rem", color: "var(--success)", fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
-                    <CheckCircle size={12} /> Verfügbar
-                  </span>
-                </div>
+            {agents.length === 0 ? (
+              /* Fallback wenn noch keine Agents in der DB sind */
+              <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "60px 20px", color: "var(--text-muted)" }}>
+                Agents werden in Kürze verfügbar sein.
               </div>
-            ))}
+            ) : (
+              agents.map(agent => (
+                <div key={agent.id} className="agent-card-full reveal">
+                  <div className="agent-full-icon">{getAgentIcon(agent.name, agent.category)}</div>
+                  <div className="agent-full-tag">{getAgentTag(agent)}</div>
+                  <div className="agent-full-name">{agent.name}</div>
+                  <div className="agent-full-desc">{agent.description ?? ""}</div>
+                  <div className="agent-full-footer">
+                    <div className="agent-tasks">
+                      Ab <span>€{agent.price_eur}/Monat</span>
+                    </div>
+                    <span style={{ fontSize: ".72rem", color: "var(--success)", fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
+                      <CheckCircle size={12} /> Verfügbar
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
 
-            {/* Coming Soon */}
+            {/* Coming Soon — immer anzeigen */}
             <div className="agent-card-full reveal" style={{ borderStyle: "dashed", background: "rgba(99,102,241,0.02)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", minHeight: 200, cursor: "default" }}>
               <Plus size={28} style={{ color: "var(--text-muted)", marginBottom: 14 }} />
               <div className="agent-full-name" style={{ opacity: 0.6 }}>Mehr kommen bald</div>

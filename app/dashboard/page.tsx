@@ -1,15 +1,20 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { getUserAgents, getUserUsageStats } from "@/lib/supabase";
+import {
+  getUserAccessedAgents,
+  getLockedAgentsForUser,
+  getUserUsageStats,
+} from "@/lib/supabase";
 import PortalDashboard from "@/app/components/PortalDashboard";
 
 export default async function DashboardPage() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
-  const [user, agents, usage] = await Promise.all([
+  const [user, userAgents, lockedAgents, usage] = await Promise.all([
     currentUser(),
-    getUserAgents(userId),
+    getUserAccessedAgents(userId),     // DBAgent[] — bereits gekaufte Agents
+    getLockedAgentsForUser(userId),    // DBAgent[] — noch nicht gekaufte, published Agents
     getUserUsageStats(userId),
   ]);
 
@@ -25,7 +30,8 @@ export default async function DashboardPage() {
 
   return (
     <PortalDashboard
-      userAgents={agents}
+      userAgents={userAgents}
+      lockedAgents={lockedAgents}
       userName={displayName}
       userInitials={initials}
       userEmail={email}

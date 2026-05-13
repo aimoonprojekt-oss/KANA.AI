@@ -10,12 +10,12 @@ import {
   Search, Scissors, Send, Lightbulb, Gem, BarChart2,
   TrendingUp, TrendingDown, Zap, Calendar,
 } from "lucide-react";
-import type { AgentAccess, UsageOverview } from "@/lib/supabase";
+import type { DBAgent, UsageOverview } from "@/lib/supabase";
 
 /* ── Monatliches Session-Limit ── */
 const MONTHLY_LIMIT = 50;
 
-/* ── View types ── */
+/* ── View / Dept types ── */
 type View = "agents" | "history";
 type Dept = "all" | "marketing" | "sales" | "procurement" | "operations" | "research";
 
@@ -27,49 +27,52 @@ interface TriggerState {
 }
 
 interface Props {
-  userAgents:   AgentAccess[];
+  userAgents:   DBAgent[];      // Agents, auf die der User Zugang hat
+  lockedAgents: DBAgent[];      // Published Agents, die der User noch nicht gekauft hat
   userName:     string;
   userInitials: string;
   userEmail:    string;
   usage:        UsageOverview;
 }
 
-/* ── Locked placeholder agents ── */
-const LOCKED_AGENTS = [
-  { id: "locked-video", name: "Video Cutter",  dept: "marketing", tag: "Content & Video", desc: "Automatisches Video-Editing für Social Media und Kampagnen.",        icon: <Scissors size={22} /> },
-  { id: "locked-brand", name: "Brand Expert",  dept: "marketing", tag: "Brand",           desc: "Markenstrategie, Positionierung und konsistente Markenkommunikation.", icon: <Gem size={22} /> },
-];
-
 const DEPT_LABELS: Record<Dept, string> = {
   all: "Alle Agenten", marketing: "Marketing", sales: "Sales",
   procurement: "Procurement", operations: "Operations", research: "Research",
 };
 
-function getDept(name: string): Dept {
-  const n = name.toLowerCase();
-  if (n.includes("research"))                                      return "research";
-  if (n.includes("sales") || n.includes("mail") || n.includes("cold")) return "sales";
-  if (n.includes("market") || n.includes("creative") || n.includes("brand") || n.includes("video")) return "marketing";
+/* ── Hilfsfunktionen (arbeiten mit DBAgent-Feldern) ── */
+function getDept(agent: DBAgent): Dept {
+  const cat = (agent.category ?? "").toLowerCase();
+  const n   = agent.name.toLowerCase();
+  if (cat === "research"    || n.includes("research"))                                       return "research";
+  if (cat === "sales"       || n.includes("sales") || n.includes("mail") || n.includes("cold")) return "sales";
+  if (cat === "marketing"   || n.includes("market") || n.includes("creative") || n.includes("brand") || n.includes("video")) return "marketing";
+  if (cat === "procurement" || n.includes("procure") || n.includes("einkauf"))               return "procurement";
+  if (cat === "operations"  || n.includes("operations"))                                     return "operations";
   return "all";
 }
-function getIcon(name: string): React.ReactNode {
-  const n = name.toLowerCase();
-  if (n.includes("research"))                   return <Search size={22} />;
-  if (n.includes("cold") || n.includes("mail")) return <Send size={22} />;
-  if (n.includes("creative"))                   return <Lightbulb size={22} />;
-  if (n.includes("brand"))                      return <Gem size={22} />;
-  if (n.includes("video"))                      return <Scissors size={22} />;
+
+function getIcon(name: string, category: string | null = null): React.ReactNode {
+  const n = (name + " " + (category ?? "")).toLowerCase();
+  if (n.includes("research"))                         return <Search size={22} />;
+  if (n.includes("cold") || n.includes("mail") || n.includes("sales")) return <Send size={22} />;
+  if (n.includes("creative") || n.includes("strateg"))                 return <Lightbulb size={22} />;
+  if (n.includes("brand"))                            return <Gem size={22} />;
+  if (n.includes("video") || n.includes("cut"))       return <Scissors size={22} />;
   return <LayoutGrid size={22} />;
 }
-function getTag(name: string): string {
-  const n = name.toLowerCase();
-  if (n.includes("research"))                   return "Research";
-  if (n.includes("cold") || n.includes("mail")) return "Sales";
-  if (n.includes("creative"))                   return "Marketing";
-  if (n.includes("brand"))                      return "Brand";
-  if (n.includes("video"))                      return "Content & Video";
+
+function getTag(agent: DBAgent): string {
+  if (agent.category) return agent.category.charAt(0).toUpperCase() + agent.category.slice(1);
+  const n = agent.name.toLowerCase();
+  if (n.includes("research"))                         return "Research";
+  if (n.includes("cold") || n.includes("mail"))       return "Sales";
+  if (n.includes("creative"))                         return "Marketing";
+  if (n.includes("brand"))                            return "Brand";
+  if (n.includes("video"))                            return "Content & Video";
   return "KI-Agent";
 }
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
@@ -77,42 +80,80 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
 }
 
-/* ═══════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════════ */
 
-export default function PortalDashboard({ userAgents, userName, userInitials, userEmail, usage }: Props) {
+export default function PortalDashboard({
+  userAgents, lockedAgents, userName, userInitials, userEmail, usage,
+}: Props) {
   const router = useRouter();
-  const [view, setView]           = useState<View>("agents");
-  const [activeDept, setActiveDept] = useState<Dept>("all");
-  const [trigger, setTrigger]     = useState<TriggerState | null>(null);
-  const [taskInput, setTaskInput] = useState("");
-  const [inputError, setInputError] = useState(false);
+  const [view, setView]               = useState<View>("agents");
+  const [activeDept, setActiveDept]   = useState<Dept>("all");
+  const [trigger, setTrigger]         = useState<TriggerState | null>(null);
+  const [taskInput, setTaskInput]     = useState("");
+  const [inputError, setInputError]   = useState(false);
+  const [syncing, setSyncing]         = useState(false);
+  const [syncMsg, setSyncMsg]         = useState<string | null>(null);
 
-  const firstName = userName.split(" ")[0];
+  const firstName    = userName.split(" ")[0];
   const usedThisMonth = usage.totalThisMonth;
   const remaining     = Math.max(0, MONTHLY_LIMIT - usedThisMonth);
   const usedPct       = Math.min(100, Math.round((usedThisMonth / MONTHLY_LIMIT) * 100));
 
+  /* Dept-Zähler für Sidebar-Badges */
   const deptCounts: Record<string, number> = {};
   userAgents.forEach(a => {
-    const d = getDept(a.agent_name);
+    const d = getDept(a);
     if (d !== "all") deptCounts[d] = (deptCounts[d] ?? 0) + 1;
   });
 
+  /* Gefilterte Agenten für die Hauptansicht */
   const visibleAgents = activeDept === "all"
     ? userAgents
-    : userAgents.filter(a => getDept(a.agent_name) === activeDept);
+    : userAgents.filter(a => getDept(a) === activeDept);
 
-  const visibleLocked = activeDept === "all" || activeDept === "marketing"
-    ? LOCKED_AGENTS : [];
+  /* Locked Agents: nach Dept filtern (zeige nur, wenn passend) */
+  const visibleLocked = lockedAgents.filter(a =>
+    activeDept === "all" || getDept(a) === activeDept
+  );
 
-  function openTrigger(agent: AgentAccess) {
+  /* Trigger-Modal öffnen */
+  function openTrigger(agent: DBAgent) {
     setTaskInput(""); setInputError(false);
-    setTrigger({ agentId: agent.agent_id, agentName: agent.agent_name, agentDept: getTag(agent.agent_name), icon: getIcon(agent.agent_name) });
+    setTrigger({
+      agentId:   agent.anthropic_agent_id,
+      agentName: agent.name,
+      agentDept: getTag(agent),
+      icon:      getIcon(agent.name, agent.category),
+    });
   }
+
+  /* Agent-Chat starten */
   function startAgent() {
     if (!taskInput.trim()) { setInputError(true); return; }
     if (!trigger) return;
     router.push(`/chat/${trigger.agentId}`);
+  }
+
+  /* Anthropic → Supabase Sync */
+  async function syncAgents() {
+    setSyncing(true); setSyncMsg(null);
+    try {
+      const res = await fetch("/api/admin/sync-agents", {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setSyncMsg(`✓ ${json.message}`);
+        // Seite neu laden damit neue Agents sofort sichtbar sind
+        setTimeout(() => { window.location.reload(); }, 1200);
+      } else {
+        setSyncMsg(`✗ ${json.message}`);
+      }
+    } catch {
+      setSyncMsg("✗ Netzwerkfehler");
+    } finally {
+      setSyncing(false);
+    }
   }
 
   return (
@@ -202,7 +243,21 @@ export default function PortalDashboard({ userAgents, userName, userInitials, us
             <span className="breadcrumb-sep"> / </span>
             <span>{view === "history" ? "Verlauf & Nutzung" : DEPT_LABELS[activeDept]}</span>
           </div>
-          <div className="topbar-actions">
+          <div className="topbar-actions" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {syncMsg && (
+              <span style={{ fontSize: "0.78rem", color: syncMsg.startsWith("✓") ? "var(--success)" : "#F87171", fontWeight: 600 }}>
+                {syncMsg}
+              </span>
+            )}
+            <button
+              className="btn btn-outline btn-sm"
+              style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.8rem" }}
+              onClick={syncAgents}
+              disabled={syncing}
+              title="Agents aus Anthropic Console in die Datenbank schreiben"
+            >
+              {syncing ? "Sync läuft…" : "⟳ Sync aus Console"}
+            </button>
             {view === "agents" && (
               <button className="btn btn-primary btn-sm" style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <Plus size={14} /> Agent hinzufügen
@@ -221,7 +276,7 @@ export default function PortalDashboard({ userAgents, userName, userInitials, us
                   <h2>Guten Tag, {firstName} 👋</h2>
                   <p>
                     {userAgents.length > 0
-                      ? `Sie haben ${userAgents.length} aktive${userAgents.length === 1 ? "n" : ""} Agent${userAgents.length === 1 ? "en" : "en"}. Bereit für Ihren nächsten Auftrag.`
+                      ? `Sie haben ${userAgents.length} aktive${userAgents.length === 1 ? "n" : ""} Agent${userAgents.length === 1 ? "" : "en"}. Bereit für Ihren nächsten Auftrag.`
                       : "Willkommen bei KANA AI. Kaufen Sie Ihren ersten Agenten, um loszulegen."}
                   </p>
                 </div>
@@ -254,7 +309,7 @@ export default function PortalDashboard({ userAgents, userName, userInitials, us
                 </div>
               </div>
 
-              {userAgents.length === 0 && activeDept === "all" ? (
+              {userAgents.length === 0 && activeDept === "all" && visibleLocked.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "60px 20px", background: "var(--bg-card)", borderRadius: "var(--radius-lg)", border: "1px solid var(--border)" }}>
                   <div style={{ fontSize: 40, marginBottom: 12 }}>🛍️</div>
                   <h3 style={{ fontWeight: 800, marginBottom: 8 }}>Noch keine Agenten</h3>
@@ -262,12 +317,14 @@ export default function PortalDashboard({ userAgents, userName, userInitials, us
                 </div>
               ) : (
                 <div className="portal-agents-grid">
+
+                  {/* ── Freigeschaltete Agents ── */}
                   {visibleAgents.map(agent => (
                     <div key={agent.id} className="portal-agent-card">
-                      <div className="portal-agent-icon">{getIcon(agent.agent_name)}</div>
-                      <div className="portal-agent-tag">{getTag(agent.agent_name)}</div>
-                      <div className="portal-agent-name">{agent.agent_name}</div>
-                      <div className="portal-agent-desc">{agent.agent_description}</div>
+                      <div className="portal-agent-icon">{getIcon(agent.name, agent.category)}</div>
+                      <div className="portal-agent-tag">{getTag(agent)}</div>
+                      <div className="portal-agent-name">{agent.name}</div>
+                      <div className="portal-agent-desc">{agent.description ?? ""}</div>
                       <div className="portal-agent-footer">
                         <button className="btn-trigger-portal" onClick={() => openTrigger(agent)}>
                           <Play size={13} /> Starten
@@ -275,15 +332,19 @@ export default function PortalDashboard({ userAgents, userName, userInitials, us
                       </div>
                     </div>
                   ))}
+
+                  {/* ── Gesperrte Agents (aus DB, published aber nicht gekauft) ── */}
                   {visibleLocked.map(agent => (
                     <div key={agent.id} className="portal-agent-card locked">
                       <div className="lock-badge"><Lock size={11} /> Gesperrt</div>
-                      <div className="portal-agent-icon" style={{ opacity: 0.45 }}>{agent.icon}</div>
-                      <div className="portal-agent-tag">{agent.tag}</div>
+                      <div className="portal-agent-icon" style={{ opacity: 0.45 }}>{getIcon(agent.name, agent.category)}</div>
+                      <div className="portal-agent-tag">{getTag(agent)}</div>
                       <div className="portal-agent-name">{agent.name}</div>
-                      <div className="portal-agent-desc">{agent.desc}</div>
+                      <div className="portal-agent-desc">{agent.description ?? ""}</div>
                       <div className="portal-agent-footer">
-                        <button className="btn-buy"><CreditCard size={13} /> Jetzt kaufen</button>
+                        <button className="btn-buy">
+                          <CreditCard size={13} /> Ab €{agent.price_eur}/Monat
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -295,7 +356,7 @@ export default function PortalDashboard({ userAgents, userName, userInitials, us
           {/* ══ HISTORY / USAGE VIEW ══ */}
           {view === "history" && (
             <>
-              {/* Limit Banner */}
+              {/* Header */}
               <div className="welcome-banner">
                 <div className="welcome-text">
                   <h2 style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -320,7 +381,6 @@ export default function PortalDashboard({ userAgents, userName, userInitials, us
                     <div style={{ fontSize: "1.4rem", fontWeight: 900, color: remaining > 10 ? "var(--success)" : "#F87171" }}>{remaining}</div>
                   </div>
                 </div>
-                {/* Progress Bar */}
                 <div style={{ background: "var(--bg-secondary)", borderRadius: 999, height: 8, overflow: "hidden" }}>
                   <div style={{
                     height: "100%", borderRadius: 999,
@@ -379,7 +439,7 @@ export default function PortalDashboard({ userAgents, userName, userInitials, us
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                               <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--accent-glow)", border: "1px solid var(--accent-border)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--accent-bright)" }}>
-                                {getIcon(stat.agentName)}
+                                <Search size={14} />
                               </div>
                               <div>
                                 <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--text-primary)" }}>{stat.agentName}</div>
