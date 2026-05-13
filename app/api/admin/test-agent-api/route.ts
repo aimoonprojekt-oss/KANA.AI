@@ -7,10 +7,11 @@ export const runtime = "nodejs";
 /**
  * GET /api/admin/test-agent-api?masterId=agent_xxx
  *
- * Testet welche Anthropic Agent-API Calls verfügbar sind:
- * 1. agents.retrieve() → Master-Config lesen
- * 2. agents.create()   → Kundenkopie erstellen (entscheidend)
- * 3. agents.delete()   → Test-Kopie wieder löschen
+ * Testet agents.retrieve() + agents.create() mit den korrekten Feldern.
+ * Aus dem ersten Test wissen wir:
+ *  - retrieve() funktioniert ✅
+ *  - create() schlägt fehl wegen environment_id → jetzt entfernt
+ *  - Korrekte Felder: name, model (Objekt), system, description, tools, skills, mcp_servers
  */
 export async function GET(req: NextRequest) {
   const { userId } = await auth();
@@ -23,53 +24,57 @@ export async function GET(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const beta = (anthropic as any).beta;
 
-  const results: Record<string, unknown> = {};
-
-  // ── 1. agents.retrieve() ─────────────────────────────────────────────────
+  // ── 1. Master-Agent laden ────────────────────────────────────────────────
+  let masterAgent: Record<string, unknown>;
   try {
-    const agent = await beta.agents.retrieve(masterId);
-    results.retrieve = { ok: true, agent };
+    masterAgent = await beta.agents.retrieve(masterId);
   } catch (e) {
-    results.retrieve = { ok: false, error: String(e) };
+    return NextResponse.json({ error: `retrieve fehlgeschlagen: ${String(e)}` }, { status: 500 });
   }
 
-  // ── 2. agents.create() — nur wenn retrieve geklappt hat ──────────────────
-  if ((results.retrieve as { ok: boolean }).ok) {
-    const masterAgent = (results.retrieve as { agent: Record<string, unknown> }).agent;
+  // ── 2. Kopie erstellen — ohne environment_id, mit korrekten Feldern ─────
+  let createdAgent: Record<string, unknown> | null = null;
+  let createError: string | null = null;
+  try {
+    createdAgent = await beta.agents.create({
+      name:        `TEST_COPY_DELETE_ME_${Date.now()}`,
+      model:       masterAgent.model,
+      description: masterAgent.description ?? "",
+      system:      masterAgent.system ?? "",
+      tools:       masterAgent.tools ?? [],
+      skills:      masterAgent.skills ?? [],
+      mcp_servers: masterAgent.mcp_servers ?? [],
+    });
+  } catch (e) {
+    createError = String(e);
+  }
+
+  // ── 3. Test-Kopie direkt wieder löschen ─────────────────────────────────
+  let deleteResult: string | null = null;
+  if (createdAgent?.id) {
     try {
-      const copy = await beta.agents.create({
-        name:           `TEST_COPY_DELETE_ME_${Date.now()}`,
-        model:          masterAgent.model,
-        description:    masterAgent.description ?? "Test-Kopie",
-        instructions:   masterAgent.instructions ?? masterAgent.system_prompt,
-        tools:          masterAgent.tools ?? [],
-        environment_id: process.env.ANTHROPIC_ENVIRONMENT_ID,
-      });
-      results.create = { ok: true, newAgentId: copy.id, copy };
-
-      // ── 3. Test-Kopie direkt wieder löschen ──────────────────────────────
-      try {
-        await beta.agents.delete(copy.id);
-        results.delete = { ok: true };
-      } catch (e) {
-        results.delete = { ok: false, error: String(e) };
-      }
+      await beta.agents.delete(createdAgent.id);
+      deleteResult = "gelöscht ✅";
     } catch (e) {
-      results.create = { ok: false, error: String(e) };
+      deleteResult = `Löschen fehlgeschlagen: ${String(e)}`;
     }
-  } else {
-    results.create = { ok: false, skipped: "retrieve fehlgeschlagen" };
   }
 
-  const canCopy =
-    (results.retrieve as { ok: boolean }).ok &&
-    (results.create as { ok: boolean }).ok;
+  const canCopy = !!createdAgent && !createError;
 
   return NextResponse.json({
     summary: canCopy
       ? "✅ Kundenkopien möglich — retrieve + create funktionieren"
-      : "❌ Kundenkopien nicht möglich — siehe errors unten",
+      : "❌ create fehlgeschlagen — siehe createError",
     canCopy,
-    details: results,
+    newAgentId:  createdAgent?.id ?? null,
+    deleteResult,
+    createError,
+    masterFields: {
+      name:    masterAgent.name,
+      model:   masterAgent.model,
+      hasSystem: !!(masterAgent.system),
+      toolCount: Array.isArray(masterAgent.tools) ? masterAgent.tools.length : 0,
+    },
   });
 }
