@@ -204,7 +204,7 @@ export default function LandingPage({ agents: _ }: Props) {
               Dein Marketing{" "}
               <span className="text-shimmer">läuft.</span>
               <br />
-              <span style={{ fontSize: "0.88em", fontStyle: "italic", opacity: 0.88 }}>
+              <span style={{ fontSize: "0.88em", opacity: 0.88 }}>
                 Du baust dein Business.
               </span>
             </h1>
@@ -393,7 +393,7 @@ export default function LandingPage({ agents: _ }: Props) {
             </div>
 
             {/* Agent */}
-            <div style={{ background: "var(--bg-card)", border: "1px solid var(--accent-border)", borderRadius: "var(--radius-lg)", overflow: "hidden", animation: "card-glow 2.5s ease-in-out infinite" }}>
+            <div style={{ background: "var(--bg-card)", border: "1px solid var(--accent-border)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
               <div style={{ padding: "20px 28px", borderBottom: "1px solid var(--accent-border)", background: "var(--accent-glow)" }}>
                 <div style={{ fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "1.5px", color: "var(--accent-bright)", marginBottom: 4 }}>Dein KI-Marketing-Agent</div>
                 <div style={{ fontWeight: 800, color: "var(--text-primary)" }}>End-to-End, vollautomatisch</div>
@@ -448,7 +448,6 @@ export default function LandingPage({ agents: _ }: Props) {
             background: "linear-gradient(135deg, rgba(99,102,241,0.18), rgba(139,92,246,0.12))",
             border: "1px solid var(--accent-border)",
             display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24,
-            animation: "card-glow 3s ease-in-out infinite",
           }}>
             <div>
               <div style={{ fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "1.5px", color: "var(--accent-bright)", marginBottom: 8 }}>Komplettpaket</div>
@@ -489,8 +488,6 @@ export default function LandingPage({ agents: _ }: Props) {
                 borderRadius: "var(--radius-lg)", padding: "32px 28px",
                 position: "relative",
                 transform: plan.highlight ? "scale(1.04)" : "none",
-                animation: plan.highlight ? "card-glow 2.5s ease-in-out infinite" : "none",
-                animationDelay: `${i * 0.1}s`,
               }}>
                 {plan.badge && (
                   <div style={{

@@ -310,21 +310,17 @@ export default function PortalDashboard({
               </div>
 
               <div className="stats-row">
-                <div className="stat-card">
-                  <div className="stat-label-small">Aktive Agenten</div>
-                  <div className="stat-val">{userAgents.length}</div>
-                  <div className="stat-change">{userAgents.length > 0 ? "Einsatzbereit" : "Noch keine Agenten"}</div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-label-small">Sessions diesen Monat</div>
-                  <div className="stat-val">{usedThisMonth}</div>
-                  <div className="stat-change">{remaining} von {MONTHLY_LIMIT} verbleibend</div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-label-small">Modell</div>
-                  <div className="stat-val" style={{ fontSize: "1.1rem" }}>Sonnet 4.6</div>
-                  <div className="stat-change">Frontier Intelligence</div>
-                </div>
+                {[
+                  { label: "Aktive Agenten", val: String(userAgents.length), change: userAgents.length > 0 ? "Einsatzbereit" : "Noch keine Agenten" },
+                  { label: "Sessions diesen Monat", val: String(usedThisMonth), change: `${remaining} von ${MONTHLY_LIMIT} verbleibend` },
+                  { label: "Modell", val: "Sonnet 4.6", change: "Frontier Intelligence", small: true },
+                ].map((s, i) => (
+                  <div key={s.label} className="stat-card" style={{ animation: `card-fadein 0.5s ${i * 0.1}s ease both` }}>
+                    <div className="stat-label-small">{s.label}</div>
+                    <div className="stat-val" style={s.small ? { fontSize: "1.1rem" } : {}}>{s.val}</div>
+                    <div className="stat-change">{s.change}</div>
+                  </div>
+                ))}
               </div>
 
               <div className="portal-section-header">
@@ -343,8 +339,8 @@ export default function PortalDashboard({
                 <div className="portal-agents-grid">
 
                   {/* ── Freigeschaltete Agents ── */}
-                  {visibleAgents.map(agent => (
-                    <div key={agent.id} className="portal-agent-card">
+                  {visibleAgents.map((agent, i) => (
+                    <div key={agent.id} className="portal-agent-card" style={{ animation: `card-fadein 0.5s ${i * 0.08}s ease both` }}>
                       <div className="portal-agent-icon">{getIcon(agent.name, agent.category)}</div>
                       <div className="portal-agent-tag">{getTag(agent)}</div>
                       <div className="portal-agent-name">{agent.name}</div>
@@ -358,8 +354,8 @@ export default function PortalDashboard({
                   ))}
 
                   {/* ── Gesperrte Agents (aus DB, published aber nicht gekauft) ── */}
-                  {visibleLocked.map(agent => (
-                    <div key={agent.id} className="portal-agent-card locked">
+                  {visibleLocked.map((agent, i) => (
+                    <div key={agent.id} className="portal-agent-card locked" style={{ animation: `card-fadein 0.5s ${(visibleAgents.length + i) * 0.08}s ease both` }}>
                       <div className="lock-badge"><Lock size={11} /> Gesperrt</div>
                       <div className="portal-agent-icon" style={{ opacity: 0.45 }}>{getIcon(agent.name, agent.category)}</div>
                       <div className="portal-agent-tag">{getTag(agent)}</div>
