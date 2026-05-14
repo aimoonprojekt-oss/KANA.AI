@@ -3,9 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  ArrowRight, TrendingUp, Eye, Sparkles, Send,
-  LayoutGrid, FileText, Zap, BarChart2,
-  CheckCircle, Shield, Clock, RefreshCw, ChevronDown,
+  ArrowRight, Search, Lightbulb, Send,
+  Zap, BarChart2, CheckCircle, Lock, Clock, Activity,
 } from "lucide-react";
 import type { DBAgent } from "@/lib/supabase";
 
@@ -45,24 +44,24 @@ const PROBLEM_TAGS = [
 
 /* ── How it works steps ────────────────────────────────────────────────────── */
 const HOW_STEPS = [
-  { icon: <Eye size={20} />,      n: "01", title: "Markt analysieren",     desc: "Der Agent beobachtet kontinuierlich Trends, Wettbewerber und Chancen in deiner Nische – rund um die Uhr, automatisch." },
-  { icon: <Sparkles size={20} />, n: "02", title: "Creatives erstellen",   desc: "Optimierte Video- und Foto-Ads aus deinen bestehenden Assets. Kein Briefing, kein Freelancer, kein Warten." },
-  { icon: <Send size={20} />,     n: "03", title: "Kampagne schalten",     desc: "Fertige Werbemittel werden automatisch auf den richtigen Kanälen veröffentlicht – vollständig ohne manuellen Eingriff." },
-  { icon: <BarChart2 size={20} />,n: "04", title: "Ergebnisse optimieren", desc: "Kontinuierliche Auswertung, A/B-Testing und Anpassung. Der Agent lernt mit jedem Zyklus dazu." },
+  { icon: <Search size={20} />,    n: "01", title: "Markt analysieren",     desc: "Der Agent beobachtet kontinuierlich Trends, Wettbewerber und Chancen in deiner Nische – rund um die Uhr, automatisch." },
+  { icon: <Lightbulb size={20} />, n: "02", title: "Creatives erstellen",   desc: "Optimierte Video- und Foto-Ads aus deinen bestehenden Assets. Kein Briefing, kein Freelancer, kein Warten." },
+  { icon: <Send size={20} />,      n: "03", title: "Kampagne schalten",     desc: "Fertige Werbemittel werden automatisch auf den richtigen Kanälen veröffentlicht – vollständig ohne manuellen Eingriff." },
+  { icon: <BarChart2 size={20} />, n: "04", title: "Ergebnisse optimieren", desc: "Kontinuierliche Auswertung, A/B-Testing und Anpassung. Der Agent lernt mit jedem Zyklus dazu." },
 ];
 
 /* ── Sub-Agent Cards ───────────────────────────────────────────────────────── */
 const SUB_AGENTS = [
-  { icon: <Eye size={22} />,        tag: "Research",  name: "Marktanalyse-Agent",      desc: "Beobachtet Trends, Chancen und Verschiebungen in deiner Nische – kontinuierlich und automatisch." },
-  { icon: <BarChart2 size={22} />,  tag: "Analytics", name: "Ad-Analyse-Agent",        desc: "Wertet Konkurrenz-Ads systematisch aus. Extrahiert Hooks, Formate und Best Practices für die nächste Kampagne." },
-  { icon: <Sparkles size={22} />,   tag: "Creative",  name: "Creative-Agent",          desc: "Erstellt optimierte Video- und Foto-Ads aus deinen bestehenden Assets. Kein Briefing, kein Freelancer, kein Warten." },
-  { icon: <Send size={22} />,       tag: "Publishing",name: "Veröffentlichungs-Agent", desc: "Schaltet fertige Creatives automatisch auf den richtigen Kanälen. Vollständig ohne manuellen Eingriff." },
+  { icon: <Search size={22} />,    tag: "Research",   name: "Marktanalyse-Agent",      desc: "Beobachtet Trends, Chancen und Verschiebungen in deiner Nische – kontinuierlich und automatisch." },
+  { icon: <BarChart2 size={22} />, tag: "Analytics",  name: "Ad-Analyse-Agent",        desc: "Wertet Konkurrenz-Ads systematisch aus. Extrahiert Hooks, Formate und Best Practices für die nächste Kampagne." },
+  { icon: <Lightbulb size={22} />, tag: "Creative",   name: "Creative-Agent",          desc: "Erstellt optimierte Video- und Foto-Ads aus deinen bestehenden Assets. Kein Briefing, kein Freelancer, kein Warten." },
+  { icon: <Send size={22} />,      tag: "Publishing", name: "Veröffentlichungs-Agent", desc: "Schaltet fertige Creatives automatisch auf den richtigen Kanälen. Vollständig ohne manuellen Eingriff." },
 ];
 
 /* ── Trust Cards ───────────────────────────────────────────────────────────── */
 const TRUST_CARDS = [
-  { icon: <Shield size={20} />,    title: "DSGVO-konform",         desc: "Alle Daten werden auf deutschen Servern verarbeitet. Volle Compliance, volle Kontrolle." },
-  { icon: <RefreshCw size={20} />, title: "Monatlich kündbar",     desc: "Kein Jahresvertrag, kein Kleingedrucktes. Ihr committet euch erst wenn ihr überzeugt seid." },
+  { icon: <Lock size={20} />,      title: "DSGVO-konform",         desc: "Alle Daten werden auf deutschen Servern verarbeitet. Volle Compliance, volle Kontrolle." },
+  { icon: <Activity size={20} />,  title: "Monatlich kündbar",     desc: "Kein Jahresvertrag, kein Kleingedrucktes. Ihr committet euch erst wenn ihr überzeugt seid." },
   { icon: <Clock size={20} />,     title: "Setup in wenigen Tagen",desc: "Nach dem Onboarding-Gespräch ist euer Agent innerhalb von 3–5 Tagen vollständig einsatzbereit." },
   { icon: <Zap size={20} />,       title: "Kein internes Team",    desc: "Keine Hiring-Kosten, kein Management-Aufwand, keine Urlaubsvertretung. Einfach einschalten und loslegen." },
 ];
@@ -212,10 +211,10 @@ export default function LandingPage({ agents: _ }: Props) {
           <div className="hero-visual">
             <div className="agent-cards-grid">
               {[
-                { icon: <Eye size={20} />,        name: "Marktanalyse",  dept: "Research"  },
-                { icon: <BarChart2 size={20} />,  name: "Ad-Analyse",    dept: "Analytics" },
-                { icon: <Sparkles size={20} />,   name: "Creative-Agent",dept: "Creative"  },
-                { icon: <Send size={20} />,        name: "Publishing",    dept: "Automation"},
+                { icon: <Search size={20} />,    name: "Marktanalyse",  dept: "Research"  },
+                { icon: <BarChart2 size={20} />, name: "Ad-Analyse",    dept: "Analytics" },
+                { icon: <Lightbulb size={20} />, name: "Creative-Agent",dept: "Creative"  },
+                { icon: <Send size={20} />,      name: "Publishing",    dept: "Automation"},
               ].map(card => (
                 <div key={card.name} className="agent-preview-card">
                   <div className="agent-card-icon">{card.icon}</div>
@@ -607,14 +606,10 @@ export default function LandingPage({ agents: _ }: Props) {
                   }}
                 >
                   {item.q}
-                  <ChevronDown
-                    size={18}
-                    style={{
-                      flexShrink: 0, color: "var(--text-muted)",
-                      transform: openFaq === i ? "rotate(180deg)" : "none",
-                      transition: "transform 0.25s",
-                    }}
-                  />
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                    style={{ flexShrink: 0, color: "var(--text-muted)", transform: openFaq === i ? "rotate(180deg)" : "none", transition: "transform 0.25s" }}>
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
                 </button>
                 {openFaq === i && (
                   <div style={{ padding: "0 24px 20px", fontSize: "0.9rem", color: "var(--text-secondary)", lineHeight: 1.78 }}>
