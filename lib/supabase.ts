@@ -216,16 +216,20 @@ export async function upsertAgent(agent: {
     .maybeSingle();
 
   if (existing) {
-    // Update — published/featured/price_eur bleiben unangetastet
+    // Update — published/featured/price_eur/category bleiben unangetastet
+    // category wird NUR überschrieben wenn Anthropic explizit einen Wert liefert
+    const updatePayload: Record<string, unknown> = {
+      environment_id: agent.environment_id,
+      name:           agent.name,
+      slug:           agent.slug,
+      description:    agent.description ?? null,
+    };
+    if (agent.category !== undefined) {
+      updatePayload.category = agent.category;
+    }
     const { error } = await db
       .from("agents")
-      .update({
-        environment_id: agent.environment_id,
-        name:           agent.name,
-        slug:           agent.slug,
-        description:    agent.description ?? null,
-        category:       agent.category ?? null,
-      })
+      .update(updatePayload)
       .eq("anthropic_agent_id", agent.anthropic_agent_id);
     if (error) throw new Error(`Update fehlgeschlagen: ${error.message}`);
   } else {
