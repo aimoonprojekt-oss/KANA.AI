@@ -8,41 +8,30 @@ import {
 } from "lucide-react";
 import type { DBAgent } from "@/lib/supabase";
 
-/* Props bleiben kompatibel mit app/page.tsx */
 interface Props { agents: DBAgent[] }
 
-/* ── FAQ Daten ─────────────────────────────────────────────────────────────── */
+const HERO_SUB = "Unser KI-Agent analysiert deinen Markt, erstellt deine Werbemittel und schaltet sie automatisch – vollständig ohne Agentur, ohne Team, ohne deinen Aufwand.";
+
 const FAQ_ITEMS = [
-  {
-    q: "Kann ich den Agent selbst steuern oder anpassen?",
-    a: "Bewusst nicht – und das ist euer Vorteil. Ihr bekommt einen managed Agent mit geprüfter Qualität. Ihr gebt das Ziel vor, wir stellen sicher dass der Agent es zuverlässig und konsistent erreicht. Keine Fehlkonfiguration, kein Qualitätsverlust.",
-  },
-  {
-    q: "Wie schnell sind erste Ergebnisse sichtbar?",
-    a: "Nach einem kurzen Onboarding-Gespräch ist euer Agent innerhalb weniger Tage vollständig einsatzbereit. Erste Analysen und Creatives liefert er ab dem ersten Tag aktiver Nutzung.",
-  },
-  {
-    q: "Ist meine Werbestrategie und meine Daten sicher?",
-    a: "Ja – vollständig. Alle Daten werden DSGVO-konform verarbeitet. Eure Strategie, eure Assets und eure Ergebnisse bleiben ausschließlich bei euch.",
-  },
-  {
-    q: "Warum lohnt sich das verglichen mit einer Agentur oder einem Team?",
-    a: "Eine eigene Marketing-Abteilung kostet 8.000–15.000€/Monat – plus Einarbeitung, Fluktuation und Management-Aufwand. Eine klassische Agentur liefert generische Lösungen. Euer Agent kennt euren Markt, arbeitet 24/7 und skaliert ohne Mehrkosten.",
-  },
-  {
-    q: "Was wenn ich unzufrieden bin?",
-    a: "Monatlich kündbar, kein Risiko, kein Kleingedrucktes. Wir sind überzeugt von unseren Ergebnissen – und ihr sollt es auch sein, bevor ihr langfristig committet.",
-  },
+  { q: "Kann ich den Agent selbst steuern oder anpassen?",
+    a: "Bewusst nicht – und das ist euer Vorteil. Ihr bekommt einen managed Agent mit geprüfter Qualität. Ihr gebt das Ziel vor, wir stellen sicher dass der Agent es zuverlässig und konsistent erreicht. Keine Fehlkonfiguration, kein Qualitätsverlust." },
+  { q: "Wie schnell sind erste Ergebnisse sichtbar?",
+    a: "Nach einem kurzen Onboarding-Gespräch ist euer Agent innerhalb weniger Tage vollständig einsatzbereit. Erste Analysen und Creatives liefert er ab dem ersten Tag aktiver Nutzung." },
+  { q: "Ist meine Werbestrategie und meine Daten sicher?",
+    a: "Ja – vollständig. Alle Daten werden DSGVO-konform verarbeitet. Eure Strategie, eure Assets und eure Ergebnisse bleiben ausschließlich bei euch." },
+  { q: "Warum lohnt sich das verglichen mit einer Agentur oder einem Team?",
+    a: "Eine eigene Marketing-Abteilung kostet 8.000–15.000€/Monat – plus Einarbeitung, Fluktuation und Management-Aufwand. Eine klassische Agentur liefert generische Lösungen. Euer Agent kennt euren Markt, arbeitet 24/7 und skaliert ohne Mehrkosten." },
+  { q: "Was wenn ich unzufrieden bin?",
+    a: "Monatlich kündbar, kein Risiko, kein Kleingedrucktes. Wir sind überzeugt von unseren Ergebnissen – und ihr sollt es auch sein, bevor ihr langfristig committet." },
 ];
 
-/* ── Problem Tags ──────────────────────────────────────────────────────────── */
 const PROBLEM_TAGS = [
   "Markt beobachten", "Konkurrenz-Ads analysieren", "Creatives briefen",
   "Videos & Fotos produzieren", "Ads testen", "Ergebnisse auswerten",
-  "Optimieren & hochladen", "Wiederholen",
+  "Optimieren & hochladen", "Wiederholen", "Zielgruppen definieren",
+  "Kampagnen planen", "Budgets verwalten", "Reports erstellen",
 ];
 
-/* ── How it works steps ────────────────────────────────────────────────────── */
 const HOW_STEPS = [
   { icon: <Search size={20} />,    n: "01", title: "Markt analysieren",     desc: "Der Agent beobachtet kontinuierlich Trends, Wettbewerber und Chancen in deiner Nische – rund um die Uhr, automatisch." },
   { icon: <Lightbulb size={20} />, n: "02", title: "Creatives erstellen",   desc: "Optimierte Video- und Foto-Ads aus deinen bestehenden Assets. Kein Briefing, kein Freelancer, kein Warten." },
@@ -50,7 +39,6 @@ const HOW_STEPS = [
   { icon: <BarChart2 size={20} />, n: "04", title: "Ergebnisse optimieren", desc: "Kontinuierliche Auswertung, A/B-Testing und Anpassung. Der Agent lernt mit jedem Zyklus dazu." },
 ];
 
-/* ── Sub-Agent Cards ───────────────────────────────────────────────────────── */
 const SUB_AGENTS = [
   { icon: <Search size={22} />,    tag: "Research",   name: "Marktanalyse-Agent",      desc: "Beobachtet Trends, Chancen und Verschiebungen in deiner Nische – kontinuierlich und automatisch." },
   { icon: <BarChart2 size={22} />, tag: "Analytics",  name: "Ad-Analyse-Agent",        desc: "Wertet Konkurrenz-Ads systematisch aus. Extrahiert Hooks, Formate und Best Practices für die nächste Kampagne." },
@@ -58,7 +46,6 @@ const SUB_AGENTS = [
   { icon: <Send size={22} />,      tag: "Publishing", name: "Veröffentlichungs-Agent", desc: "Schaltet fertige Creatives automatisch auf den richtigen Kanälen. Vollständig ohne manuellen Eingriff." },
 ];
 
-/* ── Trust Cards ───────────────────────────────────────────────────────────── */
 const TRUST_CARDS = [
   { icon: <Lock size={20} />,      title: "DSGVO-konform",         desc: "Alle Daten werden auf deutschen Servern verarbeitet. Volle Compliance, volle Kontrolle." },
   { icon: <Activity size={20} />,  title: "Monatlich kündbar",     desc: "Kein Jahresvertrag, kein Kleingedrucktes. Ihr committet euch erst wenn ihr überzeugt seid." },
@@ -69,9 +56,10 @@ const TRUST_CARDS = [
 /* ═══════════════════════════════════════════════════════════════════════════ */
 
 export default function LandingPage({ agents: _ }: Props) {
-  const canvasRef  = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [openFaq, setOpenFaq]     = useState<number | null>(null);
-  const [stickyCtaVisible, setStickyCtaVisible] = useState(false);
+  const [typedSub, setTypedSub]   = useState("");
+  const [showCursor, setShowCursor] = useState(true);
 
   /* ── Neural Network Canvas ── */
   useEffect(() => {
@@ -123,22 +111,55 @@ export default function LandingPage({ agents: _ }: Props) {
     return () => { cancelAnimationFrame(animId); window.removeEventListener("resize", resize); };
   }, []);
 
-  /* ── Scroll Reveal ── */
+  /* ── Typewriter ── */
+  useEffect(() => {
+    let i = 0;
+    // Small delay so hero title renders first
+    const startDelay = setTimeout(() => {
+      const timer = setInterval(() => {
+        if (i < HERO_SUB.length) {
+          setTypedSub(HERO_SUB.slice(0, i + 1));
+          i++;
+        } else {
+          clearInterval(timer);
+          // Keep cursor blinking 3s then hide
+          setTimeout(() => setShowCursor(false), 3000);
+        }
+      }, 16);
+      return () => clearInterval(timer);
+    }, 900);
+    return () => clearTimeout(startDelay);
+  }, []);
+
+  /* ── Scroll Reveal (staggered) ── */
   useEffect(() => {
     const io = new IntersectionObserver((entries) => {
-      entries.forEach((e) => {
-        if (e.isIntersecting) { e.target.classList.add("visible"); io.unobserve(e.target); }
+      entries.forEach((e, idx) => {
+        if (e.isIntersecting) {
+          const el = e.target as HTMLElement;
+          el.style.transitionDelay = `${idx * 0.07}s`;
+          el.classList.add("visible");
+          io.unobserve(el);
+        }
       });
     }, { threshold: 0.1 });
     document.querySelectorAll(".reveal").forEach(el => io.observe(el));
     return () => io.disconnect();
   }, []);
 
-  /* ── Sticky CTA nach Hero ── */
+  /* ── Mouse spotlight on hero ── */
   useEffect(() => {
-    const onScroll = () => setStickyCtaVisible(window.scrollY > 600);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    const hero = document.getElementById("hero-section");
+    if (!hero) return;
+    const onMove = (e: MouseEvent) => {
+      const rect = hero.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      hero.style.setProperty("--mx", `${x}px`);
+      hero.style.setProperty("--my", `${y}px`);
+    };
+    hero.addEventListener("mousemove", onMove);
+    return () => hero.removeEventListener("mousemove", onMove);
   }, []);
 
   return (
@@ -163,19 +184,14 @@ export default function LandingPage({ agents: _ }: Props) {
         </div>
       </nav>
 
-      {/* ══════════════════════════════════════════════════════ STICKY CTA */}
-      <div style={{
-        position: "fixed", bottom: 28, right: 28, zIndex: 999,
-        opacity: stickyCtaVisible ? 1 : 0, transform: stickyCtaVisible ? "translateY(0)" : "translateY(16px)",
-        transition: "all 0.35s ease", pointerEvents: stickyCtaVisible ? "auto" : "none",
-      }}>
-        <a href="#kontakt" className="btn btn-primary" style={{ padding: "14px 24px", fontSize: "0.9rem", boxShadow: "0 8px 32px rgba(99,102,241,0.5)" }}>
-          Demo buchen <ArrowRight size={15} />
-        </a>
-      </div>
-
       {/* ══════════════════════════════════════════════════════ HERO */}
-      <section className="hero">
+      <section
+        id="hero-section"
+        className="hero"
+        style={{
+          background: "radial-gradient(600px circle at var(--mx, 50%) var(--my, 40%), rgba(99,102,241,0.07) 0%, transparent 70%)",
+        }}
+      >
         <canvas ref={canvasRef} id="heroCanvas" />
         <div className="hero-overlay" />
         <div className="hero-content">
@@ -186,17 +202,19 @@ export default function LandingPage({ agents: _ }: Props) {
             </div>
             <h1 className="hero-title">
               Dein Marketing{" "}
-              <span className="highlight">läuft.</span>
+              <span className="text-shimmer">läuft.</span>
               <br />
-              <span style={{ fontSize: "0.88em", fontStyle: "italic", opacity: 0.9 }}>
+              <span style={{ fontSize: "0.88em", fontStyle: "italic", opacity: 0.88 }}>
                 Du baust dein Business.
               </span>
             </h1>
+
+            {/* Typewriter Sub */}
             <p className="hero-sub">
-              Unser KI-Agent analysiert deinen Markt, erstellt deine Werbemittel
-              und schaltet sie automatisch – vollständig ohne Agentur, ohne Team,
-              ohne deinen Aufwand.
+              {typedSub}
+              {showCursor && <span className="cursor" />}
             </p>
+
             <div className="hero-actions">
               <a href="#kontakt" className="btn btn-primary">
                 Kostenlosen Demo-Call buchen <ArrowRight size={15} />
@@ -231,7 +249,7 @@ export default function LandingPage({ agents: _ }: Props) {
       </section>
 
       {/* ══════════════════════════════════════════════════════ STATS */}
-      <div className="stats-bar" id="statsBar">
+      <div className="stats-bar">
         <div className="stats-bar-inner">
           <div className="stat-item">
             <div className="stat-number" style={{ color: "#F87171" }}>20h+</div>
@@ -259,25 +277,36 @@ export default function LandingPage({ agents: _ }: Props) {
           <h2 className="section-title reveal">
             Professionelles Marketing<br />ist ein Vollzeitjob.
           </h2>
-          <p className="section-sub reveal" style={{ marginBottom: 40 }}>
+          <p className="section-sub reveal" style={{ marginBottom: 48 }}>
             Wer heute wirklich sichtbar sein will, braucht kontinuierliche Analyse,
             starke Creatives und schnelle Reaktion auf den Markt. Das kostet Zeit –
             bis zu 20 Stunden pro Woche.
           </p>
 
-          {/* Tag Cloud */}
-          <div className="reveal" style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 48 }}>
-            {PROBLEM_TAGS.map((tag, i) => (
-              <span key={tag} style={{
-                padding: "8px 16px", borderRadius: 100,
-                background: i % 2 === 0 ? "rgba(99,102,241,0.12)" : "rgba(255,255,255,0.05)",
-                border: `1px solid ${i % 2 === 0 ? "var(--accent-border)" : "var(--border)"}`,
-                fontSize: "0.85rem", fontWeight: 600,
-                color: i % 2 === 0 ? "var(--accent-bright)" : "var(--text-secondary)",
-              }}>
-                {tag}
-              </span>
-            ))}
+          {/* ── Infinite Marquee ── */}
+          <div className="reveal marquee-fade" style={{ overflow: "hidden", marginBottom: 48 }}>
+            <div className="marquee-track">
+              {/* Triple for seamless loop */}
+              {[...PROBLEM_TAGS, ...PROBLEM_TAGS, ...PROBLEM_TAGS].map((tag, i) => (
+                <span key={i} style={{
+                  padding: "9px 18px", borderRadius: 100, whiteSpace: "nowrap",
+                  background: i % 3 === 0
+                    ? "rgba(99,102,241,0.14)"
+                    : i % 3 === 1
+                    ? "rgba(139,92,246,0.10)"
+                    : "rgba(255,255,255,0.05)",
+                  border: `1px solid ${i % 3 === 0 ? "var(--accent-border)" : i % 3 === 1 ? "rgba(139,92,246,0.3)" : "var(--border)"}`,
+                  fontSize: "0.85rem", fontWeight: 600,
+                  color: i % 3 === 0
+                    ? "var(--accent-bright)"
+                    : i % 3 === 1
+                    ? "#C4B5FD"
+                    : "var(--text-secondary)",
+                }}>
+                  {tag}
+                </span>
+              ))}
+            </div>
           </div>
 
           {/* Closing statement */}
@@ -308,20 +337,28 @@ export default function LandingPage({ agents: _ }: Props) {
             Dein Agent übernimmt den kompletten Kreislauf.
           </p>
 
-          {/* 4 Steps with arrows */}
-          <div className="reveal" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 0, alignItems: "start" }}>
+          <div className="reveal" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 0, alignItems: "flex-start" }}>
             {HOW_STEPS.map((step, i) => (
               <div key={step.n} style={{ display: "flex", alignItems: "flex-start" }}>
-                <div className="step-card" style={{ flex: 1, background: "var(--bg-card)", borderRadius: "var(--radius-lg)", padding: 28, border: "1px solid var(--border)" }}>
-                  <div className="step-number">{step.n}</div>
+                <div style={{
+                  flex: 1, background: "var(--bg-card)", borderRadius: "var(--radius-lg)",
+                  padding: 28, border: "1px solid var(--border)",
+                  animation: `card-fadein 0.6s ${i * 0.15}s ease both`,
+                }}>
+                  <div className="step-number" style={{ animation: "step-num-pulse 3s ease-in-out infinite" }}>
+                    {step.n}
+                  </div>
                   <div className="step-icon">{step.icon}</div>
                   <div className="step-title">{step.title}</div>
                   <div className="step-desc">{step.desc}</div>
                 </div>
                 {i < HOW_STEPS.length - 1 && (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "0 8px", marginTop: 60, color: "var(--accent-bright)", fontSize: "1.4rem", fontWeight: 900, flexShrink: 0 }}>
-                    →
-                  </div>
+                  <div style={{
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    padding: "0 6px", marginTop: 58, color: "var(--accent-bright)",
+                    fontSize: "1.3rem", fontWeight: 900, flexShrink: 0,
+                    animation: `card-fadein 0.6s ${i * 0.15 + 0.3}s ease both`,
+                  }}>→</div>
                 )}
               </div>
             ))}
@@ -341,55 +378,36 @@ export default function LandingPage({ agents: _ }: Props) {
             Dein Agent liefert dieselbe Arbeit – für einen Bruchteil davon.
           </p>
 
-          {/* Comparison Table */}
           <div className="reveal" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
-            {/* Left: Team */}
+            {/* Team */}
             <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
               <div style={{ padding: "20px 28px", borderBottom: "1px solid var(--border)", background: "rgba(248,113,113,0.07)" }}>
                 <div style={{ fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "1.5px", color: "#F87171", marginBottom: 4 }}>Marketing-Team</div>
                 <div style={{ fontWeight: 800, color: "var(--text-primary)" }}>2–3 Personen, Festanstellung</div>
               </div>
-              {[
-                "8.000–15.000€ / Monat",
-                "Bürozeiten, Urlaub, Krankheit",
-                "3–6 Monate bis Vollleistung",
-                "Jede Erweiterung = neue Stelle",
-                "HR, Briefings, Kontrolle",
-              ].map(item => (
+              {["8.000–15.000€ / Monat", "Bürozeiten, Urlaub, Krankheit", "3–6 Monate bis Vollleistung", "Jede Erweiterung = neue Stelle", "HR, Briefings, Kontrolle"].map(item => (
                 <div key={item} style={{ padding: "14px 28px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10, fontSize: "0.875rem", color: "var(--text-secondary)" }}>
-                  <span style={{ color: "#F87171", fontWeight: 700, fontSize: "1rem" }}>✕</span>
-                  {item}
+                  <span style={{ color: "#F87171", fontWeight: 700 }}>✕</span>{item}
                 </div>
               ))}
             </div>
 
-            {/* Right: Agent */}
-            <div style={{ background: "var(--bg-card)", border: "1px solid var(--accent-border)", borderRadius: "var(--radius-lg)", overflow: "hidden", boxShadow: "0 0 40px rgba(99,102,241,0.1)" }}>
+            {/* Agent */}
+            <div style={{ background: "var(--bg-card)", border: "1px solid var(--accent-border)", borderRadius: "var(--radius-lg)", overflow: "hidden", animation: "card-glow 2.5s ease-in-out infinite" }}>
               <div style={{ padding: "20px 28px", borderBottom: "1px solid var(--accent-border)", background: "var(--accent-glow)" }}>
                 <div style={{ fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "1.5px", color: "var(--accent-bright)", marginBottom: 4 }}>Dein KI-Marketing-Agent</div>
                 <div style={{ fontWeight: 800, color: "var(--text-primary)" }}>End-to-End, vollautomatisch</div>
               </div>
-              {[
-                "Bis zu 5× günstiger als ein Team",
-                "24/7 – kein Ausfall, kein Urlaub",
-                "Einsatzbereit in wenigen Tagen",
-                "Mehr Märkte, gleicher Preis",
-                "Produkt, Kunden, Wachstum",
-              ].map(item => (
+              {["Bis zu 5× günstiger als ein Team", "24/7 – kein Ausfall, kein Urlaub", "Einsatzbereit in wenigen Tagen", "Mehr Märkte, gleicher Preis", "Produkt, Kunden, Wachstum"].map(item => (
                 <div key={item} style={{ padding: "14px 28px", borderBottom: "1px solid rgba(99,102,241,0.12)", display: "flex", alignItems: "center", gap: 10, fontSize: "0.875rem", color: "var(--text-secondary)" }}>
-                  <CheckCircle size={15} style={{ color: "var(--success)", flexShrink: 0 }} />
-                  {item}
+                  <CheckCircle size={15} style={{ color: "var(--success)", flexShrink: 0 }} />{item}
                 </div>
               ))}
             </div>
           </div>
 
           {/* ROI Box */}
-          <div className="reveal" style={{
-            padding: "28px 36px", borderRadius: "var(--radius-lg)",
-            background: "linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.04))",
-            border: "1px solid var(--accent-border)",
-          }}>
+          <div className="reveal" style={{ padding: "28px 36px", borderRadius: "var(--radius-lg)", background: "linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.04))", border: "1px solid var(--accent-border)" }}>
             <div style={{ fontSize: "0.72rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "1.5px", color: "var(--accent-bright)", marginBottom: 10 }}>ROI-Hinweis</div>
             <p style={{ fontSize: "1rem", color: "var(--text-secondary)", lineHeight: 1.75 }}>
               Die eigentliche Frage ist nicht der Preis – sondern{" "}
@@ -414,8 +432,8 @@ export default function LandingPage({ agents: _ }: Props) {
           </p>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 20, marginBottom: 20 }}>
-            {SUB_AGENTS.map(agent => (
-              <div key={agent.name} className="agent-card-full reveal">
+            {SUB_AGENTS.map((agent, i) => (
+              <div key={agent.name} className="agent-card-full reveal" style={{ animationDelay: `${i * 0.1}s` }}>
                 <div className="agent-full-icon">{agent.icon}</div>
                 <div className="agent-full-tag">{agent.tag}</div>
                 <div className="agent-full-name">{agent.name}</div>
@@ -430,14 +448,11 @@ export default function LandingPage({ agents: _ }: Props) {
             background: "linear-gradient(135deg, rgba(99,102,241,0.18), rgba(139,92,246,0.12))",
             border: "1px solid var(--accent-border)",
             display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24,
+            animation: "card-glow 3s ease-in-out infinite",
           }}>
             <div>
-              <div style={{ fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "1.5px", color: "var(--accent-bright)", marginBottom: 8 }}>
-                Komplettpaket
-              </div>
-              <div style={{ fontSize: "1.3rem", fontWeight: 900, color: "var(--text-primary)", marginBottom: 6 }}>
-                Komplette Marketing-Abteilung – End-to-End
-              </div>
+              <div style={{ fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "1.5px", color: "var(--accent-bright)", marginBottom: 8 }}>Komplettpaket</div>
+              <div style={{ fontSize: "1.3rem", fontWeight: 900, color: "var(--text-primary)", marginBottom: 6 }}>Komplette Marketing-Abteilung – End-to-End</div>
               <p style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>
                 Alle vier Agents arbeiten nahtlos zusammen. Ein Prozess, ein Preis, null Aufwand für dich.
               </p>
@@ -460,42 +475,30 @@ export default function LandingPage({ agents: _ }: Props) {
             Wähle den Plan der zu deiner Unternehmensgröße passt – und skaliere jederzeit hoch.
           </p>
 
-          <div className="reveal" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 }}>
+          <div className="reveal" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24, alignItems: "start" }}>
             {[
-              {
-                name: "Starter", highlight: false,
-                sub: "Für den Einstieg",
-                features: ["1 Agent", "20 Runs / Monat", "1 Markt / Nische", "E-Mail Support"],
-              },
-              {
-                name: "Growth", highlight: true,
-                badge: "Am beliebtesten",
-                sub: "Für wachsende Unternehmen",
-                features: ["Volle Agent-Kette", "60 Runs / Monat", "1 Markt / Nische", "Priority Support"],
-              },
-              {
-                name: "Scale", highlight: false,
-                sub: "Für mehrere Märkte",
-                features: ["Alle Agents + Bundle", "Unlimited Runs", "Mehrere Märkte", "Dedizierter Ansprechpartner"],
-              },
-            ].map(plan => (
+              { name: "Starter",   highlight: false, sub: "Für den Einstieg",              features: ["1 Agent", "20 Runs / Monat", "1 Markt / Nische", "E-Mail Support"] },
+              { name: "Growth",    highlight: true,  sub: "Für wachsende Unternehmen",     features: ["Volle Agent-Kette", "60 Runs / Monat", "1 Markt / Nische", "Priority Support"], badge: "★ Am beliebtesten" },
+              { name: "Scale",     highlight: false, sub: "Für mehrere Märkte",            features: ["Alle Agents + Bundle", "Unlimited Runs", "Mehrere Märkte", "Dedizierter Ansprechpartner"] },
+            ].map((plan, i) => (
               <div key={plan.name} style={{
-                background: plan.highlight ? "linear-gradient(135deg, rgba(99,102,241,0.16), rgba(139,92,246,0.1))" : "var(--bg-card)",
+                background: plan.highlight
+                  ? "linear-gradient(135deg, rgba(99,102,241,0.16), rgba(139,92,246,0.1))"
+                  : "var(--bg-card)",
                 border: `1px solid ${plan.highlight ? "var(--accent-border)" : "var(--border)"}`,
                 borderRadius: "var(--radius-lg)", padding: "32px 28px",
                 position: "relative",
-                boxShadow: plan.highlight ? "0 0 48px rgba(99,102,241,0.15)" : "none",
-                transform: plan.highlight ? "scale(1.03)" : "none",
+                transform: plan.highlight ? "scale(1.04)" : "none",
+                animation: plan.highlight ? "card-glow 2.5s ease-in-out infinite" : "none",
+                animationDelay: `${i * 0.1}s`,
               }}>
                 {plan.badge && (
                   <div style={{
-                    position: "absolute", top: -13, left: "50%", transform: "translateX(-50%)",
+                    position: "absolute", top: -14, left: "50%", transform: "translateX(-50%)",
                     background: "var(--accent)", color: "#fff",
-                    fontSize: "0.7rem", fontWeight: 800, padding: "4px 14px",
-                    borderRadius: 100, letterSpacing: "0.5px", whiteSpace: "nowrap",
-                  }}>
-                    ★ {plan.badge}
-                  </div>
+                    fontSize: "0.7rem", fontWeight: 800, padding: "5px 16px",
+                    borderRadius: 100, whiteSpace: "nowrap",
+                  }}>{plan.badge}</div>
                 )}
                 <div style={{ fontSize: "1.3rem", fontWeight: 900, color: "var(--text-primary)", marginBottom: 4 }}>{plan.name}</div>
                 <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: 24 }}>{plan.sub}</div>
@@ -505,8 +508,7 @@ export default function LandingPage({ agents: _ }: Props) {
                 <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
                   {plan.features.map(f => (
                     <div key={f} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "0.875rem", color: "var(--text-secondary)" }}>
-                      <CheckCircle size={15} style={{ color: "var(--success)", flexShrink: 0 }} />
-                      {f}
+                      <CheckCircle size={15} style={{ color: "var(--success)", flexShrink: 0 }} />{f}
                     </div>
                   ))}
                 </div>
@@ -523,7 +525,7 @@ export default function LandingPage({ agents: _ }: Props) {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════════════════ TRUST & USE CASE */}
+      {/* ══════════════════════════════════════════════════════ TRUST */}
       <section className="landing-section" style={{ background: "var(--bg-secondary)", borderTop: "1px solid var(--border)" }}>
         <div className="section-inner">
           <div className="section-tag reveal">Vertrauen & Sicherheit</div>
@@ -534,46 +536,22 @@ export default function LandingPage({ agents: _ }: Props) {
             Volle Transparenz, volle Kontrolle – und ein Use Case der bereits live im Einsatz ist.
           </p>
 
-          {/* Trust Cards */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 48 }}>
-            {TRUST_CARDS.map(card => (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+            {TRUST_CARDS.map((card, i) => (
               <div key={card.title} className="reveal" style={{
                 background: "var(--bg-card)", border: "1px solid var(--border)",
                 borderRadius: "var(--radius-lg)", padding: 24,
-              }}>
+                animation: `card-fadein 0.6s ${i * 0.12}s ease both`,
+                transition: "border-color 0.25s, transform 0.25s",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "var(--accent-border)"; (e.currentTarget as HTMLElement).style.transform = "translateY(-4px)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLElement).style.transform = "none"; }}
+              >
                 <div style={{ width: 44, height: 44, borderRadius: 12, background: "var(--accent-glow)", border: "1px solid var(--accent-border)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--accent-bright)", marginBottom: 14 }}>
                   {card.icon}
                 </div>
                 <div style={{ fontWeight: 800, fontSize: "0.95rem", color: "var(--text-primary)", marginBottom: 8 }}>{card.title}</div>
                 <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", lineHeight: 1.65 }}>{card.desc}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Before / After */}
-          <div className="reveal" style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
-              <div style={{ padding: "20px 28px", borderBottom: "1px solid var(--border)", background: "rgba(248,113,113,0.06)", borderRight: "1px solid var(--border)" }}>
-                <div style={{ fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "1.5px", color: "#F87171" }}>Vorher (ohne Agent)</div>
-              </div>
-              <div style={{ padding: "20px 28px", borderBottom: "1px solid var(--border)", background: "rgba(52,211,153,0.06)" }}>
-                <div style={{ fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "1.5px", color: "var(--success)" }}>Nachher (Agent im Einsatz)</div>
-              </div>
-            </div>
-            {[
-              ["Manuelle Marktrecherche wöchentlich", "Kontinuierliche Analyse – automatisch"],
-              ["Freelancer für Ad-Creatives", "Creatives aus eigenen Assets"],
-              ["Manuelles Hochladen & Testen", "Vollautomatische Veröffentlichung"],
-              ["15h+ Marketing-Aufwand pro Woche", "0h Aufwand – Fokus auf das Business"],
-              ["Abhängig von externen Dienstleistern", "Vollständig unabhängig & skalierbar"],
-            ].map(([before, after], i) => (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
-                <div style={{ padding: "14px 28px", borderBottom: "1px solid var(--border)", borderRight: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10, fontSize: "0.875rem", color: "var(--text-muted)" }}>
-                  <span style={{ color: "#F87171", fontWeight: 700 }}>✕</span> {before}
-                </div>
-                <div style={{ padding: "14px 28px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10, fontSize: "0.875rem", color: "var(--text-secondary)" }}>
-                  <CheckCircle size={14} style={{ color: "var(--success)", flexShrink: 0 }} /> {after}
-                </div>
               </div>
             ))}
           </div>
@@ -591,20 +569,19 @@ export default function LandingPage({ agents: _ }: Props) {
           <div style={{ marginTop: 48, display: "flex", flexDirection: "column", gap: 12, maxWidth: 800 }}>
             {FAQ_ITEMS.map((item, i) => (
               <div key={i} className="reveal" style={{
-                background: "var(--bg-card)", border: `1px solid ${openFaq === i ? "var(--accent-border)" : "var(--border)"}`,
+                background: "var(--bg-card)",
+                border: `1px solid ${openFaq === i ? "var(--accent-border)" : "var(--border)"}`,
                 borderRadius: "var(--radius-lg)", overflow: "hidden",
                 transition: "border-color 0.2s",
+                animation: `card-fadein 0.5s ${i * 0.08}s ease both`,
               }}>
-                <button
-                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                  style={{
-                    width: "100%", padding: "20px 24px",
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    background: "transparent", border: "none", cursor: "pointer",
-                    color: "var(--text-primary)", fontFamily: "inherit",
-                    fontSize: "0.95rem", fontWeight: 700, textAlign: "left", gap: 16,
-                  }}
-                >
+                <button onClick={() => setOpenFaq(openFaq === i ? null : i)} style={{
+                  width: "100%", padding: "20px 24px",
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  background: "transparent", border: "none", cursor: "pointer",
+                  color: "var(--text-primary)", fontFamily: "inherit",
+                  fontSize: "0.95rem", fontWeight: 700, textAlign: "left", gap: 16,
+                }}>
                   {item.q}
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
                     style={{ flexShrink: 0, color: "var(--text-muted)", transform: openFaq === i ? "rotate(180deg)" : "none", transition: "transform 0.25s" }}>
@@ -647,10 +624,7 @@ export default function LandingPage({ agents: _ }: Props) {
 
       {/* ══════════════════════════════════════════════════════ FOOTER */}
       <footer className="landing-footer">
-        <div className="footer-logo">
-          <span className="footer-dot" />
-          KANA AI
-        </div>
+        <div className="footer-logo"><span className="footer-dot" />KANA AI</div>
         <div className="footer-copy">© 2026 KANA AI. Alle Rechte vorbehalten.</div>
         <div className="footer-links">
           <a href="#">Impressum</a>
