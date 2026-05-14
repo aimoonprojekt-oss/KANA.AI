@@ -606,8 +606,14 @@ input, textarea, select { font-family: inherit; outline: none; }
   .agents-grid-landing, .how-steps { grid-template-columns: 1fr; }
   .landing-section, .stats-bar, .cta-section, .landing-footer { padding-left: 24px; padding-right: 24px; }
   .landing-nav { padding: 0 24px; }
+  .nav-links { display: none; }
   .hero { padding: 100px 24px 60px; }
   .stats-bar-inner { grid-template-columns: repeat(2,1fr); }
   .portal-wrapper { flex-direction: column; }
   .sidebar { width: 100%; height: auto; }
+}
+
+/* How-it-works 4 cols → 2 cols auf mittleren Screens */
+@media (max-width: 1100px) and (min-width: 901px) {
+  .how-steps { grid-template-columns: repeat(2,1fr); }
 }
