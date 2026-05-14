@@ -517,7 +517,7 @@ export default function LandingPage({ agents: _ }: Props) {
           </div>
 
           <p className="reveal" style={{ textAlign: "center", fontSize: "0.78rem", color: "var(--text-muted)" }}>
-            Alle Preise auf Anfrage · Kein Setup-Fee · Monatlich kündbar · Alle Preise zzgl. MwSt.
+            Alle Preise auf Anfrage · Monatlich kündbar · Alle Preise zzgl. MwSt.
           </p>
         </div>
       </section>
