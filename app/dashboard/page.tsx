@@ -7,14 +7,20 @@ import {
 } from "@/lib/supabase";
 import PortalDashboard from "@/app/components/PortalDashboard";
 
-export default async function DashboardPage() {
+interface PageProps {
+  searchParams: Promise<{ purchased?: string }>;
+}
+
+export default async function DashboardPage({ searchParams }: PageProps) {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
+  const params = await searchParams;
+
   const [user, userAgents, lockedAgents, usage] = await Promise.all([
     currentUser(),
-    getUserAccessedAgents(userId),     // DBAgent[] — bereits gekaufte Agents
-    getLockedAgentsForUser(userId),    // DBAgent[] — noch nicht gekaufte, published Agents
+    getUserAccessedAgents(userId),
+    getLockedAgentsForUser(userId),
     getUserUsageStats(userId),
   ]);
 
@@ -36,6 +42,7 @@ export default async function DashboardPage() {
       userInitials={initials}
       userEmail={email}
       usage={usage}
+      purchasedSlug={params.purchased}
     />
   );
 }
