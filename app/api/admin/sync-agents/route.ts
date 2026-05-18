@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { upsertAgent } from "@/lib/supabase";
+import { upsertAgent, getSupabaseAdmin } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
@@ -15,7 +15,6 @@ function slugify(name: string): string {
 
 function isAdmin(userId: string): boolean {
   const adminIds = (process.env.ADMIN_USER_IDS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-  // Falls ADMIN_USER_IDS nicht gesetzt ist, darf jeder eingeloggte User syncen
   if (adminIds.length === 0) return true;
   return adminIds.includes(userId);
 }
@@ -23,13 +22,11 @@ function isAdmin(userId: string): boolean {
 /**
  * POST /api/admin/sync-agents
  *
- * Liest alle Master-Agents aus der Anthropic Console und schreibt/aktualisiert
- * sie in der Supabase `agents` Tabelle.
- *
- * Fixes:
- * - ANTHROPIC_ENVIRONMENT_ID ist optional (wird aus API-Antwort gelesen)
- * - Paginierung: iteriert alle Seiten via for-await (auto-pagination)
- * - Kundenkopien werden zuverlässig übersprungen
+ * Vollständige Synchronisation mit der Anthropic Console:
+ * 1. Alle Master-Agents aus Anthropic laden (auto-paginiert)
+ * 2. Neue Agents in Supabase einfügen / bestehende aktualisieren
+ * 3. Agents die in Anthropic gelöscht wurden → in Supabase auf published=false setzen
+ *    (Soft-Delete: Preis, Stripe-ID und Einstellungen bleiben erhalten)
  */
 export async function POST() {
   const { userId } = await auth();
@@ -45,56 +42,48 @@ export async function POST() {
   const beta = (anthropic as any).beta;
 
   try {
-    // ── Alle Agents laden (auto-paginiert) ──────────────────────────────────
+    // ── 1. Alle Agents aus Anthropic Console laden (auto-paginiert) ──────────
     const agentList: Record<string, unknown>[] = [];
 
     try {
-      // Anthropic SDK unterstützt async iteration für paginierte Listen
       for await (const agent of beta.agents.list()) {
         agentList.push(agent as Record<string, unknown>);
       }
     } catch {
-      // Fallback: erste Seite direkt auslesen
       const resp = await beta.agents.list();
       const page: Record<string, unknown>[] =
-        resp?.data ??
-        resp?.agents ??
-        (Array.isArray(resp) ? resp : []);
+        resp?.data ?? resp?.agents ?? (Array.isArray(resp) ? resp : []);
       agentList.push(...page);
     }
 
     console.log(`[sync-agents] ${agentList.length} Agent(en) aus Anthropic Console geladen`);
 
-    if (agentList.length === 0) {
-      return NextResponse.json({
-        message: "Keine Agents in der Anthropic Console gefunden. Prüfe ob ANTHROPIC_API_KEY korrekt ist und Agents existieren.",
-        synced: [],
-      });
-    }
+    // ── 2. Master-Agents filtern (Kundenkopien und Test-Agents überspringen) ─
+    const masterAgents = agentList.filter((agent) => {
+      const name = (agent.name ?? agent.display_name ?? "") as string;
+      return !/ — user_\w+/.test(name) && !name.startsWith("TEST_COPY_DELETE_ME");
+    });
 
-    // Fallback environment_id: aus dem ersten Agent lesen oder Env-Var nutzen
+    const anthropicIds = new Set(
+      masterAgents.map((a) => (a.id ?? a.agent_id ?? "") as string).filter(Boolean)
+    );
+
     const fallbackEnvId =
       process.env.ANTHROPIC_ENVIRONMENT_ID ??
-      (agentList[0]?.environment_id as string) ??
+      (masterAgents[0]?.environment_id as string) ??
       "default";
 
-    const synced:  { id: string; name: string }[] = [];
-    const skipped: string[]                         = [];
-    const errors:  string[]                         = [];
+    const synced:     { id: string; name: string }[] = [];
+    const skipped:    string[]                         = [];
+    const errors:     string[]                         = [];
 
-    for (const agent of agentList) {
-      const agentId   = (agent.id   ?? agent.agent_id   ?? "") as string;
+    // ── 3. Upsert: neue/geänderte Agents in Supabase schreiben ──────────────
+    for (const agent of masterAgents) {
+      const agentId   = (agent.id ?? agent.agent_id ?? "") as string;
       const agentName = (agent.name ?? agent.display_name ?? agentId) as string;
 
       if (!agentId) {
         errors.push(`Agent ohne ID übersprungen: ${JSON.stringify(agent)}`);
-        continue;
-      }
-
-      // Kundenkopien überspringen (Name enthält " — user_xxxxx" oder "TEST_COPY")
-      if (/ — user_\w+/.test(agentName) || agentName.startsWith("TEST_COPY_DELETE_ME")) {
-        console.log(`[sync-agents] Kundenkopie übersprungen: ${agentName}`);
-        skipped.push(agentName);
         continue;
       }
 
@@ -105,14 +94,13 @@ export async function POST() {
           name:               agentName,
           slug:               slugify(agentName),
           description:        (agent.description as string) ?? undefined,
-          // Kategorie: aus metadata.category, oder direkt agent.category
           category:
             (agent as Record<string, Record<string, unknown>>).metadata?.category as string ??
             (agent.category as string) ??
             undefined,
         });
         synced.push({ id: agentId, name: agentName });
-        console.log(`[sync-agents] ✓ ${agentName} (${agentId})`);
+        console.log(`[sync-agents] ✓ upsert: ${agentName}`);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error(`[sync-agents] ✗ ${agentName}:`, msg);
@@ -120,13 +108,49 @@ export async function POST() {
       }
     }
 
+    // ── 4. Soft-Delete: Agents die in Anthropic gelöscht wurden ─────────────
+    //    → published=false setzen (Einstellungen wie Preis bleiben erhalten)
+    const db = getSupabaseAdmin();
+
+    const { data: supabaseAgents } = await db
+      .from("agents")
+      .select("anthropic_agent_id, name, published")
+      .not("anthropic_agent_id", "is", null);
+
+    const unpublished: string[] = [];
+
+    for (const row of supabaseAgents ?? []) {
+      const isInConsole = anthropicIds.has(row.anthropic_agent_id);
+      // War der Agent vorher published und ist jetzt weg → auf false setzen
+      if (!isInConsole && row.published) {
+        await db
+          .from("agents")
+          .update({ published: false })
+          .eq("anthropic_agent_id", row.anthropic_agent_id);
+        unpublished.push(row.name ?? row.anthropic_agent_id);
+        console.log(`[sync-agents] ↓ unpublished (nicht mehr in Console): ${row.name}`);
+      }
+    }
+
+    // Skipped zählen (Kundenkopien)
+    for (const agent of agentList) {
+      const name = (agent.name ?? agent.display_name ?? "") as string;
+      if (/ — user_\w+/.test(name) || name.startsWith("TEST_COPY_DELETE_ME")) {
+        skipped.push(name);
+      }
+    }
+
     return NextResponse.json({
-      message: `${synced.length} Agent(en) synchronisiert.${
-        skipped.length > 0 ? ` ${skipped.length} Kundenkopie(n) übersprungen.` : ""
-      }${errors.length > 0 ? ` ${errors.length} Fehler.` : ""}`,
+      message: [
+        `${synced.length} Agent(en) synchronisiert.`,
+        unpublished.length > 0 ? `${unpublished.length} Agent(en) deaktiviert (nicht mehr in Console).` : "",
+        skipped.length > 0 ? `${skipped.length} Kundenkopie(n) übersprungen.` : "",
+        errors.length > 0 ? `${errors.length} Fehler.` : "",
+      ].filter(Boolean).join(" "),
       synced,
-      skipped: skipped.length > 0 ? skipped : undefined,
-      errors:  errors.length  > 0 ? errors  : undefined,
+      unpublished: unpublished.length > 0 ? unpublished : undefined,
+      skipped:     skipped.length > 0     ? skipped     : undefined,
+      errors:      errors.length > 0      ? errors      : undefined,
     });
 
   } catch (error) {
