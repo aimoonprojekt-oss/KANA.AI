@@ -34,6 +34,10 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
   const email = user?.emailAddresses[0]?.emailAddress ?? "";
 
+  // Admin-Check: userId muss in ADMIN_USER_IDS stehen (oder Liste ist leer → alle sind Admin)
+  const adminIds = (process.env.ADMIN_USER_IDS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const isAdmin  = adminIds.length === 0 || adminIds.includes(userId);
+
   return (
     <PortalDashboard
       userAgents={userAgents}
@@ -43,6 +47,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       userEmail={email}
       usage={usage}
       purchasedSlug={params.purchased}
+      isAdmin={isAdmin}
     />
   );
 }

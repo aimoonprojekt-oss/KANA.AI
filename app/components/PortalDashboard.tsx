@@ -47,6 +47,7 @@ interface Props {
   userEmail:     string;
   usage:         UsageOverview;
   purchasedSlug?: string;
+  isAdmin?:       boolean;
 }
 
 const DEPT_LABELS: Record<Dept, string> = {
@@ -101,7 +102,7 @@ function fmtEur(n: number) {
 /* ═══════════════════════════════════════════════════════ */
 
 export default function PortalDashboard({
-  userAgents, lockedAgents, userName, userInitials, userEmail, usage, purchasedSlug,
+  userAgents, lockedAgents, userName, userInitials, userEmail, usage, purchasedSlug, isAdmin,
 }: Props) {
   const router = useRouter();
 
@@ -343,6 +344,18 @@ export default function PortalDashboard({
             </span>
             Support kontaktieren
           </a>
+
+          {isAdmin && (
+            <>
+              <span className="sidebar-section-title" style={{ marginTop: 28 }}>Admin</span>
+              <a href="/admin" className="sidebar-item" style={{ textDecoration: "none" }}>
+                <span className="item-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><circle cx="17.5" cy="17.5" r="3.5"/></svg>
+                </span>
+                Agent-Verwaltung
+              </a>
+            </>
+          )}
         </nav>
 
         <div className="sidebar-footer">
