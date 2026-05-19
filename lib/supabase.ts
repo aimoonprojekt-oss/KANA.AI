@@ -109,6 +109,21 @@ export async function getOrCreateOrganization(userId: string): Promise<string> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// ADMIN-HELPER — zentrale Prüfung, ob ein Clerk-User Admin ist
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Gibt true zurück wenn userId in ADMIN_USER_IDS steht.
+ * Ist die Variable leer oder nicht gesetzt → KEIN Admin-Zugang (fail-safe).
+ * Komma-getrennte Clerk user_ids: "user_2abc,user_2xyz"
+ */
+export function isAdminUser(userId: string): boolean {
+  const raw = process.env.ADMIN_USER_IDS ?? "";
+  if (!raw.trim()) return false;
+  return raw.split(",").map((id) => id.trim()).includes(userId);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // AGENTS — Katalog
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -144,6 +159,9 @@ export async function getDBAgentById(anthropicAgentId: string): Promise<DBAgent 
 
 /** Agents, auf die ein User Zugang hat — via agent_access1 + organizations */
 export async function getUserAccessedAgents(userId: string): Promise<DBAgent[]> {
+  // Admins haben Zugang zu ALLEN veröffentlichten Agents
+  if (isAdminUser(userId)) return getAllAgents();
+
   const db = getSupabaseAdmin();
 
   // 1. Organisation des Users finden
@@ -176,6 +194,8 @@ export async function getUserAccessedAgents(userId: string): Promise<DBAgent[]> 
 
 /** Veröffentlichte Agents, die der User noch NICHT gekauft hat (für Locked-Karten) */
 export async function getLockedAgentsForUser(userId: string): Promise<DBAgent[]> {
+  // Admins haben keine gesperrten Agents
+  if (isAdminUser(userId)) return [];
   const db = getSupabaseAdmin();
 
   const { data: org } = await db
@@ -257,6 +277,9 @@ export async function upsertAgent(agent: {
  * @param anthropicAgentId  anthropic_agent_id (z.B. "agent_01G2...")
  */
 export async function checkAgentAccess(userId: string, anthropicAgentId: string): Promise<boolean> {
+  // Admins haben immer Zugang zu allen Agents — kein Kauf notwendig
+  if (isAdminUser(userId)) return true;
+
   const db = getSupabaseAdmin();
 
   // Organisation des Users finden

@@ -4,6 +4,7 @@ import {
   getUserAccessedAgents,
   getLockedAgentsForUser,
   getUserUsageStats,
+  isAdminUser,
 } from "@/lib/supabase";
 import PortalDashboard from "@/app/components/PortalDashboard";
 
@@ -34,9 +35,8 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
   const email = user?.emailAddresses[0]?.emailAddress ?? "";
 
-  // Admin-Check: userId muss in ADMIN_USER_IDS stehen (oder Liste ist leer → alle sind Admin)
-  const adminIds = (process.env.ADMIN_USER_IDS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-  const isAdmin  = adminIds.length === 0 || adminIds.includes(userId);
+  // Admin-Check über zentrale Funktion aus lib/supabase.ts
+  const isAdmin = isAdminUser(userId);
 
   return (
     <PortalDashboard
