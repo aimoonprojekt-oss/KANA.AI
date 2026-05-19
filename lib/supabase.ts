@@ -440,6 +440,125 @@ export async function completeRun(runId: string, outputSummary?: string): Promis
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// WIDGET CONFIGS — anonymer Support-Chat für Shopify-Widgets
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Konfiguration eines eingebetteten Support-Widgets (pro Shop) */
+export type WidgetConfig = {
+  id:                   string;
+  widget_token:         string;
+  organization_id:      string;
+  anthropic_agent_id:   string;
+  shopify_shop:         string | null;
+  shopify_access_token: string | null;
+  dhl_api_key:          string | null;
+  trello_key:           string | null;
+  trello_token:         string | null;
+  trello_board_id:      string | null;
+  escalation_email:     string | null;
+  active:               boolean;
+};
+
+/**
+ * Widget-Konfiguration anhand des Tokens laden.
+ * Wird bei jedem anonymen Chat-Request aufgerufen — daher Index auf widget_token.
+ */
+export async function getWidgetConfig(token: string): Promise<WidgetConfig | null> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("widget_configs")
+    .select("*")
+    .eq("widget_token", token)
+    .eq("active", true)
+    .maybeSingle();
+
+  if (error) {
+    console.error("getWidgetConfig Fehler:", error.message);
+    return null;
+  }
+  return data ?? null;
+}
+
+/**
+ * Widget-Config für eine Organisation anlegen oder aktualisieren.
+ * Gibt den widget_token zurück (UUID, unveränderlich nach Erstellung).
+ */
+export async function upsertWidgetConfig(config: {
+  organization_id:      string;
+  anthropic_agent_id:   string;
+  shopify_shop?:        string;
+  shopify_access_token?:string;
+  dhl_api_key?:         string;
+  trello_key?:          string;
+  trello_token?:        string;
+  trello_board_id?:     string;
+  escalation_email?:    string;
+}): Promise<string> {
+  const db = getSupabaseAdmin();
+
+  // Bestehende Config suchen
+  const { data: existing } = await db
+    .from("widget_configs")
+    .select("id, widget_token")
+    .eq("organization_id", config.organization_id)
+    .maybeSingle();
+
+  if (existing) {
+    await db
+      .from("widget_configs")
+      .update({ ...config, active: true })
+      .eq("id", existing.id);
+    return existing.widget_token;
+  }
+
+  // Neuen Token generieren und eintragen
+  const token = crypto.randomUUID();
+  const { error } = await db
+    .from("widget_configs")
+    .insert({ ...config, widget_token: token, active: true });
+
+  if (error) throw new Error(`Widget-Config konnte nicht erstellt werden: ${error.message}`);
+  return token;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ESCALATIONS — Eskalationsprotokoll
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export type EscalationEntry = {
+  organization_id:  string;
+  shop:             string;
+  reason:           string;
+  summary:          string;
+  customer_message: string;
+  priority:         "HOCH" | "NORMAL";
+  created_at:       string;
+};
+
+/** Eskalation in der Datenbank protokollieren */
+export async function logEscalation(entry: EscalationEntry): Promise<void> {
+  const { error } = await getSupabaseAdmin()
+    .from("escalations")
+    .insert(entry);
+
+  if (error) {
+    // Nur loggen — darf den Chat-Flow nicht unterbrechen
+    console.error("logEscalation Fehler:", error.message);
+  }
+}
+
+/** Offene Eskalationen für eine Organisation laden (Admin-Dashboard) */
+export async function getOpenEscalations(organizationId: string) {
+  const { data } = await getSupabaseAdmin()
+    .from("escalations")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("handled", false)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  return data ?? [];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // USAGE STATS — für Verlauf-Tab
 // ═══════════════════════════════════════════════════════════════════════════════
 

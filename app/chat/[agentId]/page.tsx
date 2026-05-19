@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useRef, useEffect, useCallback, Suspense } from "react";
 
 type Message = { role: "user" | "assistant"; content: string };
+type OutputFile = { id: string; filename: string };
 
 /* ─── Inline Markdown Parser ─────────────────────────────────────────────── */
 function parseInline(text: string): React.ReactNode {
@@ -137,6 +138,7 @@ function ChatPageInner() {
   const [currentTool, setCurrentTool] = useState<string | null>(null);
   const [sessionId, setSessionId]     = useState<string | null>(sessionFromUrl);
   const [agentName, setAgentName]     = useState("KANA Agent");
+  const [outputFiles, setOutputFiles] = useState<OutputFile[]>([]);
 
   const bottomRef      = useRef<HTMLDivElement>(null);
   const hasSentInitial = useRef(false);
@@ -245,6 +247,9 @@ function ChatPageInner() {
             } else if (ev.tool) {
               // Fix 4: Tool-Use als Status anzeigen, nicht als Chat-Text
               setCurrentTool(ev.tool);
+            } else if (ev.files && Array.isArray(ev.files)) {
+              // Output-Dateien vom Agent empfangen
+              setOutputFiles(prev => [...prev, ...ev.files]);
             } else if (ev.error) {
               setMessages(prev => {
                 const u = [...prev];
@@ -396,6 +401,49 @@ function ChatPageInner() {
                 <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
               </svg>
               {currentTool}
+            </div>
+          </div>
+        )}
+
+        {/* ── Output-Dateien vom Agent ── */}
+        {outputFiles.length > 0 && (
+          <div style={{ padding: "8px 16px 12px" }}>
+            <div style={{
+              background: "rgba(99,102,241,0.08)",
+              border: "1px solid rgba(99,102,241,0.25)",
+              borderRadius: 12, padding: "14px 16px",
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent-bright)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                Erstellte Dateien
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {outputFiles.map(f => (
+                  <a key={f.id}
+                    href={`/api/files/${f.id}`}
+                    download={f.filename}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "9px 12px", borderRadius: 8,
+                      background: "rgba(99,102,241,0.12)",
+                      border: "1px solid rgba(99,102,241,0.2)",
+                      color: "var(--text-primary)", textDecoration: "none",
+                      fontSize: 13, fontWeight: 600,
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = "rgba(99,102,241,0.22)")}
+                    onMouseLeave={e => (e.currentTarget.style.background = "rgba(99,102,241,0.12)")}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-bright)" strokeWidth="2.5" style={{ flexShrink: 0 }}>
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="7 10 12 15 17 10"/>
+                      <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.filename}</span>
+                    <span style={{ fontSize: 11, color: "var(--accent-bright)", fontWeight: 700, flexShrink: 0 }}>↓ Download</span>
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
         )}

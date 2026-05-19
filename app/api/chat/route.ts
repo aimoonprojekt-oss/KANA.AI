@@ -141,6 +141,25 @@ export async function POST(req: NextRequest) {
             }
           }
 
+          // ── 6. Output-Dateien via Files API abholen ────────────────────
+          // Agent schreibt Dateien nach /mnt/session/outputs/ im Container.
+          // Nach session.status_idle sind sie über die Files API abrufbar.
+          try {
+            const fileList = await beta.files.list({ scope_id: activeSessionId });
+            if (fileList?.data?.length > 0) {
+              const files = fileList.data.map((f: { id: string; filename?: string }) => ({
+                id: f.id,
+                filename: f.filename ?? f.id,
+              }));
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ files })}\n\n`)
+              );
+            }
+          } catch (filesError) {
+            // Files API nicht verfügbar oder keine Dateien — kein fataler Fehler
+            console.warn("Files API:", filesError);
+          }
+
           // Run als completed markieren
           if (runId) {
             const summary = fullResponse.slice(0, 500) || undefined;
