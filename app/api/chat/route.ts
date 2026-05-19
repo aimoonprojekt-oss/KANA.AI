@@ -131,10 +131,9 @@ export async function POST(req: NextRequest) {
                 }
               }
             } else if (event.type === "agent.tool_use") {
-              // Optional: Tool-Aktivität fürs UI sichtbar machen
-              const note = `\n[Tool: ${event.name ?? "unknown"}]\n`;
+              // Tool-Name als separates Event senden (kein Text — wird im UI als Status angezeigt)
               controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ text: note })}\n\n`)
+                encoder.encode(`data: ${JSON.stringify({ tool: event.name ?? "tool" })}\n\n`)
               );
             } else if (event.type === "session.status_idle") {
               // Agent ist fertig

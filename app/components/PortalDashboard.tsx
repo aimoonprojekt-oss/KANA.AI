@@ -669,15 +669,21 @@ export default function PortalDashboard({
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                     {usage.recentSessions.map((session, i) => (
-                      <div key={session.id} style={{
-                        display: "flex", alignItems: "center", gap: 14,
-                        padding: "10px 12px", borderRadius: 8,
-                        background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)",
-                      }}>
+                      <div key={session.id}
+                        onClick={() => router.push(`/chat/${session.agent_id}?session=${session.anthropic_session_id}`)}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 14,
+                          padding: "10px 12px", borderRadius: 8,
+                          background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)",
+                          cursor: "pointer", transition: "background 0.15s ease",
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(99,102,241,0.08)")}
+                        onMouseLeave={e => (e.currentTarget.style.background = i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)")}
+                      >
                         <div style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 }} />
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: "0.83rem", fontWeight: 600, color: "var(--text-primary)" }}>{session.agentName}</div>
-                          <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>Session gestartet</div>
+                          <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>Session fortsetzen →</div>
                         </div>
                         <div style={{ textAlign: "right" }}>
                           <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>{fmtDate(session.created_at)}</div>
