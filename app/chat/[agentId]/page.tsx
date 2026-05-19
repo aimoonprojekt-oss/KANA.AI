@@ -9,21 +9,31 @@ type Message = { role: "user" | "assistant"; content: string };
 /* ─── Inline Markdown Parser ─────────────────────────────────────────────── */
 function parseInline(text: string): React.ReactNode {
   const parts: React.ReactNode[] = [];
-  const regex = /\*\*(.+?)\*\*|\*(.+?)\*|`([^`\n]+)`/g;
+  // Order matters: links before bold/italic so [**text**](url) works
+  const regex = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)|\*\*(.+?)\*\*|\*(.+?)\*|`([^`\n]+)`/g;
   let last = 0, k = 0;
   let m: RegExpExecArray | null;
   while ((m = regex.exec(text)) !== null) {
     if (m.index > last) parts.push(text.slice(last, m.index));
-    if (m[1] !== undefined)
-      parts.push(<strong key={k++} style={{ fontWeight: 700 }}>{m[1]}</strong>);
-    else if (m[2] !== undefined)
-      parts.push(<em key={k++}>{m[2]}</em>);
+    if (m[1] !== undefined && m[2] !== undefined)
+      // Markdown link [label](url)
+      parts.push(
+        <a key={k++} href={m[2]} target="_blank" rel="noopener noreferrer" style={{
+          color: "#a78bfa", textDecoration: "underline",
+          textDecorationColor: "rgba(167,139,250,0.4)",
+          fontWeight: 600, wordBreak: "break-all",
+        }}>{m[1]}</a>
+      );
     else if (m[3] !== undefined)
+      parts.push(<strong key={k++} style={{ fontWeight: 700 }}>{m[3]}</strong>);
+    else if (m[4] !== undefined)
+      parts.push(<em key={k++}>{m[4]}</em>);
+    else if (m[5] !== undefined)
       parts.push(
         <code key={k++} style={{
           background: "rgba(255,255,255,0.12)", padding: "1px 6px",
           borderRadius: 4, fontFamily: "monospace", fontSize: "0.88em",
-        }}>{m[3]}</code>
+        }}>{m[5]}</code>
       );
     last = m.index + m[0].length;
   }
@@ -183,17 +193,43 @@ function ChatPageInner() {
       const dec = new TextDecoder();
       let buf = "";
 
-      while (true) {
+      outer: while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
+
+        // Flush remaining buffer on stream end; otherwise append new chunk
+        if (done) {
+          // Process whatever is left in buf (catches last line without trailing \n)
+          if (buf.trim()) {
+            const line = buf.trim();
+            if (line.startsWith("data: ")) {
+              const raw = line.slice(6).trim();
+              if (raw !== "[DONE]") {
+                try {
+                  const ev = JSON.parse(raw);
+                  if (ev.text) {
+                    setCurrentTool(null);
+                    setMessages(prev => {
+                      const u = [...prev];
+                      u[u.length - 1] = { role: "assistant", content: u[u.length - 1].content + ev.text };
+                      return u;
+                    });
+                  }
+                } catch { /* ignore */ }
+              }
+            }
+          }
+          break;
+        }
+
+        // Strip carriage returns (some proxies use CRLF)
+        buf += dec.decode(value, { stream: true }).replace(/\r/g, "");
         const parts = buf.split("\n");
-        buf = parts.pop() ?? "";
+        buf = parts.pop() ?? "";  // save incomplete last line for next chunk
 
         for (const line of parts) {
           if (!line.startsWith("data: ")) continue;
-          const raw = line.slice(6);
-          if (raw === "[DONE]") break;
+          const raw = line.slice(6).trim();
+          if (raw === "[DONE]") break outer;
           try {
             const ev = JSON.parse(raw);
             if (ev.text) {
@@ -209,8 +245,15 @@ function ChatPageInner() {
             } else if (ev.tool) {
               // Fix 4: Tool-Use als Status anzeigen, nicht als Chat-Text
               setCurrentTool(ev.tool);
+            } else if (ev.error) {
+              setMessages(prev => {
+                const u = [...prev];
+                u[u.length - 1] = { role: "assistant", content: `❌ ${ev.error}` };
+                return u;
+              });
+              break outer;
             }
-          } catch { /* ignore */ }
+          } catch { /* ignore malformed JSON */ }
         }
       }
     } catch (err: unknown) {
