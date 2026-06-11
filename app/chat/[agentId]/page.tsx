@@ -3,6 +3,7 @@
 import { useUser } from "@clerk/nextjs";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useRef, useEffect, useCallback, Suspense } from "react";
+import ResearchAgent from "@/app/components/ResearchAgent";
 
 type Message = { role: "user" | "assistant"; content: string };
 type OutputFile = { id: string; filename: string };
@@ -126,6 +127,9 @@ function MarkdownMsg({ text }: { text: string }) {
 function ChatPageInner() {
   const { user } = useUser();
   const { agentId } = useParams<{ agentId: string }>();
+
+  // Custom Research Agent — eigene UI statt Chat
+  if (agentId === "custom_creative_researcher") return <ResearchAgent />;
   const router = useRouter();
   const searchParams = useSearchParams();
 

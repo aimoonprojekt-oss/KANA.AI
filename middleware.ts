@@ -6,6 +6,7 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",   // Login
   "/sign-up(.*)",   // Registrierung
   "/api/webhooks/stripe", // Stripe Webhook (muss ohne Auth erreichbar sein)
+  "/api/research/(.*)",  // Research Agent (intern, Auth im Frontend)
 ]);
 
 // Alle anderen Routen sind GESCHÜTZT
