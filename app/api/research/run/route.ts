@@ -111,6 +111,8 @@ async function executeTool(name: string, input: Record<string, unknown>, targetP
       if (RETAILER_KEYWORDS.some(k => text.includes(k))) return false
       const imp = parseInt(String(ad.impressions_text ?? '0')) || 0
       if (imp > 0 && imp < 150000) return false
+      // Bei VIDEO-Suche: nur Ads mit tatsächlicher video_url behalten
+      if (adType === 'VIDEO' && !ad.video_hd_url && !ad.video_sd_url && !ad.video_preview_image_url) return false
       return true
     })
 
