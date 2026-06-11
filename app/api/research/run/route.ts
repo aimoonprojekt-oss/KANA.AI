@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getSupabaseAdmin } from '@/lib/supabase'
 import { searchFacebookAds } from '@/lib/apify'
 import { analyzeVideoUrl } from '@/lib/gemini'
+import { downloadAndStoreVideo } from '@/lib/videoStorage'
 
 const SNL_KEYWORDS = ['sinsnlashes', 'sins n lashes', 'sins & lashes', 'sinsnlashes.com']
 const RETAILER_KEYWORDS = ['rossmann', 'müller', 'douglas', 'dm ', 'drogerie', 'amazon', 'otto']
@@ -23,12 +24,24 @@ const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
-    name: 'analyze_video',
-    description: 'Analysiert ein Video via Gemini AI und erstellt einen detaillierten Breakdown.',
+    name: 'download_video',
+    description: 'Lädt ein Video von einer Facebook/CDN URL herunter und speichert es in Supabase Storage. Gibt eine stabile öffentliche URL zurück die Gemini verwenden kann.',
     input_schema: {
       type: 'object' as const,
       properties: {
-        videoUrl: { type: 'string', description: 'Direkte URL zum Video (mp4)' },
+        videoUrl: { type: 'string', description: 'Facebook CDN URL zum Video' },
+        adId:     { type: 'string', description: 'Ad-ID für den Dateinamen' },
+      },
+      required: ['videoUrl', 'adId'],
+    },
+  },
+  {
+    name: 'analyze_video',
+    description: 'Analysiert ein Video via Gemini AI und erstellt einen detaillierten Breakdown. Nur mit stabilen Supabase Storage URLs verwenden (nicht mit Facebook URLs).',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        videoUrl: { type: 'string', description: 'Stabile Supabase Storage URL zum Video (von download_video)' },
         adId:     { type: 'string', description: 'Ad-ID für die Zuordnung' },
       },
       required: ['videoUrl', 'adId'],
@@ -118,6 +131,16 @@ async function executeTool(name: string, input: Record<string, unknown>, targetP
     return JSON.stringify({ count: selected.length, ads: selected })
   }
 
+  if (name === 'download_video') {
+    const { videoUrl, adId } = input as { videoUrl: string, adId: string }
+    try {
+      const storageUrl = await downloadAndStoreVideo(videoUrl, adId)
+      return JSON.stringify({ adId, storageUrl, success: true })
+    } catch (err) {
+      return JSON.stringify({ adId, success: false, error: String(err) })
+    }
+  }
+
   if (name === 'analyze_video') {
     const { videoUrl, adId } = input as { videoUrl: string, adId: string }
     try {
@@ -181,8 +204,12 @@ ABLAUF — führe diese Schritte der Reihe nach aus:
    Keywords für Mascara: ["growth mascara", "lash mascara serum"]
    Keywords für Wimpernlifting: ["lash lift kit", "wimpernlifting"]
 
-2. Für jede Ad die ein video_url Feld in den API-Daten hat: Rufe "analyze_video" auf.
-   Die Video-URL kommt direkt aus den Apify-Ergebnissen — kein extra Schritt nötig.
+2. Für jede Ad die ein video_url Feld in den API-Daten hat:
+   a) Rufe zuerst "download_video" auf mit der Facebook CDN URL und der Ad-ID.
+      Das Video wird heruntergeladen und in Supabase Storage gespeichert.
+   b) Wenn download_video erfolgreich war (success: true), rufe "analyze_video" auf
+      mit der zurückgegebenen storageUrl (NICHT die originale Facebook URL).
+   c) Wenn download_video fehlschlägt: Ad trotzdem speichern, aber ohne Video-Breakdown.
 
 3. Rufe für jede Ad "save_ad_research" auf mit ALLEN verfügbaren Daten aus den API-Responses.
    - Laufzeit berechnen: aktuelles Datum minus start_date in Tagen
