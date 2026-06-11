@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
-import { grantAgentAccess, getDBAgentById } from "@/lib/supabase";
+import { grantAgentAccess, getDBAgentById } from "@/lib/platform/supabase";
 
 export const runtime = "nodejs";
 

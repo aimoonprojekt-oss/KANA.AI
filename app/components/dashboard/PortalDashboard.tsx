@@ -11,7 +11,7 @@ import {
   TrendingUp, TrendingDown, Zap, Calendar, CheckCircle,
   ArrowRight,
 } from "lucide-react";
-import type { DBAgent, UsageOverview } from "@/lib/supabase";
+import type { DBAgent, UsageOverview } from "@/lib/platform/supabase";
 
 /* ─── Konstanten ─────────────────────────────────────── */
 const MONTHLY_LIMIT = 50;

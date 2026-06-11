@@ -3,7 +3,7 @@
 import { useUser } from "@clerk/nextjs";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useRef, useEffect, useCallback, Suspense } from "react";
-import ResearchAgent from "@/app/components/ResearchAgent";
+import ResearchAgent from "@/app/components/agents/ResearchAgent";
 
 type Message = { role: "user" | "assistant"; content: string };
 type OutputFile = { id: string; filename: string };

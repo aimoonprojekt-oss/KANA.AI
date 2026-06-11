@@ -6,7 +6,7 @@ import {
   ArrowRight, Search, Lightbulb, Send,
   Zap, BarChart2, CheckCircle, Lock, Clock, Activity,
 } from "lucide-react";
-import type { DBAgent } from "@/lib/supabase";
+import type { DBAgent } from "@/lib/platform/supabase";
 
 interface Props { agents: DBAgent[] }
 

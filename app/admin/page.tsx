@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { getAllAgents } from "@/lib/supabase";
-import AdminDashboard from "@/app/components/AdminDashboard";
+import { getAllAgents } from "@/lib/platform/supabase";
+import AdminDashboard from "@/app/components/dashboard/AdminDashboard";
 
 export default async function AdminPage() {
   const { userId } = await auth();

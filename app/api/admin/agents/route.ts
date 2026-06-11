@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
-import { getAllAgents, getSupabaseAdmin } from "@/lib/supabase";
+import { getAllAgents, getSupabaseAdmin } from "@/lib/platform/supabase";
 
 export const runtime = "nodejs";
 

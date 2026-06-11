@@ -1,8 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { getSupabaseAdmin } from '@/lib/supabase'
-import { searchFacebookAds } from '@/lib/apify'
-import { analyzeVideoUrl } from '@/lib/gemini'
-import { downloadAndStoreVideo } from '@/lib/videoStorage'
+import { getSupabaseAdmin } from '@/lib/platform/supabase'
+import { searchFacebookAds } from '@/lib/agents/apify'
+import { analyzeVideoUrl } from '@/lib/agents/gemini'
+import { downloadAndStoreVideo } from '@/lib/agents/videoStorage'
 
 const SNL_KEYWORDS = ['sinsnlashes', 'sins n lashes', 'sins & lashes', 'sinsnlashes.com']
 const RETAILER_KEYWORDS = ['rossmann', 'müller', 'douglas', 'dm ', 'drogerie', 'amazon', 'otto']

@@ -1,4 +1,4 @@
-import { getSupabaseAdmin } from '@/lib/supabase'
+import { getSupabaseAdmin } from '@/lib/platform/supabase'
 
 const BUCKET = 'ad-videos'
 const MAX_SIZE_BYTES = 100 * 1024 * 1024 // 100 MB

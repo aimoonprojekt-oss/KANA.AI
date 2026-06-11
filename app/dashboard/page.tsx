@@ -5,8 +5,8 @@ import {
   getLockedAgentsForUser,
   getUserUsageStats,
   isAdminUser,
-} from "@/lib/supabase";
-import PortalDashboard from "@/app/components/PortalDashboard";
+} from "@/lib/platform/supabase";
+import PortalDashboard from "@/app/components/dashboard/PortalDashboard";
 
 interface PageProps {
   searchParams: Promise<{ purchased?: string }>;

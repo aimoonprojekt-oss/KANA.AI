@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { getDBAgentById } from "@/lib/supabase";
+import { getDBAgentById } from "@/lib/platform/supabase";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 

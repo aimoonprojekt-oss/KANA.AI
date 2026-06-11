@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
-import SupportChatWidget from "./components/SupportChatWidget";
+import SupportChatWidget from "./components/ui/SupportChatWidget";
 import "./globals.css";
 
 export const metadata: Metadata = {

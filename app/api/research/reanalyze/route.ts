@@ -1,5 +1,5 @@
-import { getSupabaseAdmin } from '@/lib/supabase'
-import { analyzeVideoUrl } from '@/lib/gemini'
+import { getSupabaseAdmin } from '@/lib/platform/supabase'
+import { analyzeVideoUrl } from '@/lib/agents/gemini'
 
 // Läuft nur die Gemini-Analyse für bereits gespeicherte Ads nochmal
 export async function POST(req: Request) {

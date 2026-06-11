@@ -8,7 +8,7 @@ import {
   getCustomerAgentId,
   createRun,
   completeRun,
-} from "@/lib/supabase";
+} from "@/lib/platform/supabase";
 
 // Managed Agents brauchen pro Request einen langen Lauf — Edge-Runtime
 // würde nach ~30s schließen. Daher Node-Runtime + max. Laufzeit hochsetzen.

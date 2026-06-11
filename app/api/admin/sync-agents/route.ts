@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { upsertAgent, getSupabaseAdmin } from "@/lib/supabase";
+import { upsertAgent, getSupabaseAdmin } from "@/lib/platform/supabase";
 
 export const runtime = "nodejs";
 

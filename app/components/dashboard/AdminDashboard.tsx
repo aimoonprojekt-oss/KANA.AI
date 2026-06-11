@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import type { DBAgent } from "@/lib/supabase";
+import type { DBAgent } from "@/lib/platform/supabase";
 
 interface AdminDashboardProps {
   agents: DBAgent[];

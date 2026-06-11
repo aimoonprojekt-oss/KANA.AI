@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest } from "next/server";
-import { getWidgetConfig, logEscalation, WidgetConfig } from "@/lib/supabase";
+import { getWidgetConfig, logEscalation, WidgetConfig } from "@/lib/platform/supabase";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
