@@ -1,4 +1,4 @@
-const GEMINI_MODEL = 'gemini-2.5-flash-preview-05-20'
+const GEMINI_MODEL = 'gemini-2.5-flash'
 
 function apiKey() {
   const k = process.env.GEMINI_API_KEY
