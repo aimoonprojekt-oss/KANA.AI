@@ -224,7 +224,7 @@ export default function BrandExpert() {
             continue;
           }
 
-          let textColor = light;
+          let textColor: readonly [number,number,number] = light;
           let font: "normal"|"bold" = "normal";
           let size = 8.5;
           let xOff = 0;
