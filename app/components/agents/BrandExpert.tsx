@@ -351,6 +351,14 @@ export default function BrandExpert() {
           {isRunning ? (<><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation:"spin 1s linear infinite" }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Agent arbeitet — bitte warten…</>) : btnLabel}
         </button>
 
+        {/* Test PDF Button (immer sichtbar) */}
+        {!isRunning && !reportText && (
+          <button onClick={() => setReportText(`╔══════════════════════════════════════╗\n║  SINS 'N LASHES — BRAND REPORT TEST  ║\n║  KW 24 — 12.06.2026                  ║\n╚══════════════════════════════════════╝\n\n─── TIKTOK UPDATE ───\n[NEU] 302.3K Follower @sinscosmetics\n[GEÄNDERT] Engagement Rate: 4.2% → 5.1%\n- Top Video: 1.2M Views\n- Posting Frequenz: 7x/Woche\n\n─── INSTAGRAM UPDATE ───\n201K Follower @sinsnlashes\n- Story Views: 8.500 Ø\n- Beste Hook: "POV: your lashes finally grew"\n\n─── WEBSITE UPDATE ───\n[NEU] Neues Bundle: Lash Duo Set €59,99\nWimpernserum Solo: €36,99 — In den Warenkorb\n- Conversion Rate: 3.4%\n`)}
+            style={{ width:"100%", padding:"10px", borderRadius:8, fontSize:12, fontWeight:500, cursor:"pointer", border:"1px dashed rgba(255,255,255,0.15)", background:"transparent", color:"rgba(255,255,255,0.3)", marginTop:8 }}>
+            🧪 Test PDF generieren
+          </button>
+        )}
+
         {/* PDF-Download nach abgeschlossenem Report */}
         {reportText && !isRunning && (
           <button onClick={downloadPDF} disabled={pdfLoading}
