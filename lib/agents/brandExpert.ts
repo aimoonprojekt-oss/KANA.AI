@@ -241,41 +241,83 @@ DATENQUALITÄTS-REGELN (UNVERHANDELBAR):
 4. Unsichere Daten als UNVERIFIZIERT markieren
 5. Alles am Ende in write_brand_knowledge speichern`
 
-  if (mode === 'weekly-scrape') {
+  if (mode === 'weekly-report') {
     return `${base}
 
-WEEKLY SCRAPE — Führe diese Schritte der Reihe nach aus:
+WEEKLY REPORT — Führe ZUERST den vollständigen Scrape aus, dann erstelle den Report. Alles in einem Durchgang.
 
-1. read_all_knowledge — Aktuellen Stand laden
-2. fetch_website sinsnlashes.com — Lagerstand + aktuelle Offers (Button-Text!)
-3. scrape_web TikTok @sinscosmetics — Follower-Zahl verifizieren (via SocialBlade oder direkter TikTok-URL)
-4. scrape_web Instagram @sinsnlashes — Follower-Zahl + neueste Posts
-5. scrape_meta_ads "sinsnlashes" — Eigene aktive Ads + Laufzeiten
-6. scrape_web Gutefrage "sins n lashes" — Neue Kundenstimmen und Einwände
-7. scrape_web Trustpilot sinsnlashes.com — Neue Bewertungen
-8. scrape_meta_ads "Orphica" — Konkurrenz-Update
-9. Alle Erkenntnisse mit write_brand_knowledge speichern (overview, brand_social, brand_website, brand_competitors, brand_audience)
-10. Abschließende Zusammenfassung: Was hat sich seit letztem Scrape geändert?
+═══ PHASE 1: SCRAPE ═══
 
-WICHTIG: Nie weitergehen wenn eine URL nicht lädt — anderen Tool-Typ versuchen oder als UNVERIFIZIERT markieren.`
-  }
+Schritt 1 — read_all_knowledge: Aktuellen Stand aus DB laden
+Schritt 2 — fetch_website https://www.sinsnlashes.com/: Lagerstand (Button-Text!), Offers, Preise
+Schritt 3 — scrape_web https://www.tiktok.com/@sinscosmetics: TikTok Follower, neueste Videos
+Schritt 4 — scrape_web https://www.instagram.com/sinsnlashes/: Instagram Follower, neueste Posts
+Schritt 5 — scrape_meta_ads "sinsnlashes": Eigene aktive Meta-Ads (Laufzeit = Profitabilitäts-Signal)
+Schritt 6 — scrape_web https://www.trustpilot.com/review/sinsnlashes.com: Neue Bewertungen, Kaufblocker
+Schritt 7 — scrape_meta_ads "Orphica": Konkurrenz-Ads
+Schritt 8 — scrape_meta_ads "nanolash": Konkurrenz-Ads
+Schritt 9 — scrape_web gutefrage.net Suche "sins n lashes": Kundenstimmen, Einwände
 
-  if (mode === 'brand-report') {
-    return `${base}
+Erkenntnisse speichern: write_brand_knowledge für brand_social, brand_website, brand_competitors, brand_audience, overview
 
-BRAND REPORT — Erstelle einen vollständigen wöchentlichen Brand Intelligence Report:
+═══ PHASE 2: REPORT (EXAKT dieses Format) ═══
 
-1. read_all_knowledge — Alle aktuellen Daten laden
-2. Erstelle einen strukturierten Report mit diesen Sektionen:
-   - Executive Summary (3 wichtigste Erkenntnisse der Woche)
-   - Social Media KPIs (Follower-Entwicklung alle Plattformen)
-   - Website & Produkte (Lagerstand, aktive Offers)
-   - Meta Ads Performance (aktuelle Ads, Laufzeiten, Strategie)
-   - Konkurrenz (was machen Orphica & Co.)
-   - Zielgruppe & Insights (neue Kundenstimmen, Einwände)
-   - Empfehlungen (3–5 konkrete Aktionspunkte)
-3. Report klar und präzise — keine Daten erfinden
-4. Abschließend overview mit update_date aktualisieren`
+╔══════════════════════════════════════════════════════╗
+║     SINS 'N LASHES — BRAND INTELLIGENCE REPORT      ║
+║     KW [aktuelle KW] — [Datum TT.MM.YYYY]           ║
+╚══════════════════════════════════════════════════════╝
+
+─── WEBSITE UPDATE ───────────────────────────────────
+Neue Produkte: [Ja: Details / Nein]
+Preisänderungen: [Ja: Details / Nein]
+Aktive Offers: [Details]
+Lagerstand: [Welche Produkte verfügbar / OOS]
+Änderungen gegenüber Vorwoche: [Details oder "Keine Änderungen"]
+
+─── SOCIAL MEDIA ─────────────────────────────────────
+TikTok (@sinscosmetics):
+  Follower: [Zahl] (Quelle: Scrape [Datum])
+  Top Post der Woche: [Hook] — [Views] Views
+  Engagement Trend: ↑ steigend / ↓ fallend / → stabil
+
+Instagram (@sinsnlashes):
+  Follower: [Zahl] (Quelle: Scrape [Datum])
+  Top Post: [Details]
+  Trend: ↑ / ↓ / →
+
+─── META ADS (Top 3 nach Laufzeit) ───────────────────
+#1: "[Hook/Headline]" — [X Tage aktiv] — [Creative-Typ]
+    Warum stark: [1 Satz]
+#2: "[Hook/Headline]" — [X Tage aktiv] — [Creative-Typ]
+    Warum stark: [1 Satz]
+#3: "[Hook/Headline]" — [X Tage aktiv] — [Creative-Typ]
+    Warum stark: [1 Satz]
+Ad-Muster diese Woche: [Was haben Top-Ads gemeinsam?]
+
+─── KONKURRENZ ────────────────────────────────────────
+Orphica: [Neue Ads / Aktivität / "Keine Änderungen"]
+Nanolash: [Neue Ads / Aktivität / "Keine Änderungen"]
+Neue Threats: [Details oder "Keine"]
+Neue Chancen: [Details oder "Keine"]
+
+─── ZIELGRUPPE & KUNDENSTIMMEN ───────────────────────
+Trustpilot: [X.X Sterne / X Reviews]
+Neue positive Stimmen: [Zitat oder Zusammenfassung]
+Kaufblocker / Einwände: [Zitat oder Zusammenfassung]
+Community-Stimmung: [positiv/neutral/negativ + Grund]
+
+─── TOP 3 HANDLUNGSEMPFEHLUNGEN ──────────────────────
+1. [Konkrete Aktion] — Priorität: [Hoch/Mittel/Niedrig]
+2. [Konkrete Aktion] — Priorität: [Hoch/Mittel/Niedrig]
+3. [Konkrete Aktion] — Priorität: [Hoch/Mittel/Niedrig]
+
+─── FRÜHWARNSIGNALE ───────────────────────────────────
+[Potenzielle Risiken oder "Keine"]
+
+─── NÄCHSTE WOCHE ─────────────────────────────────────
+Zu beobachten: [Details]
+Empfohlener Content-Fokus: [Details]
+Nächster Scrape empfohlen: [Datum + 7 Tage]`
   }
 
   if (mode === 'brand-check') {

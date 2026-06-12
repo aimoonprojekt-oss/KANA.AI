@@ -28,8 +28,7 @@ export async function POST(req: Request) {
 
       try {
         const modeLabels: Record<string, string> = {
-          'weekly-scrape': '🔍 Weekly Scrape',
-          'brand-report':  '📊 Brand Report',
+          'weekly-report': '📊 Weekly Report',
           'brand-check':   '✅ Brand Check',
           'brand-update':  '💾 Brand Update',
         }
@@ -40,10 +39,8 @@ export async function POST(req: Request) {
         const messages: Anthropic.MessageParam[] = [
           {
             role: 'user',
-            content: mode === 'weekly-scrape'
-              ? 'Starte den Weekly Scrape für Sins \'n Lashes.'
-              : mode === 'brand-report'
-              ? 'Erstelle den vollständigen Brand Intelligence Report.'
+            content: mode === 'weekly-report'
+              ? "Starte den Weekly Report für Sins 'n Lashes — scrappe alle Kanäle und erstelle danach den vollständigen strukturierten Report."
               : mode === 'brand-check'
               ? `Prüfe ob folgender Content on-brand ist: "${input ?? ''}"`
               : `Speichere folgende neue Brand-Information: "${input ?? ''}"`,
