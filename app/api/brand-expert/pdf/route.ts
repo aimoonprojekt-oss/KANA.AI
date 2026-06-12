@@ -64,7 +64,7 @@ export async function POST(req: Request) {
     return new Response(JSON.stringify({ error: 'Kein Zugriff' }), { status: 403 })
   }
 
-  const { reportText, reportDate } = await req.json()
+  const { reportText, reportDate, mode } = await req.json()
   if (!reportText) {
     return new Response(JSON.stringify({ error: 'reportText fehlt' }), { status: 400 })
   }
@@ -72,7 +72,9 @@ export async function POST(req: Request) {
   const now = reportDate ? new Date(reportDate) : new Date()
   const kw  = getKW(now)
   const dateStr = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-  const fileName = `Brand_Intelligence_Report_${now.toISOString().slice(0, 10)}.pdf`
+  const isSetup = mode === 'brand-setup'
+  const filePrefix = isSetup ? 'Brand_Setup_Report' : 'Brand_Weekly_Update'
+  const fileName = `${filePrefix}_${now.toISOString().slice(0, 10)}.pdf`
 
   const chunks: Buffer[] = []
   await new Promise<void>((resolve, reject) => {
@@ -108,12 +110,14 @@ export async function POST(req: Request) {
        .text('SINS \'N LASHES', margin, 80, { align: 'center', width: contentW, characterSpacing: 4 })
 
     // Report title
+    const titleText = isSetup ? 'Brand Setup\nReport' : 'Weekly Update\nReport'
     doc.fontSize(28).fillColor(COLOR_WHITE).font('Helvetica-Bold')
-       .text('Brand Intelligence\nReport', margin, 110, { align: 'center', width: contentW, lineGap: 8 })
+       .text(titleText, margin, 110, { align: 'center', width: contentW, lineGap: 8 })
 
     // KW + Date
+    const subtitleText = isSetup ? `Erstellt: ${dateStr} — Vollständige Basis` : `KW ${kw} — ${dateStr}`
     doc.fontSize(14).fillColor(COLOR_MUTED).font('Helvetica')
-       .text(`KW ${kw} — ${dateStr}`, margin, 210, { align: 'center', width: contentW })
+       .text(subtitleText, margin, 210, { align: 'center', width: contentW })
 
     // Divider
     doc.rect(margin + 60, 250, contentW - 120, 1).fill(COLOR_BORDER)
@@ -173,24 +177,48 @@ export async function POST(req: Request) {
       // Section body
       const bodyLines = section.body.split('\n').filter(l => l.trim())
       for (const line of bodyLines) {
-        ensureSpace(16)
+        ensureSpace(18)
 
         const trimmed = line.trim()
 
-        // Sub-headers (lines ending with : or starting with TikTok/Instagram/etc.)
+        // [NEU] tag — grüner Badge + grüner Text
+        if (trimmed.startsWith('[NEU]')) {
+          const rest = trimmed.slice(5).trim()
+          doc.rect(margin, y, 30, 13).fill('#14532d')
+          doc.fontSize(7).fillColor('#22c55e').font('Helvetica-Bold')
+             .text('NEU', margin + 3, y + 3, { width: 24 })
+          doc.fontSize(9).fillColor('#22c55e').font('Helvetica-Bold')
+             .text(rest, margin + 36, y, { width: contentW - 36 })
+          y += 16
+          continue
+        }
+
+        // [GEÄNDERT] tag — oranger Badge + oranger Text
+        if (trimmed.startsWith('[GEÄNDERT]') || trimmed.startsWith('[GEANDERT]')) {
+          const rest = trimmed.replace(/^\[GEÄNDERT\]|\[GEANDERT\]/, '').trim()
+          doc.rect(margin, y, 55, 13).fill('#431407')
+          doc.fontSize(7).fillColor('#f97316').font('Helvetica-Bold')
+             .text('GEÄNDERT', margin + 3, y + 3, { width: 50 })
+          doc.fontSize(9).fillColor('#f97316').font('Helvetica')
+             .text(rest, margin + 62, y, { width: contentW - 62 })
+          y += 16
+          continue
+        }
+
+        // Sub-headers
         if (trimmed.match(/^[A-ZÄÖÜ][^:]+:$/) || trimmed.match(/^(TikTok|Instagram|Orphica|Nanolash)(\s|:)/)) {
           doc.fontSize(9).fillColor('#cccccc').font('Helvetica-Bold')
              .text(trimmed, margin, y, { width: contentW })
           y += 14
         }
-        // Numbered items (1. 2. 3.)
+        // Numbered items
         else if (trimmed.match(/^[1-9]\./)) {
           doc.rect(margin, y + 4, 3, 3).fill(COLOR_ACCENT)
           doc.fontSize(9).fillColor(COLOR_WHITE).font('Helvetica')
              .text(trimmed, margin + 10, y, { width: contentW - 10 })
           y += 14
         }
-        // Bullet items (- or •)
+        // Bullet items
         else if (trimmed.match(/^[-•]/)) {
           doc.circle(margin + 3, y + 5, 2).fill(COLOR_MUTED)
           doc.fontSize(9).fillColor('#dddddd').font('Helvetica')
@@ -207,13 +235,13 @@ export async function POST(req: Request) {
              .text(trimmed.slice(1).trim(), margin + 14, y, { width: contentW - 14 })
           y += 14
         }
-        // Indented content (starts with spaces)
+        // Indented
         else if (line.match(/^\s{2,}/)) {
           doc.fontSize(8.5).fillColor(COLOR_MUTED).font('Helvetica')
              .text(trimmed, margin + 16, y, { width: contentW - 16 })
           y += 13
         }
-        // Regular line
+        // Regular
         else {
           doc.fontSize(9).fillColor('#dddddd').font('Helvetica')
              .text(trimmed, margin, y, { width: contentW })

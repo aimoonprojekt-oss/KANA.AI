@@ -28,7 +28,8 @@ export async function POST(req: Request) {
 
       try {
         const modeLabels: Record<string, string> = {
-          'weekly-report': '📊 Weekly Report',
+          'brand-setup':   '🚀 Brand Setup',
+          'weekly-update': '🔄 Weekly Update',
           'brand-check':   '✅ Brand Check',
           'brand-update':  '💾 Brand Update',
         }
@@ -36,16 +37,13 @@ export async function POST(req: Request) {
 
         const systemPrompt = buildBrandExpertSystemPrompt(mode, input)
 
-        const messages: Anthropic.MessageParam[] = [
-          {
-            role: 'user',
-            content: mode === 'weekly-report'
-              ? "Starte den Weekly Report für Sins 'n Lashes — scrappe alle Kanäle und erstelle danach den vollständigen strukturierten Report."
-              : mode === 'brand-check'
-              ? `Prüfe ob folgender Content on-brand ist: "${input ?? ''}"`
-              : `Speichere folgende neue Brand-Information: "${input ?? ''}"`,
-          },
-        ]
+        const userMessage =
+          mode === 'brand-setup'   ? "Starte den vollständigen Brand Setup für Sins 'n Lashes — baue die komplette Wissensbasis von Grund auf." :
+          mode === 'weekly-update' ? "Starte den Weekly Update für Sins 'n Lashes — vergleiche mit dem gespeicherten Stand und markiere alle Änderungen." :
+          mode === 'brand-check'   ? `Prüfe ob folgender Content on-brand ist: "${input ?? ''}"` :
+                                     `Speichere folgende neue Brand-Information: "${input ?? ''}"`
+
+        const messages: Anthropic.MessageParam[] = [{ role: 'user', content: userMessage }]
 
         // Agentic Loop
         while (true) {
