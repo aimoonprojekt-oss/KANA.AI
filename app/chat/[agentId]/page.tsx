@@ -4,6 +4,7 @@ import { useUser } from "@clerk/nextjs";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import ResearchAgent from "@/app/components/agents/ResearchAgent";
+import BrandExpert from "@/app/components/agents/BrandExpert";
 
 type Message = { role: "user" | "assistant"; content: string };
 type OutputFile = { id: string; filename: string };
@@ -130,6 +131,7 @@ function ChatPageInner() {
 
   // Custom Research Agent — eigene UI statt Chat
   if (agentId === "custom_creative_researcher") return <ResearchAgent />;
+  if (agentId === "custom_brand_expert") return <BrandExpert />;
   const router = useRouter();
   const searchParams = useSearchParams();
 
