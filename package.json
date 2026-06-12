@@ -14,14 +14,13 @@
     "@supabase/supabase-js": "^2.45.0",
     "lucide-react": "^1.14.0",
     "next": "^15.3.0",
-    "pdfkit": "^0.15.2",
+    "pdf-lib": "^1.17.1",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "stripe": "^16.0.0"
   },
   "devDependencies": {
     "@types/node": "^20",
-    "@types/pdfkit": "^0.13.9",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "typescript": "^5"

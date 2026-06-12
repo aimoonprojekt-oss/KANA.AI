@@ -1,16 +1,23 @@
 import { auth } from '@clerk/nextjs/server'
 import { isAdminUser } from '@/lib/platform/supabase'
-import PDFDocument from 'pdfkit'
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
 
-// Sins 'n Lashes brand colors
-const COLOR_BG     = '#0a0a0a'
-const COLOR_WHITE  = '#ffffff'
-const COLOR_ACCENT = '#9333ea'
-const COLOR_MUTED  = '#888888'
-const COLOR_BORDER = '#222222'
+// Sins 'n Lashes brand colors (normalized 0–1)
+const BG      = rgb(0.039, 0.039, 0.039)   // #0a0a0a
+const WHITE   = rgb(1, 1, 1)
+const ACCENT  = rgb(0.576, 0.200, 0.918)   // #9333ea
+const MUTED   = rgb(0.533, 0.533, 0.533)   // #888888
+const BORDER  = rgb(0.133, 0.133, 0.133)   // #222222
+const GREEN   = rgb(0.133, 0.773, 0.369)   // #22c55e
+const GREEN_BG = rgb(0.078, 0.322, 0.173)  // #14532d
+const ORANGE  = rgb(0.976, 0.451, 0.086)   // #f97316
+const ORANGE_BG = rgb(0.259, 0.078, 0.027) // #431407
+const LIGHT   = rgb(0.867, 0.867, 0.867)   // #dddddd
+const MED     = rgb(0.800, 0.800, 0.800)   // #cccccc
+const HEADER_BG = rgb(0.067, 0.067, 0.067) // #111111
 
 function getKW(date: Date): number {
   const startOfYear = new Date(date.getFullYear(), 0, 1)
@@ -18,7 +25,6 @@ function getKW(date: Date): number {
   return Math.ceil((diff / (1000 * 60 * 60 * 24) + startOfYear.getDay() + 1) / 7)
 }
 
-// Parse the report text into sections
 function parseSections(text: string): { header: string; body: string }[] {
   const sections: { header: string; body: string }[] = []
   const lines = text.split('\n')
@@ -28,14 +34,11 @@ function parseSections(text: string): { header: string; body: string }[] {
     const stripped = line.replace(/[─═╔╗╚╝║]/g, '').trim()
     if (!stripped) continue
 
-    // Section header line (e.g. "─── WEBSITE UPDATE ───")
     if (line.match(/^─{3,}\s+[A-ZÄÖÜ]/)) {
       if (current) sections.push(current)
       current = { header: stripped.replace(/─+/g, '').trim(), body: '' }
       continue
     }
-
-    // Title box lines (╔ ║ ╚)
     if (line.match(/^[╔╚]/)) continue
     if (line.match(/^║\s+SINS/)) {
       if (current) sections.push(current)
@@ -46,16 +49,32 @@ function parseSections(text: string): { header: string; body: string }[] {
       if (current) current.body += '\n' + stripped
       continue
     }
-
     if (current) {
       current.body += (current.body ? '\n' : '') + line
     } else {
-      // Pre-header content
       current = { header: '', body: line }
     }
   }
   if (current) sections.push(current)
   return sections.filter(s => s.body.trim())
+}
+
+// Wrap text to max width (in characters — rough but works for monospace-like layouts)
+function wrapText(text: string, maxChars: number): string[] {
+  if (text.length <= maxChars) return [text]
+  const words = text.split(' ')
+  const lines: string[] = []
+  let current = ''
+  for (const word of words) {
+    if ((current + ' ' + word).trim().length <= maxChars) {
+      current = (current + ' ' + word).trim()
+    } else {
+      if (current) lines.push(current)
+      current = word
+    }
+  }
+  if (current) lines.push(current)
+  return lines
 }
 
 export async function POST(req: Request) {
@@ -69,205 +88,229 @@ export async function POST(req: Request) {
     return new Response(JSON.stringify({ error: 'reportText fehlt' }), { status: 400 })
   }
 
-  const now = reportDate ? new Date(reportDate) : new Date()
-  const kw  = getKW(now)
-  const dateStr = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-  const isSetup = mode === 'brand-setup'
+  const now       = reportDate ? new Date(reportDate) : new Date()
+  const kw        = getKW(now)
+  const dateStr   = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const isSetup   = mode === 'brand-setup'
   const filePrefix = isSetup ? 'Brand_Setup_Report' : 'Brand_Weekly_Update'
-  const fileName = `${filePrefix}_${now.toISOString().slice(0, 10)}.pdf`
+  const fileName  = `${filePrefix}_${now.toISOString().slice(0, 10)}.pdf`
 
-  const chunks: Buffer[] = []
-  await new Promise<void>((resolve, reject) => {
-    const doc = new PDFDocument({
-      size:   'A4',
-      margin: 50,
-      info: {
-        Title:    `Sins 'n Lashes — Brand Intelligence Report KW${kw}`,
-        Author:   'KANA.AI Brand Expert',
-        Subject:  'Weekly Brand Intelligence Report',
-        Creator:  'KANA.AI',
-      },
-    })
+  const pdfDoc = await PDFDocument.create()
+  pdfDoc.setTitle(`Sins 'n Lashes — Brand Intelligence Report KW${kw}`)
+  pdfDoc.setAuthor('KANA.AI Brand Expert')
 
-    doc.on('data',  (chunk: Buffer) => chunks.push(chunk))
-    doc.on('end',   resolve)
-    doc.on('error', reject)
+  const regular = await pdfDoc.embedFont(StandardFonts.Helvetica)
+  const bold    = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
-    const pageW = doc.page.width
-    const pageH = doc.page.height
-    const margin = 50
-    const contentW = pageW - margin * 2
+  const A4W = 595
+  const A4H = 842
+  const M   = 50
+  const CW  = A4W - M * 2
 
-    // ── COVER PAGE ────────────────────────────────────────────
-    // Dark background rect
-    doc.rect(0, 0, pageW, pageH).fill(COLOR_BG)
+  // ── COVER PAGE ──────────────────────────────────────────────────
+  const cover = pdfDoc.addPage([A4W, A4H])
 
-    // Purple accent bar top
-    doc.rect(0, 0, pageW, 6).fill(COLOR_ACCENT)
+  // Dark bg
+  cover.drawRectangle({ x: 0, y: 0, width: A4W, height: A4H, color: BG })
 
-    // Brand name
-    doc.fontSize(11).fillColor(COLOR_ACCENT).font('Helvetica')
-       .text('SINS \'N LASHES', margin, 80, { align: 'center', width: contentW, characterSpacing: 4 })
+  // Purple bar top
+  cover.drawRectangle({ x: 0, y: A4H - 6, width: A4W, height: 6, color: ACCENT })
 
-    // Report title
-    const titleText = isSetup ? 'Brand Setup\nReport' : 'Weekly Update\nReport'
-    doc.fontSize(28).fillColor(COLOR_WHITE).font('Helvetica-Bold')
-       .text(titleText, margin, 110, { align: 'center', width: contentW, lineGap: 8 })
-
-    // KW + Date
-    const subtitleText = isSetup ? `Erstellt: ${dateStr} — Vollständige Basis` : `KW ${kw} — ${dateStr}`
-    doc.fontSize(14).fillColor(COLOR_MUTED).font('Helvetica')
-       .text(subtitleText, margin, 210, { align: 'center', width: contentW })
-
-    // Divider
-    doc.rect(margin + 60, 250, contentW - 120, 1).fill(COLOR_BORDER)
-
-    // Powered by
-    doc.fontSize(9).fillColor(COLOR_MUTED).font('Helvetica')
-       .text('Erstellt von KANA.AI Brand Expert Agent', margin, 265, { align: 'center', width: contentW })
-
-    // ── CONTENT PAGES ─────────────────────────────────────────
-    const sections = parseSections(reportText)
-
-    doc.addPage()
-    doc.rect(0, 0, pageW, pageH).fill(COLOR_BG)
-    doc.rect(0, 0, pageW, 4).fill(COLOR_ACCENT)
-
-    let y = margin
-    let pageNum = 2
-
-    const addPageHeader = () => {
-      doc.rect(0, 0, pageW, 4).fill(COLOR_ACCENT)
-      doc.fontSize(8).fillColor(COLOR_MUTED).font('Helvetica')
-         .text(`Sins 'n Lashes — Brand Intelligence Report KW${kw} — ${dateStr}`, margin, 18, {
-           align: 'center', width: contentW,
-         })
-      doc.rect(margin, 30, contentW, 0.5).fill(COLOR_BORDER)
-    }
-
-    addPageHeader()
-    y = 50
-
-    const ensureSpace = (needed: number) => {
-      if (y + needed > pageH - 60) {
-        // Page number at bottom
-        doc.fontSize(8).fillColor(COLOR_MUTED).font('Helvetica')
-           .text(String(pageNum), margin, pageH - 35, { align: 'center', width: contentW })
-        pageNum++
-        doc.addPage()
-        doc.rect(0, 0, pageW, pageH).fill(COLOR_BG)
-        addPageHeader()
-        y = 50
-      }
-    }
-
-    for (const section of sections) {
-      if (!section.header || section.header === 'TITEL') continue
-
-      ensureSpace(40)
-
-      // Section header background
-      doc.rect(margin - 8, y - 5, contentW + 16, 26).fill('#111111')
-      doc.rect(margin - 8, y - 5, 3, 26).fill(COLOR_ACCENT)
-
-      doc.fontSize(10).fillColor(COLOR_ACCENT).font('Helvetica-Bold')
-         .text(section.header, margin + 8, y, { width: contentW - 16 })
-      y += 28
-
-      // Section body
-      const bodyLines = section.body.split('\n').filter(l => l.trim())
-      for (const line of bodyLines) {
-        ensureSpace(18)
-
-        const trimmed = line.trim()
-
-        // [NEU] tag — grüner Badge + grüner Text
-        if (trimmed.startsWith('[NEU]')) {
-          const rest = trimmed.slice(5).trim()
-          doc.rect(margin, y, 30, 13).fill('#14532d')
-          doc.fontSize(7).fillColor('#22c55e').font('Helvetica-Bold')
-             .text('NEU', margin + 3, y + 3, { width: 24 })
-          doc.fontSize(9).fillColor('#22c55e').font('Helvetica-Bold')
-             .text(rest, margin + 36, y, { width: contentW - 36 })
-          y += 16
-          continue
-        }
-
-        // [GEÄNDERT] tag — oranger Badge + oranger Text
-        if (trimmed.startsWith('[GEÄNDERT]') || trimmed.startsWith('[GEANDERT]')) {
-          const rest = trimmed.replace(/^\[GEÄNDERT\]|\[GEANDERT\]/, '').trim()
-          doc.rect(margin, y, 55, 13).fill('#431407')
-          doc.fontSize(7).fillColor('#f97316').font('Helvetica-Bold')
-             .text('GEÄNDERT', margin + 3, y + 3, { width: 50 })
-          doc.fontSize(9).fillColor('#f97316').font('Helvetica')
-             .text(rest, margin + 62, y, { width: contentW - 62 })
-          y += 16
-          continue
-        }
-
-        // Sub-headers
-        if (trimmed.match(/^[A-ZÄÖÜ][^:]+:$/) || trimmed.match(/^(TikTok|Instagram|Orphica|Nanolash)(\s|:)/)) {
-          doc.fontSize(9).fillColor('#cccccc').font('Helvetica-Bold')
-             .text(trimmed, margin, y, { width: contentW })
-          y += 14
-        }
-        // Numbered items
-        else if (trimmed.match(/^[1-9]\./)) {
-          doc.rect(margin, y + 4, 3, 3).fill(COLOR_ACCENT)
-          doc.fontSize(9).fillColor(COLOR_WHITE).font('Helvetica')
-             .text(trimmed, margin + 10, y, { width: contentW - 10 })
-          y += 14
-        }
-        // Bullet items
-        else if (trimmed.match(/^[-•]/)) {
-          doc.circle(margin + 3, y + 5, 2).fill(COLOR_MUTED)
-          doc.fontSize(9).fillColor('#dddddd').font('Helvetica')
-             .text(trimmed.replace(/^[-•]\s*/, ''), margin + 12, y, { width: contentW - 12 })
-          y += 14
-        }
-        // Arrow items (↑ ↓ →)
-        else if (trimmed.match(/^[↑↓→]/)) {
-          const arrow = trimmed[0]
-          const col = arrow === '↑' ? '#22c55e' : arrow === '↓' ? '#ef4444' : COLOR_MUTED
-          doc.fontSize(9).fillColor(col).font('Helvetica-Bold')
-             .text(arrow, margin, y, { width: 12 })
-          doc.fontSize(9).fillColor('#dddddd').font('Helvetica')
-             .text(trimmed.slice(1).trim(), margin + 14, y, { width: contentW - 14 })
-          y += 14
-        }
-        // Indented
-        else if (line.match(/^\s{2,}/)) {
-          doc.fontSize(8.5).fillColor(COLOR_MUTED).font('Helvetica')
-             .text(trimmed, margin + 16, y, { width: contentW - 16 })
-          y += 13
-        }
-        // Regular
-        else {
-          doc.fontSize(9).fillColor('#dddddd').font('Helvetica')
-             .text(trimmed, margin, y, { width: contentW })
-          y += 14
-        }
-      }
-      y += 12 // Section spacing
-    }
-
-    // Last page number
-    doc.fontSize(8).fillColor(COLOR_MUTED).font('Helvetica')
-       .text(String(pageNum), margin, pageH - 35, { align: 'center', width: contentW })
-
-    // Purple bar bottom cover page
-    doc.rect(0, pageH - 4, pageW, 4).fill(COLOR_ACCENT)
-
-    doc.end()
+  // Brand name
+  const brandName = "SINS 'N LASHES"
+  const brandW    = bold.widthOfTextAtSize(brandName, 11)
+  cover.drawText(brandName, {
+    x: (A4W - brandW) / 2, y: A4H - 90,
+    size: 11, font: bold, color: ACCENT,
   })
 
-  const pdfBuffer = Buffer.concat(chunks)
+  // Report title
+  const titleLine1 = isSetup ? 'Brand Setup' : 'Weekly Update'
+  const titleLine2 = 'Report'
+  const t1W = bold.widthOfTextAtSize(titleLine1, 28)
+  const t2W = bold.widthOfTextAtSize(titleLine2, 28)
+  cover.drawText(titleLine1, { x: (A4W - t1W) / 2, y: A4H - 130, size: 28, font: bold, color: WHITE })
+  cover.drawText(titleLine2, { x: (A4W - t2W) / 2, y: A4H - 165, size: 28, font: bold, color: WHITE })
 
-  return new Response(pdfBuffer, {
+  // Subtitle
+  const subtitle = isSetup ? `Erstellt: ${dateStr} - Vollstaendige Basis` : `KW ${kw} - ${dateStr}`
+  const subW = regular.widthOfTextAtSize(subtitle, 13)
+  cover.drawText(subtitle, { x: (A4W - subW) / 2, y: A4H - 215, size: 13, font: regular, color: MUTED })
+
+  // Divider
+  cover.drawRectangle({ x: M + 60, y: A4H - 260, width: CW - 120, height: 1, color: BORDER })
+
+  // Powered by
+  const poweredBy = 'Erstellt von KANA.AI Brand Expert Agent'
+  const pwW = regular.widthOfTextAtSize(poweredBy, 9)
+  cover.drawText(poweredBy, { x: (A4W - pwW) / 2, y: A4H - 278, size: 9, font: regular, color: MUTED })
+
+  // Purple bar bottom
+  cover.drawRectangle({ x: 0, y: 0, width: A4W, height: 4, color: ACCENT })
+
+  // ── CONTENT PAGES ───────────────────────────────────────────────
+  const sections = parseSections(reportText)
+  const headerText = `Sins 'n Lashes - Brand Intelligence Report KW${kw} - ${dateStr}`
+
+  let page    = pdfDoc.addPage([A4W, A4H])
+  let pageNum = 2
+  let y       = A4H
+
+  const initPage = () => {
+    page.drawRectangle({ x: 0, y: 0, width: A4W, height: A4H, color: BG })
+    page.drawRectangle({ x: 0, y: A4H - 4, width: A4W, height: 4, color: ACCENT })
+    const hw = regular.widthOfTextAtSize(headerText, 7.5)
+    page.drawText(headerText, { x: (A4W - hw) / 2, y: A4H - 22, size: 7.5, font: regular, color: MUTED })
+    page.drawRectangle({ x: M, y: A4H - 32, width: CW, height: 0.5, color: BORDER })
+    y = A4H - 50
+  }
+
+  const ensureSpace = (needed: number) => {
+    if (y - needed < 50) {
+      // Page number
+      const pStr = String(pageNum)
+      const pW   = regular.widthOfTextAtSize(pStr, 8)
+      page.drawText(pStr, { x: (A4W - pW) / 2, y: 28, size: 8, font: regular, color: MUTED })
+      pageNum++
+      page = pdfDoc.addPage([A4W, A4H])
+      initPage()
+    }
+  }
+
+  initPage()
+
+  const CHARS_PER_LINE = 85 // ~9pt Helvetica in 495pt width
+
+  for (const section of sections) {
+    if (!section.header || section.header === 'TITEL') continue
+
+    ensureSpace(40)
+
+    // Section header bg
+    const headerH = 26
+    page.drawRectangle({ x: M - 8, y: y - headerH + 18, width: CW + 16, height: headerH, color: HEADER_BG })
+    page.drawRectangle({ x: M - 8, y: y - headerH + 18, width: 3, height: headerH, color: ACCENT })
+
+    // Clip header text to avoid overflow
+    const hdr = section.header.length > 60 ? section.header.slice(0, 60) + '…' : section.header
+    page.drawText(hdr, { x: M + 4, y: y, size: 9.5, font: bold, color: ACCENT })
+    y -= 32
+
+    const bodyLines = section.body.split('\n').filter(l => l.trim())
+
+    for (const line of bodyLines) {
+      const trimmed = line.trim()
+
+      if (trimmed.startsWith('[NEU]')) {
+        const rest     = trimmed.slice(5).trim()
+        const wrapped  = wrapText(rest, CHARS_PER_LINE - 10)
+        ensureSpace(16 + (wrapped.length - 1) * 14)
+        // Badge
+        page.drawRectangle({ x: M, y: y - 11, width: 28, height: 14, color: GREEN_BG })
+        page.drawText('NEU', { x: M + 3, y: y - 8, size: 7, font: bold, color: GREEN })
+        // Text
+        for (let i = 0; i < wrapped.length; i++) {
+          page.drawText(wrapped[i], { x: M + 34, y: y - i * 13, size: 8.5, font: bold, color: GREEN })
+        }
+        y -= 14 + (wrapped.length - 1) * 13
+        continue
+      }
+
+      if (trimmed.startsWith('[GEÄNDERT]') || trimmed.startsWith('[GEANDERT]')) {
+        const rest    = trimmed.replace(/^\[GEÄ?NDERT\]/, '').trim()
+        const wrapped = wrapText(rest, CHARS_PER_LINE - 15)
+        ensureSpace(16 + (wrapped.length - 1) * 14)
+        page.drawRectangle({ x: M, y: y - 11, width: 54, height: 14, color: ORANGE_BG })
+        page.drawText('GEAENDERT', { x: M + 3, y: y - 8, size: 6.5, font: bold, color: ORANGE })
+        for (let i = 0; i < wrapped.length; i++) {
+          page.drawText(wrapped[i], { x: M + 60, y: y - i * 13, size: 8.5, font: regular, color: ORANGE })
+        }
+        y -= 14 + (wrapped.length - 1) * 13
+        continue
+      }
+
+      // Sub-headers
+      if (trimmed.match(/^[A-ZÄÖÜ][^:]+:$/) || trimmed.match(/^(TikTok|Instagram|Orphica|Nanolash)(\s|:)/)) {
+        const wrapped = wrapText(trimmed, CHARS_PER_LINE)
+        ensureSpace(14 * wrapped.length)
+        for (let i = 0; i < wrapped.length; i++) {
+          page.drawText(wrapped[i], { x: M, y: y - i * 13, size: 8.5, font: bold, color: MED })
+        }
+        y -= 13 * wrapped.length
+        continue
+      }
+
+      // Numbered items
+      if (trimmed.match(/^[1-9]\./)) {
+        const wrapped = wrapText(trimmed, CHARS_PER_LINE - 5)
+        ensureSpace(14 * wrapped.length)
+        page.drawRectangle({ x: M, y: y - 8, width: 3, height: 3, color: ACCENT })
+        for (let i = 0; i < wrapped.length; i++) {
+          page.drawText(wrapped[i], { x: M + 8, y: y - i * 13, size: 8.5, font: regular, color: WHITE })
+        }
+        y -= 13 * wrapped.length
+        continue
+      }
+
+      // Bullet items
+      if (trimmed.match(/^[-•]/)) {
+        const content = trimmed.replace(/^[-•]\s*/, '')
+        const wrapped = wrapText(content, CHARS_PER_LINE - 6)
+        ensureSpace(14 * wrapped.length)
+        page.drawCircle({ x: M + 3, y: y - 4, size: 2, color: MUTED })
+        for (let i = 0; i < wrapped.length; i++) {
+          page.drawText(wrapped[i], { x: M + 10, y: y - i * 13, size: 8.5, font: regular, color: LIGHT })
+        }
+        y -= 13 * wrapped.length
+        continue
+      }
+
+      // Arrow items
+      if (trimmed.match(/^[↑↓→]/)) {
+        const arrow  = trimmed[0]
+        const col    = arrow === '↑' ? GREEN : arrow === '↓' ? rgb(0.937, 0.267, 0.267) : MUTED
+        const rest   = trimmed.slice(1).trim()
+        const wrapped = wrapText(rest, CHARS_PER_LINE - 6)
+        ensureSpace(14 * wrapped.length)
+        page.drawText(arrow === '↑' ? '^' : arrow === '↓' ? 'v' : '>', { x: M, y, size: 8.5, font: bold, color: col })
+        for (let i = 0; i < wrapped.length; i++) {
+          page.drawText(wrapped[i], { x: M + 12, y: y - i * 13, size: 8.5, font: regular, color: LIGHT })
+        }
+        y -= 13 * wrapped.length
+        continue
+      }
+
+      // Regular text
+      const indented = line.match(/^\s{2,}/)
+      const wrapped  = wrapText(trimmed, CHARS_PER_LINE)
+      ensureSpace(13 * wrapped.length)
+      for (let i = 0; i < wrapped.length; i++) {
+        page.drawText(wrapped[i], {
+          x: indented ? M + 14 : M,
+          y: y - i * 12,
+          size: indented ? 8 : 8.5,
+          font: regular,
+          color: indented ? MUTED : LIGHT,
+        })
+      }
+      y -= 12 * wrapped.length
+    }
+
+    y -= 14 // Section spacing
+  }
+
+  // Final page number
+  const fpStr = String(pageNum)
+  const fpW   = regular.widthOfTextAtSize(fpStr, 8)
+  page.drawText(fpStr, { x: (A4W - fpW) / 2, y: 28, size: 8, font: regular, color: MUTED })
+
+  const pdfBytes = await pdfDoc.save()
+
+  return new Response(pdfBytes, {
     headers: {
       'Content-Type':        'application/pdf',
       'Content-Disposition': `attachment; filename="${fileName}"`,
-      'Content-Length':      String(pdfBuffer.length),
+      'Content-Length':      String(pdfBytes.length),
     },
   })
 }

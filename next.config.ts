@@ -5,9 +5,6 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "2mb",
     },
-    outputFileTracingIncludes: {
-      "/api/brand-expert/pdf": ["./node_modules/pdfkit/js/data/**/*"],
-    },
   },
 };
 
