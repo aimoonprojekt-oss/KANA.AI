@@ -49,7 +49,7 @@ export async function POST(req: Request) {
             }
           }
 
-          if (response.stop_reason === 'end_turn') {
+          if (response.stop_reason === 'end_turn' || response.stop_reason !== 'tool_use') {
             send({ type: 'done', message: '✅ Strategy Guide fertig.' })
             break
           }
@@ -69,6 +69,8 @@ export async function POST(req: Request) {
               }
             }
           }
+
+          if (toolResults.length === 0) break
 
           messages.push({ role: 'assistant', content: response.content })
           messages.push({ role: 'user', content: toolResults })
