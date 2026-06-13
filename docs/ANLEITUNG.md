@@ -72,3 +72,13 @@ Neu befüllen mit:
 ```bash
 node seed_supabase.js   # aus dem "Brand experte railway" Ordner
 ```
+
+## Creative Strategist Agent
+
+Die REF-Dateien liegen in Supabase (`strategist_knowledge` Tabelle).
+Neu befüllen mit:
+```bash
+node seed_strategist.js   # aus dem "Brand experte railway" Ordner
+```
+
+Beide Agents sind nur für Admins sichtbar — Sidebar unter "Admin" → Brand Expert / Creative Strategist.

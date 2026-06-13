@@ -354,6 +354,14 @@ export default function PortalDashboard({
                 </span>
                 Agent-Verwaltung
               </a>
+              <a href="/chat/custom_brand_expert" className="sidebar-item" style={{ textDecoration: "none" }}>
+                <span className="item-icon">🧠</span>
+                Brand Expert
+              </a>
+              <a href="/chat/custom_creative_strategist" className="sidebar-item" style={{ textDecoration: "none" }}>
+                <span className="item-icon">🎯</span>
+                Creative Strategist
+              </a>
             </>
           )}
         </nav>
