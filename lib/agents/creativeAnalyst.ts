@@ -41,6 +41,16 @@ async function readBreakdowns(): Promise<string> {
   ).join('\n\n═══════════════════════════════════════\n\n')
 }
 
+async function readBrandKnowledge(): Promise<string> {
+  const db = getSupabaseAdmin()
+  const { data, error } = await db
+    .from('brand_knowledge')
+    .select('key, title, content')
+    .order('key')
+  if (error || !data || data.length === 0) return 'Keine Brand Knowledge gefunden.'
+  return data.map(r => `## ${r.title} (${r.key})\n\n${r.content}`).join('\n\n---\n\n')
+}
+
 async function saveAnalysis(input: Record<string, unknown>): Promise<string> {
   const db = getSupabaseAdmin()
   const { ad_id, advertiser, score, klasse, content } = input as {
@@ -69,9 +79,10 @@ export async function executeAnalystTool(
   name: string,
   input: Record<string, unknown>
 ): Promise<string> {
-  if (name === 'read_analyst_refs')  return await readAnalystRefs()
-  if (name === 'read_breakdowns')    return await readBreakdowns()
-  if (name === 'save_analysis')      return await saveAnalysis(input)
+  if (name === 'read_analyst_refs')   return await readAnalystRefs()
+  if (name === 'read_brand_knowledge') return await readBrandKnowledge()
+  if (name === 'read_breakdowns')     return await readBreakdowns()
+  if (name === 'save_analysis')       return await saveAnalysis(input)
   return `Unbekanntes Tool: ${name}`
 }
 
@@ -81,6 +92,11 @@ export const CREATIVE_ANALYST_TOOLS: Anthropic.Tool[] = [
   {
     name: 'read_analyst_refs',
     description: 'Liest alle REF-Dateien des Creative Analyst aus Supabase: Analyse-Framework, Hook-Swipe-File, Scoring-Rubrik (K1-K6), Format-Glossar, Negativ-Beispiele, Brand & Industry Context, Produkt-Info.',
+    input_schema: { type: 'object' as const, properties: {}, required: [] },
+  },
+  {
+    name: 'read_brand_knowledge',
+    description: 'Liest die komplette Brand Knowledge Basis aus Supabase — SNL Produkte, USPs, Zielgruppe, Psychografie, Konkurrenz-Daten, erlaubte Claims und Content Bank. Wird genutzt um Competitor-Stärken und -Schwächen direkt gegen SNL abzugleichen.',
     input_schema: { type: 'object' as const, properties: {}, required: [] },
   },
   {
@@ -121,15 +137,28 @@ Deine Aufgabe: Competitor-Ads analysieren — K1-K6 Scoring durchführen, Stärk
 ## Workflow
 
 ### Schritt 1 — REF-Dateien laden
-Rufe read_analyst_refs auf. Lade: Analyse-Framework (8 Schritte), Scoring-Rubrik (K1-K6).
+Rufe read_analyst_refs auf. Lade: Analyse-Framework (8 Schritte), Scoring-Rubrik (K1-K6), Hook-Swipe-File, Format-Glossar.
 
-### Schritt 2 — Breakdowns laden
+### Schritt 2 — Brand Knowledge laden
+Rufe read_brand_knowledge auf. Extrahiere:
+- SNL USPs, Kern-Benefit, Produktpreise, Hero Product
+- Zielgruppe, Psychografie, Pain Points, Kaufmotive
+- Bekannte Konkurrenten und deren Positionierung (aus 08_brand_competitors)
+- Erlaubte Claims (aus 10_brand_claims) — was SNL kommunizieren darf
+- Marken-DNA: was ist ON-BRAND / OFF-BRAND für SNL
+Diese Daten sind die Referenz für alle Wettbewerbs-Einordnungen und SNL-Empfehlungen.
+
+### Schritt 3 — Breakdowns laden
 Rufe read_breakdowns auf.
 - KEINE_BREAKDOWNS_VORHANDEN → informiere den User und stoppe.
 - ALLE_ANALYSIERT → informiere den User, alle Breakdowns sind verarbeitet.
 - Sonst: liste die zu analysierenden Ads auf.
 
-### Schritt 3 — K1-K6 Scoring (für jede Breakdown-Datei)
+### Schritt 4 — K1-K6 Scoring (für jede Breakdown-Datei)
+Nutze Brand Knowledge aktiv beim Scoring:
+- Wettbewerbs-Einordnung: Competitor-Stärken/Schwächen DIREKT gegen SNL-USPs abgleichen
+- Empfehlungen: nur Hooks/Formeln empfehlen die mit SNL ON-BRAND und erlaubten Claims kompatibel sind
+- Differenzierung: wo SNL klar besser ist als der Competitor konkret benennen
 
 Scoring-Formel: Gesamt-Score = (K1×0.30) + (K2×0.20) + (K3×0.15) + (K4×0.20) + (K5×0.10) + (K6×0.05)
 
@@ -140,7 +169,7 @@ Score-Klassen:
 - 1.5–2.4 → Schwache Ad
 - 1.0–1.4 → Keine Relevanz
 
-### Schritt 4 — Für jede Ad: save_analysis aufrufen
+### Schritt 5 — Für jede Ad: save_analysis aufrufen
 Speichere die vollständige Analyse mit:
 - ad_id, advertiser, score (Float), klasse (Text), content (vollständiger Markdown-Report)
 
@@ -153,7 +182,7 @@ Der content muss enthalten:
 - Wettbewerbs-Einordnung (Stärken/Schwächen vs. SNL, Kommunikationsvorteil für SNL)
 - Empfehlungen für SNL (konkret, nicht generisch)
 
-### Schritt 5 — Abschluss ausgeben
+### Schritt 6 — Abschluss ausgeben
 
 Zeige Zusammenfassung:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
