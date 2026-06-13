@@ -103,7 +103,7 @@ export const CREATIVE_ANALYST_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'read_breakdowns',
-    description: 'Liest alle noch nicht analysierten Breakdown-Dateien aus Supabase (analyst_breakdowns Tabelle). Gibt KEINE_BREAKDOWNS_VORHANDEN zurück wenn die Tabelle leer ist, oder ALLE_ANALYSIERT wenn alle Breakdowns bereits verarbeitet wurden.',
+    description: 'Liest alle noch nicht analysierten Video-Breakdowns aus der ad_research Tabelle (Spalte: video_breakdown). Gibt KEINE_BREAKDOWNS_VORHANDEN zurück wenn keine Breakdowns vorhanden sind, oder ALLE_ANALYSIERT wenn alle bereits verarbeitet wurden.',
     input_schema: { type: 'object' as const, properties: {}, required: [] },
   },
   {
@@ -151,7 +151,7 @@ Rufe read_brand_knowledge auf. Extrahiere:
 Diese Daten sind die Referenz für alle Wettbewerbs-Einordnungen und SNL-Empfehlungen.
 
 ### Schritt 3 — Breakdowns laden
-Rufe read_breakdowns auf.
+Rufe read_breakdowns auf. Die Breakdowns stammen aus der Tabelle ad_research (Spalte: video_breakdown).
 - KEINE_BREAKDOWNS_VORHANDEN → informiere den User und stoppe.
 - ALLE_ANALYSIERT → informiere den User, alle Breakdowns sind verarbeitet.
 - Sonst: liste die zu analysierenden Ads auf.
