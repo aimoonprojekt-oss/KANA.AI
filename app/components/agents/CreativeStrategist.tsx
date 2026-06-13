@@ -5,9 +5,24 @@ import { useRouter } from "next/navigation";
 
 type LogEntry = { type: string; message: string; ts: number };
 
+type Mode = "20" | "10" | "2";
+
+const MODE_LABELS: Record<Mode, string> = {
+  "20": "20 Briefs",
+  "10": "10 Briefs",
+  "2":  "2 Briefs",
+};
+
+const MODE_DESCRIPTIONS: Record<Mode, string> = {
+  "20": "5 Stages · je 2 Image + 2 Video = 20 Briefs",
+  "10": "5 Stages · je 1 Image + 1 Video = 10 Briefs",
+  "2":  "Stage 1 · 1 Image + 1 Video = 2 Briefs",
+};
+
 export default function CreativeStrategist() {
   const router = useRouter();
   const [isRunning, setIsRunning] = useState(false);
+  const [mode, setMode] = useState<Mode>("20");
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [reportText, setReportText] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -18,13 +33,13 @@ export default function CreativeStrategist() {
     setTimeout(() => logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" }), 50);
   }, []);
 
-  const runAgent = useCallback(async () => {
+  const runAgent = useCallback(async (selectedMode: Mode) => {
     if (isRunning) return;
     setIsRunning(true); setLogs([]); setReportText(null);
     const collected: string[] = [];
     try {
       const res = await fetch("/api/creative-strategist/run", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: selectedMode }),
       });
       if (!res.ok) { const e = await res.json(); addLog({ type: "error", message: e.error ?? "Fehler", ts: Date.now() }); return; }
       const reader = res.body!.getReader();
@@ -105,7 +120,7 @@ export default function CreativeStrategist() {
 
       // Subtitle
       doc.setFont("helvetica","normal"); doc.setFontSize(14); ink(gold);
-      doc.text("5 Stages · 20 Creative Briefs", PW/2, 162, { align:"center" });
+      doc.text(MODE_DESCRIPTIONS[mode], PW/2, 162, { align:"center" });
 
       // Divider
       rect(M+40, 185, CW-80, 1, gold);
@@ -288,17 +303,23 @@ export default function CreativeStrategist() {
 
       <div style={{ maxWidth:720, margin:"0 auto", padding:"24px 20px" }}>
 
-        {/* Main Button */}
-        <button onClick={runAgent} disabled={isRunning}
-          style={{ width:"100%", padding:"20px", borderRadius:12, fontSize:15, fontWeight:700, cursor:isRunning?"not-allowed":"pointer", border:"none", background:isRunning?"rgba(255,255,255,0.06)":"linear-gradient(135deg,#c9a96e,#8b6914)", color:isRunning?"var(--text3)":"#1a1a1a", transition:"all 0.15s", display:"flex", alignItems:"center", justifyContent:"center", gap:10, marginBottom:12 }}>
-          {isRunning
-            ? (<><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation:"spin 1s linear infinite" }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Agent arbeitet — bitte warten…</>)
-            : (<>🎯 Ad Strategy Guide erstellen</>)}
-        </button>
+        {/* Mode Buttons */}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:12 }}>
+          {(["20","10","2"] as Mode[]).map(m => (
+            <button key={m} onClick={() => { setMode(m); if (!isRunning) runAgent(m); }} disabled={isRunning}
+              style={{ padding:"16px 8px", borderRadius:12, fontSize:13, fontWeight:700, cursor:isRunning?"not-allowed":"pointer", border: mode===m && isRunning ? "2px solid #c9a96e" : "2px solid rgba(201,169,110,0.2)", background: mode===m ? (isRunning ? "rgba(255,255,255,0.06)" : "linear-gradient(135deg,#c9a96e,#8b6914)") : "rgba(201,169,110,0.06)", color: mode===m ? (isRunning ? "var(--text3)" : "#1a1a1a") : "#c9a96e", transition:"all 0.15s", display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
+              {isRunning && mode === m
+                ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation:"spin 1s linear infinite" }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                : <span style={{ fontSize:16 }}>🎯</span>
+              }
+              <span>{MODE_LABELS[m]}</span>
+            </button>
+          ))}
+        </div>
 
         {/* Info */}
         <div style={{ padding:"12px 16px", borderRadius:10, background:"rgba(201,169,110,0.06)", border:"1px solid rgba(201,169,110,0.15)", marginBottom:20, fontSize:12, color:"rgba(201,169,110,0.8)", lineHeight:1.6 }}>
-          Liest Brand Knowledge + Competitor-Daten aus der Datenbank · Wendet 5 Stages Awareness Framework an · Erstellt 20 Creative Briefs (10 Image + 10 Video) · PDF-Download nach Abschluss
+          {isRunning ? `Agent arbeitet — ${MODE_DESCRIPTIONS[mode]}…` : `Wähle einen Modus → Agent liest Brand Knowledge + Competitor-Daten · Wendet 5 Stages Framework an · ${MODE_DESCRIPTIONS[mode]} · PDF-Download nach Abschluss`}
         </div>
 
         {/* PDF Download */}

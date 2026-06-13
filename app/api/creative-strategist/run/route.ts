@@ -12,6 +12,11 @@ export async function POST(req: Request) {
     return new Response(JSON.stringify({ error: 'Kein Zugriff — nur Admins' }), { status: 403 })
   }
 
+  const body = await req.json().catch(() => ({}))
+  const mode: "20" | "10" | "2" = ["20","10","2"].includes(body?.mode) ? body.mode : "20"
+
+  const briefLabel = mode === "20" ? "20 Creative Briefs" : mode === "10" ? "10 Creative Briefs (5 Image + 5 Video)" : "2 Creative Briefs (1 Image + 1 Video)"
+
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const encoder = new TextEncoder()
 
@@ -22,18 +27,18 @@ export async function POST(req: Request) {
       }
 
       try {
-        send({ type: 'start', message: '🎯 Creative Strategist startet...' })
+        send({ type: 'start', message: `🎯 Creative Strategist startet — ${briefLabel}...` })
 
         const messages: Anthropic.MessageParam[] = [{
           role: 'user',
-          content: "Erstelle den vollständigen Ad Strategy Guide für Sins 'n Lashes — lade Brand Knowledge und REF-Dateien, wende das 5 Stages Framework an und entwickle alle 20 Creative Briefs."
+          content: `Erstelle den Ad Strategy Guide für Sins 'n Lashes mit exakt ${briefLabel} — lade Brand Knowledge und REF-Dateien, wende das 5 Stages Framework an und entwickle die Briefs.`
         }]
 
         while (true) {
           const response = await anthropic.messages.create({
             model:      'claude-sonnet-4-6',
-            max_tokens: 16000,
-            system:     buildStrategistSystemPrompt(),
+            max_tokens: mode === "2" ? 6000 : mode === "10" ? 10000 : 16000,
+            system:     buildStrategistSystemPrompt(mode),
             tools:      CREATIVE_STRATEGIST_TOOLS,
             messages,
           })
