@@ -5,7 +5,7 @@ import { analyzeVideoUrl } from '@/lib/agents/gemini'
 import { downloadAndStoreVideo } from '@/lib/agents/videoStorage'
 
 export const runtime = 'nodejs'
-export const maxDuration = 300
+export const maxDuration = 600
 
 const SNL_KEYWORDS = ['sinsnlashes', 'sins n lashes', 'sins & lashes', 'sinsnlashes.com']
 const RETAILER_KEYWORDS = ['rossmann', 'müller', 'douglas', 'dm ', 'drogerie', 'amazon', 'otto']
@@ -91,13 +91,13 @@ async function executeTool(name: string, input: Record<string, unknown>, targetP
     const { data: existing } = await db.from('ad_research').select('ad_id')
     const existingIds = new Set((existing ?? []).map(r => r.ad_id))
 
-    let results = await searchFacebookAds({ searchTerms, adType, country: 'DE', maxResults: 80 })
+    let results = await searchFacebookAds({ searchTerms, adType, country: 'DE', maxResults: 30 })
 
     // Zweiter Call falls zu wenig Ergebnisse
     if (results.length < (adCount as number)) {
       const broader = await searchFacebookAds({
         searchTerms: ['lash', 'wimpern', 'eye serum', 'eyelash'],
-        adType, country: 'DE', maxResults: 80,
+        adType, country: 'DE', maxResults: 30,
       })
       const seen = new Set((results as Record<string, unknown>[]).map(a => a.ad_archive_id))
       for (const ad of broader as Record<string, unknown>[]) {

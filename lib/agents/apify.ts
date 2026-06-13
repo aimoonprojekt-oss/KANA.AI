@@ -12,7 +12,7 @@ function token() {
 async function runActor(actorId: string, input: object): Promise<string> {
   // waitForFinish=120: Apify hält die Verbindung bis zu 120s offen und gibt das Ergebnis direkt zurück
   const res = await fetch(
-    `${APIFY_BASE}/acts/${actorId}/runs?token=${token()}&waitForFinish=120`,
+    `${APIFY_BASE}/acts/${actorId}/runs?token=${token()}&waitForFinish=200`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -40,7 +40,7 @@ async function runActor(actorId: string, input: object): Promise<string> {
       throw new Error(`Apify Actor fehlgeschlagen: ${runData.status}`)
     }
   }
-  throw new Error('Apify Actor Timeout (210 Sekunden)')
+  throw new Error('Apify Actor Timeout (290 Sekunden)')
 }
 
 /** Holt alle Items aus einem Apify Dataset */
