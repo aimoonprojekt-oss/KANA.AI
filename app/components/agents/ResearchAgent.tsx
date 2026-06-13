@@ -20,6 +20,7 @@ export default function ResearchAgent() {
   const [product, setProduct]   = useState(PRODUCTS[0]);
   const [adCount, setAdCount]   = useState(3);
   const [adType, setAdType]     = useState<"VIDEO" | "IMAGE">("VIDEO");
+  const [minImpressions, setMinImpressions] = useState(0);
   const [running, setRunning]   = useState(false);
   const [log, setLog]           = useState<LogEntry[]>([]);
   const [done, setDone]         = useState(false);
@@ -38,7 +39,7 @@ export default function ResearchAgent() {
       const res = await fetch("/api/research/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetProduct: product, adCount, adType }),
+        body: JSON.stringify({ targetProduct: product, adCount, adType, minImpressions }),
       });
 
       const reader = res.body!.getReader();
@@ -141,6 +142,22 @@ export default function ResearchAgent() {
             }}>
             <option value="VIDEO">Video-Ads</option>
             <option value="IMAGE">Image-Ads</option>
+          </select>
+        </div>
+
+        {/* Min. Impressionen */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, width: 160 }}>
+          <label style={{ fontSize: 12, color: "var(--text2)", fontWeight: 600 }}>Min. Impressionen</label>
+          <select value={minImpressions} onChange={e => setMinImpressions(Number(e.target.value))} disabled={running}
+            style={{
+              background: "var(--surface)", border: "1px solid rgba(255,255,255,0.12)",
+              borderRadius: 8, padding: "8px 12px", color: "var(--text-primary)", fontSize: 14,
+            }}>
+            <option value={0}>Keine Grenze</option>
+            <option value={10000}>10.000+</option>
+            <option value={50000}>50.000+</option>
+            <option value={150000}>150.000+</option>
+            <option value={300000}>300.000+</option>
           </select>
         </div>
 

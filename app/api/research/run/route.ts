@@ -82,7 +82,7 @@ const TOOLS: Anthropic.Tool[] = [
 
 // ─── Tool-Ausführung ──────────────────────────────────────────────────────────
 
-async function executeTool(name: string, input: Record<string, unknown>, targetProduct: string): Promise<string> {
+async function executeTool(name: string, input: Record<string, unknown>, targetProduct: string, minImpressions = 0): Promise<string> {
   if (name === 'search_facebook_ads') {
     const { searchTerms, adType, adCount } = input as { searchTerms: string[], adType: string, adCount: number }
 
@@ -113,7 +113,7 @@ async function executeTool(name: string, input: Record<string, unknown>, targetP
       if (SNL_KEYWORDS.some(k => text.includes(k))) return false
       if (RETAILER_KEYWORDS.some(k => text.includes(k))) return false
       const imp = parseInt(String(ad.impressions_text ?? '0')) || 0
-      if (imp > 0 && imp < 150000) return false
+      if (minImpressions > 0 && imp > 0 && imp < minImpressions) return false
       // Bei VIDEO-Suche: nur Ads mit tatsächlicher video_url behalten
       if (adType === 'VIDEO' && !ad.video_hd_url && !ad.video_sd_url && !ad.video_preview_image_url) return false
       return true
@@ -232,7 +232,7 @@ QUALITÄTSREGELN:
 // ─── API Route ────────────────────────────────────────────────────────────────
 
 export async function POST(req: Request) {
-  const { targetProduct, adCount, adType, searchKeywords } = await req.json()
+  const { targetProduct, adCount, adType, searchKeywords, minImpressions = 0 } = await req.json()
 
   if (!targetProduct || !adCount || !adType) {
     return new Response(JSON.stringify({ error: 'targetProduct, adCount und adType sind Pflichtfelder' }), { status: 400 })
@@ -287,7 +287,7 @@ export async function POST(req: Request) {
             if (block.type === 'tool_use') {
               send({ type: 'tool', message: `🔧 ${block.name}...` })
               try {
-                const result = await executeTool(block.name, block.input as Record<string, unknown>, targetProduct)
+                const result = await executeTool(block.name, block.input as Record<string, unknown>, targetProduct, minImpressions)
                 toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
                 send({ type: 'tool_done', message: `✅ ${block.name} fertig` })
               } catch (err) {
