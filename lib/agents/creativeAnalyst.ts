@@ -17,10 +17,12 @@ async function readBreakdowns(): Promise<string> {
   const db = getSupabaseAdmin()
 
   // Alle Ads aus ad_research laden — kein Filter auf video_breakdown
-  const { data: breakdowns } = await db
+  const { data: breakdowns, error: breakdownError } = await db
     .from('ad_research')
-    .select('ad_id, advertiser, ad_text, headline, cta_button, landing_page, ad_format, laufzeit_tage, impressionen, varianten, plattformen, video_url, video_breakdown, created_at')
-    .order('created_at', { ascending: false })
+    .select('ad_id, advertiser, ad_text, headline, cta_button, landing_page, ad_format, laufzeit_tage, impressionen, varianten, plattformen, video_url, video_breakdown, research_datum')
+    .order('research_datum', { ascending: false })
+
+  if (breakdownError) return `FEHLER beim Laden: ${breakdownError.message}`
 
   if (!breakdowns || breakdowns.length === 0) return 'KEINE_BREAKDOWNS_VORHANDEN'
 
