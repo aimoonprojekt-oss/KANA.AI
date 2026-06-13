@@ -61,10 +61,10 @@ export async function searchFacebookAds(input: {
 }): Promise<object[]> {
   const adTypeParam = input.adType.toLowerCase() === 'video' ? 'video' : 'image'
 
-  // Actor erwartet Facebook Ad Library URLs
-  const urls = input.searchTerms.map(term => ({
-    url: `https://www.facebook.com/ads/library/?active_status=active&ad_type=${adTypeParam}&country=${input.country}&q=${encodeURIComponent(term)}&search_type=keyword_unordered`,
-  }))
+  // Nur den ersten (spezifischsten) Suchbegriff verwenden — mehrere URLs verlängern die Actor-Laufzeit drastisch
+  const urls = [{
+    url: `https://www.facebook.com/ads/library/?active_status=active&ad_type=${adTypeParam}&country=${input.country}&q=${encodeURIComponent(input.searchTerms[0])}&search_type=keyword_unordered`,
+  }]
 
   const datasetId = await runActor('curious_coder~facebook-ads-library-scraper', {
     urls,
