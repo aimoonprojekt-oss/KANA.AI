@@ -23,14 +23,28 @@ async function readBrandKnowledge(): Promise<string> {
   return data.map(r => `## ${r.title} (${r.key})\n_Stand: ${r.updated_at}_\n\n${r.content}`).join('\n\n---\n\n')
 }
 
+async function readAnalystResults(): Promise<string> {
+  const db = getSupabaseAdmin()
+  const { data, error } = await db
+    .from('analyst_results')
+    .select('ad_id, advertiser, score, klasse, content, created_at')
+    .order('score', { ascending: false })
+  if (error || !data || data.length === 0) return 'Keine Analyst-Ergebnisse vorhanden — Creative Analyst noch nicht ausgeführt.'
+  const summary = data.map(r =>
+    `### ${r.advertiser} (${r.ad_id}) — Score: ${r.score}/5.0 — ${r.klasse}\n_Analysiert: ${r.created_at}_\n\n${r.content}`
+  ).join('\n\n═══════════════════════════════════════\n\n')
+  return `## Creative Analyst Ergebnisse (${data.length} Ads analysiert)\n\nSortiert nach Score (höchste zuerst)\n\n${summary}`
+}
+
 // ─── Tool Executor ─────────────────────────────────────────────────────────────
 
 export async function executeStrategistTool(
   name: string,
   _input: Record<string, unknown>
 ): Promise<string> {
-  if (name === 'read_strategist_refs') return await readStrategistRefs()
-  if (name === 'read_brand_knowledge') return await readBrandKnowledge()
+  if (name === 'read_strategist_refs')  return await readStrategistRefs()
+  if (name === 'read_brand_knowledge')  return await readBrandKnowledge()
+  if (name === 'read_analyst_results')  return await readAnalystResults()
   return `Unbekanntes Tool: ${name}`
 }
 
@@ -45,6 +59,11 @@ export const CREATIVE_STRATEGIST_TOOLS: Anthropic.Tool[] = [
   {
     name: 'read_brand_knowledge',
     description: 'Liest die komplette Brand Knowledge Basis aus Supabase — alle Daten über Sins n Lashes: Produkte, Zielgruppe, Social Media, Konkurrenz, Strategie, Claims, Content Bank.',
+    input_schema: { type: 'object' as const, properties: {}, required: [] },
+  },
+  {
+    name: 'read_analyst_results',
+    description: 'Liest alle Ergebnisse des Creative Analyst aus Supabase — K1-K6 Scorings, Hook-Analysen, Copy-Analysen, Wettbewerbs-Einordnungen und SNL-Empfehlungen aller analysierten Competitor-Ads. Diese Daten sind genauso wichtig wie Brand Knowledge und müssen für die Creative Briefs genutzt werden.',
     input_schema: { type: 'object' as const, properties: {}, required: [] },
   },
 ]
@@ -108,6 +127,25 @@ Rufe read_strategist_refs auf. Lies REF-00 (Workflow), REF-06 (5 Stages Framewor
 
 ### Schritt 2 — Brand Knowledge laden
 Rufe read_brand_knowledge auf. Extrahiere:
+- Brand-Name, USPs, Kern-Benefit, Produktpreise
+- Zielgruppe, Psychografie, echte Kundenzitate
+- Social Proof Zahlen (Follower, Reviews)
+- Erlaubte Claims (aus 10_brand_claims)
+- Content Bank (aus 11_brand_content_bank)
+- Aktuelle Strategie und SWOT (aus 09_brand_strategy)
+
+### Schritt 2b — Analyst-Ergebnisse laden
+Rufe read_analyst_results auf. Diese Daten sind GENAUSO WICHTIG wie Brand Knowledge.
+Extrahiere aus den analysierten Competitor-Ads:
+- Top-performende Hooks (K1-Score ≥ 4) mit verbatim Hook-Text
+- Bewiesene Copy-Formeln (PAS, BAB, Storytelling) die bei Competitors funktionieren
+- Stärken der Competitors die SNL noch nicht nutzt
+- Schwächen der Competitors die SNL als Differenzierungsvorteil nutzen kann
+- Konkrete SNL-Empfehlungen aus den Analysen
+- Hook-Trends, Format-Trends, Trust-Trends aus dem Analyst
+
+**Wenn Analyst-Daten vorhanden:** Nutze sie als primäre Market Evidence für Schritt 3.
+**Wenn keine Analyst-Daten:** Notiere "Kein Analyst-Output vorhanden" und fahre fort.
 - Brand-Name, USPs, Kern-Benefit, Produktpreise
 - Zielgruppe, Psychografie, echte Kundenzitate
 - Social Proof Zahlen (Follower, Reviews)

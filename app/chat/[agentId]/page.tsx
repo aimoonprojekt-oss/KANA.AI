@@ -6,6 +6,7 @@ import React, { useState, useRef, useEffect, useCallback, Suspense } from "react
 import ResearchAgent from "@/app/components/agents/ResearchAgent";
 import BrandExpert from "@/app/components/agents/BrandExpert";
 import CreativeStrategist from "@/app/components/agents/CreativeStrategist";
+import CreativeAnalyst from "@/app/components/agents/CreativeAnalyst";
 
 type Message = { role: "user" | "assistant"; content: string };
 type OutputFile = { id: string; filename: string };
@@ -134,6 +135,7 @@ function ChatPageInner() {
   if (agentId === "custom_creative_researcher") return <ResearchAgent />;
   if (agentId === "custom_brand_expert") return <BrandExpert />;
   if (agentId === "custom_creative_strategist") return <CreativeStrategist />;
+  if (agentId === "custom_creative_analyst") return <CreativeAnalyst />;
   const router = useRouter();
   const searchParams = useSearchParams();
 
