@@ -16,12 +16,10 @@ async function readAnalystRefs(): Promise<string> {
 async function readBreakdowns(): Promise<string> {
   const db = getSupabaseAdmin()
 
-  // Breakdowns aus ad_research laden (Spalte: video_breakdown)
+  // Alle Ads aus ad_research laden — auch ohne video_breakdown
   const { data: breakdowns } = await db
     .from('ad_research')
-    .select('ad_id, advertiser, video_breakdown, created_at')
-    .not('video_breakdown', 'is', null)
-    .neq('video_breakdown', '')
+    .select('ad_id, advertiser, ad_text, headline, cta_button, landing_page, ad_format, laufzeit_tage, impressionen, varianten, plattformen, video_url, video_breakdown, datenstatus, created_at')
     .order('created_at', { ascending: false })
 
   if (!breakdowns || breakdowns.length === 0) return 'KEINE_BREAKDOWNS_VORHANDEN'
@@ -38,9 +36,19 @@ async function readBreakdowns(): Promise<string> {
     return `ALLE_ANALYSIERT: Alle ${breakdowns.length} Breakdowns wurden bereits analysiert. ad_ids: ${breakdowns.map(b => b.ad_id).join(', ')}`
   }
 
-  return pending.map(b =>
-    `### BREAKDOWN: ${b.ad_id} | Advertiser: ${b.advertiser}\n\n${b.video_breakdown}`
-  ).join('\n\n═══════════════════════════════════════\n\n')
+  return pending.map(b => {
+    const lines = [
+      `### AD: ${b.ad_id} | Advertiser: ${b.advertiser}`,
+      `Format: ${b.ad_format} | Laufzeit: ${b.laufzeit_tage} Tage | Impressionen: ${b.impressionen} | Varianten: ${b.varianten}`,
+      `Plattformen: ${b.plattformen}`,
+      `Headline: ${b.headline}`,
+      `Ad-Text: ${b.ad_text}`,
+      `CTA: ${b.cta_button} → ${b.landing_page}`,
+      b.video_url ? `Video-URL: ${b.video_url}` : '',
+      b.video_breakdown ? `\n**VIDEO-BREAKDOWN:**\n${b.video_breakdown}` : '(Kein Video-Breakdown verfügbar — analysiere anhand der Library-Daten)',
+    ]
+    return lines.filter(Boolean).join('\n')
+  }).join('\n\n═══════════════════════════════════════\n\n')
 }
 
 async function readBrandKnowledge(): Promise<string> {
