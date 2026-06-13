@@ -4,6 +4,9 @@ import { searchFacebookAds } from '@/lib/agents/apify'
 import { analyzeVideoUrl } from '@/lib/agents/gemini'
 import { downloadAndStoreVideo } from '@/lib/agents/videoStorage'
 
+export const runtime = 'nodejs'
+export const maxDuration = 300
+
 const SNL_KEYWORDS = ['sinsnlashes', 'sins n lashes', 'sins & lashes', 'sinsnlashes.com']
 const RETAILER_KEYWORDS = ['rossmann', 'müller', 'douglas', 'dm ', 'drogerie', 'amazon', 'otto']
 
@@ -273,7 +276,7 @@ export async function POST(req: Request) {
           }
 
           // Fertig wenn kein Tool-Call mehr
-          if (response.stop_reason === 'end_turn') {
+          if (response.stop_reason === 'end_turn' || response.stop_reason !== 'tool_use') {
             send({ type: 'done', message: 'Research abgeschlossen.' })
             break
           }
@@ -294,6 +297,8 @@ export async function POST(req: Request) {
               }
             }
           }
+
+          if (toolResults.length === 0) break
 
           // Nachrichten für nächste Runde updaten
           messages.push({ role: 'assistant', content: response.content })
