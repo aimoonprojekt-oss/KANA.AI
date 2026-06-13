@@ -16,10 +16,10 @@ async function readAnalystRefs(): Promise<string> {
 async function readBreakdowns(): Promise<string> {
   const db = getSupabaseAdmin()
 
-  // Alle Ads aus ad_research laden — auch ohne video_breakdown
+  // Breakdowns aus analyst_breakdowns laden
   const { data: breakdowns } = await db
-    .from('ad_research')
-    .select('ad_id, advertiser, ad_text, headline, cta_button, landing_page, ad_format, laufzeit_tage, impressionen, varianten, plattformen, video_url, video_breakdown, datenstatus, created_at')
+    .from('analyst_breakdowns')
+    .select('ad_id, advertiser, content, created_at')
     .order('created_at', { ascending: false })
 
   if (!breakdowns || breakdowns.length === 0) return 'KEINE_BREAKDOWNS_VORHANDEN'
@@ -36,19 +36,9 @@ async function readBreakdowns(): Promise<string> {
     return `ALLE_ANALYSIERT: Alle ${breakdowns.length} Breakdowns wurden bereits analysiert. ad_ids: ${breakdowns.map(b => b.ad_id).join(', ')}`
   }
 
-  return pending.map(b => {
-    const lines = [
-      `### AD: ${b.ad_id} | Advertiser: ${b.advertiser}`,
-      `Format: ${b.ad_format} | Laufzeit: ${b.laufzeit_tage} Tage | Impressionen: ${b.impressionen} | Varianten: ${b.varianten}`,
-      `Plattformen: ${b.plattformen}`,
-      `Headline: ${b.headline}`,
-      `Ad-Text: ${b.ad_text}`,
-      `CTA: ${b.cta_button} → ${b.landing_page}`,
-      b.video_url ? `Video-URL: ${b.video_url}` : '',
-      b.video_breakdown ? `\n**VIDEO-BREAKDOWN:**\n${b.video_breakdown}` : '(Kein Video-Breakdown verfügbar — analysiere anhand der Library-Daten)',
-    ]
-    return lines.filter(Boolean).join('\n')
-  }).join('\n\n═══════════════════════════════════════\n\n')
+  return pending.map(b =>
+    `### BREAKDOWN: ${b.ad_id} | Advertiser: ${b.advertiser}\n\n${b.content}`
+  ).join('\n\n═══════════════════════════════════════\n\n')
 }
 
 async function readBrandKnowledge(): Promise<string> {
@@ -111,7 +101,7 @@ export const CREATIVE_ANALYST_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'read_breakdowns',
-    description: 'Liest alle noch nicht analysierten Video-Breakdowns aus der ad_research Tabelle (Spalte: video_breakdown). Gibt KEINE_BREAKDOWNS_VORHANDEN zurück wenn keine Breakdowns vorhanden sind, oder ALLE_ANALYSIERT wenn alle bereits verarbeitet wurden.',
+    description: 'Liest alle noch nicht analysierten Breakdowns aus der analyst_breakdowns Tabelle. Gibt KEINE_BREAKDOWNS_VORHANDEN zurück wenn die Tabelle leer ist, oder ALLE_ANALYSIERT wenn alle bereits verarbeitet wurden.',
     input_schema: { type: 'object' as const, properties: {}, required: [] },
   },
   {
