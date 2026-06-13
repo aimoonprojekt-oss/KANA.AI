@@ -130,44 +130,40 @@ Rufe read_brand_knowledge auf. Extrahiere:
 - Brand-Name, USPs, Kern-Benefit, Produktpreise
 - Zielgruppe, Psychografie, echte Kundenzitate
 - Social Proof Zahlen (Follower, Reviews)
-- Erlaubte Claims (aus 10_brand_claims)
-- Content Bank (aus 11_brand_content_bank)
-- Aktuelle Strategie und SWOT (aus 09_brand_strategy)
-
-### Schritt 2b — Analyst-Ergebnisse laden
-Rufe read_analyst_results auf. Diese Daten sind GENAUSO WICHTIG wie Brand Knowledge.
-Extrahiere aus den analysierten Competitor-Ads:
-- Top-performende Hooks (K1-Score ≥ 4) mit verbatim Hook-Text
-- Bewiesene Copy-Formeln (PAS, BAB, Storytelling) die bei Competitors funktionieren
-- Stärken der Competitors die SNL noch nicht nutzt
-- Schwächen der Competitors die SNL als Differenzierungsvorteil nutzen kann
-- Konkrete SNL-Empfehlungen aus den Analysen
-- Hook-Trends, Format-Trends, Trust-Trends aus dem Analyst
-
-**Wenn Analyst-Daten vorhanden:** Nutze sie als primäre Market Evidence für Schritt 3.
-**Wenn keine Analyst-Daten:** Notiere "Kein Analyst-Output vorhanden" und fahre fort.
-- Brand-Name, USPs, Kern-Benefit, Produktpreise
-- Zielgruppe, Psychografie, echte Kundenzitate
-- Social Proof Zahlen (Follower, Reviews)
 - Konkurrenz-Patterns (aus 08_brand_competitors)
 - Erlaubte Claims (aus 10_brand_claims)
 - Content Bank (aus 11_brand_content_bank)
 - Aktuelle Strategie und SWOT (aus 09_brand_strategy)
 
-### Schritt 3 — 5 Stages Framework anwenden (STILL, kein Output)
-Für jede der 5 Stages aus REF-06:
-→ Welche Konkurrenz-Patterns aus brand_knowledge passen zu dieser Stage?
-→ Market Evidence dokumentieren (Marke, Mechanismus, Belege aus Datenbank)
-→ Wenn kein Beleg: "Kein Competitor-Beleg — Blue Ocean Opportunity" notieren
-→ Positioning Blocks aus REF-06 mit Brand-Daten befüllen
+### Schritt 3 — Analyst-Ergebnisse laden
+Rufe read_analyst_results auf. Diese Daten sind GENAUSO WICHTIG wie Brand Knowledge — pflichtmäßig zu laden und zu nutzen.
+Extrahiere:
+- Top-performende Hooks (K1-Score ≥ 4) mit verbatim Hook-Text
+- Bewiesene Copy-Formeln (PAS, BAB, Storytelling) die bei Competitors funktionieren
+- Stärken der Competitors die SNL noch nicht nutzt
+- Schwächen der Competitors → SNL-Differenzierungsvorteile
+- Konkrete SNL-Empfehlungen aus den Analysen
+- Hook-Trends, Format-Trends, Trust-Trends
+
+**Wenn Analyst-Daten vorhanden:** Nutze K1-K6 Scores und verbatim Hook-Texte direkt als Market Evidence in Schritt 4.
+**Wenn keine Analyst-Daten:** Notiere "Kein Analyst-Output vorhanden" und nutze nur Brand Knowledge.
+
+### Schritt 4 — 5 Stages Framework anwenden (STILL, kein Output)
+Für jede der 5 Stages aus REF-06, kombiniere BEIDE Datenquellen:
+→ Aus Brand Knowledge: Zielgruppe, Mindset, Positioning
+→ Aus Analyst Results: Welche Competitor-Hooks/Formate passen zu dieser Stage? (mit Score-Belegen)
+→ Market Evidence = Analyst-Daten + Brand Knowledge Konkurrenz-Patterns kombiniert
+→ Wenn kein Beleg aus beiden Quellen: "Kein Competitor-Beleg — Blue Ocean Opportunity"
+→ Positioning Blocks aus REF-06 mit kombinierten Daten befüllen
 
 ${briefInstructions[mode]}
 
 Für jeden Brief: Template aus REF-07 verwenden.
 Copy-Orientierungsbeispiele IMMER als "Orientierungsbeispiel — kein finaler Text" markieren.
-Alle Inhalte (USPs, Zahlen, Zitate) NUR aus den geladenen Daten — niemals erfinden.
+Alle Inhalte (USPs, Zahlen, Zitate, Hook-Texte) NUR aus den geladenen Daten — niemals erfinden.
+Hook-Texte aus Analyst Results dürfen direkt als Orientierungsbeispiel zitiert werden (mit [ANALYST: Advertiser] kennzeichnen).
 
-### Schritt 5 — Strukturierten Output ausgeben
+### Schritt 6 — Strukturierten Output ausgeben
 Gib den vollständigen Strategy Guide als strukturierten Text aus. Format:
 
 ╔════════════════════════════════════════════════════╗
@@ -180,7 +176,7 @@ Dann für jede relevante Stage:
 [Stage-Übersicht: Zielgruppe, Mindset, Positioning Blocks, Deployment-Phase]
 
 MARKET EVIDENCE:
-[Konkurrenz-Patterns aus Brand Knowledge]
+[Analyst-Ergebnisse: bewiesene Hooks/Formeln mit K1-K6 Score + Brand Knowledge Konkurrenz-Patterns]
 
 LANDING PAGE EMPFEHLUNG:
 [Typ + Aufbau]
@@ -197,12 +193,14 @@ Abschluss:
 ---
 
 ## Anti-Halluzination-Protokoll (Pflicht)
-- Alle Zahlen, Zitate, Competitor-Daten NUR aus den Tool-Ergebnissen
+- Alle Zahlen, Zitate, Hook-Texte, Scores NUR aus den Tool-Ergebnissen (Brand Knowledge + Analyst Results)
+- Analyst-Zitate mit [ANALYST: Advertiser, Score X.X] kennzeichnen
 - Abgeleitetes immer als [ABGELEITET] kennzeichnen
 - Fehlende Market Evidence → "Blue Ocean Opportunity" dokumentieren
 
 ## Stop-Regeln
 - Nicht nach Anzahl fragen — exakt ${briefCount} erstellen
+- read_analyst_results IMMER aufrufen — auch wenn keine Daten erwartet werden
 - Nicht nach Design fragen — Farbschema aus REF-08
 - Still laufen während der Analyse`
 }
