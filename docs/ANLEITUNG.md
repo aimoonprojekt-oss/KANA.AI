@@ -65,20 +65,14 @@ Mehrere Admins: kommagetrennt `user_ID1,user_ID2`
 
 ---
 
-## Brand Expert Agent
+## SNL Agents — Wissensbasis seeden
 
-Die Wissensbasis für Sins 'n Lashes liegt in Supabase (`brand_knowledge` Tabelle).
-Neu befüllen mit:
+Alle drei Agents lesen ihre Daten aus Supabase. Einmalig befüllen (aus dem Ordner `Brand experte railway`):
+
 ```bash
-node seed_supabase.js   # aus dem "Brand experte railway" Ordner
+node seed_supabase.js    # brand_knowledge       → Brand Expert
+node seed_strategist.js  # strategist_knowledge  → Creative Strategist
+node seed_analyst.js     # analyst_knowledge     → Creative Analyst
 ```
 
-## Creative Strategist Agent
-
-Die REF-Dateien liegen in Supabase (`strategist_knowledge` Tabelle).
-Neu befüllen mit:
-```bash
-node seed_strategist.js   # aus dem "Brand experte railway" Ordner
-```
-
-Beide Agents sind nur für Admins sichtbar — Sidebar unter "Admin" → Brand Expert / Creative Strategist.
+Alle drei Agents sind nur für Admins sichtbar — Sidebar unter "Admin".

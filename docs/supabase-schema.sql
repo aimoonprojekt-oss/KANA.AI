@@ -55,14 +55,51 @@ CREATE POLICY "Users see own agent access" ON agent_access
 CREATE POLICY "Users see own sessions" ON sessions
   FOR SELECT USING (auth.uid()::text = user_id);
 
--- ── Test-Daten (optional, zum Testen) ────────────────────
--- Uncomment und anpassen um einen Testuser direkt Zugang zu geben:
-/*
-INSERT INTO agent_access (user_id, agent_id, agent_name, agent_description)
-VALUES (
-  'user_DEIN_CLERK_USER_ID',   -- In Clerk Dashboard nachschauen
-  'agt_DEIN_AGENT_ID',         -- Deine Anthropic Agent ID
-  'Sales Agent',
-  'Analysiert Verkaufsdaten und gibt Empfehlungen.'
+-- ── SNL Agent Knowledge-Tabellen ─────────────────────────
+
+-- Brand Expert: Sins 'n Lashes Brand Intelligence
+CREATE TABLE IF NOT EXISTS public.brand_knowledge (
+  key        TEXT PRIMARY KEY,
+  title      TEXT NOT NULL,
+  content    TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now()
 );
-*/
+
+-- Creative Strategist: REF-Dateien (5 Stages Framework etc.)
+CREATE TABLE IF NOT EXISTS public.strategist_knowledge (
+  key        TEXT PRIMARY KEY,
+  title      TEXT NOT NULL,
+  content    TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Creative Analyst: Analyse-Framework & Scoring-Rubrik
+CREATE TABLE IF NOT EXISTS public.analyst_knowledge (
+  key        TEXT PRIMARY KEY,
+  title      TEXT NOT NULL,
+  content    TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Creative Analyst: Input-Breakdowns (vom Researcher geliefert)
+CREATE TABLE IF NOT EXISTS public.analyst_breakdowns (
+  ad_id      TEXT PRIMARY KEY,
+  advertiser TEXT NOT NULL,
+  content    TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Creative Analyst: Output-Analysen (K1-K6 Scoring, vom Strategist genutzt)
+CREATE TABLE IF NOT EXISTS public.analyst_results (
+  ad_id      TEXT PRIMARY KEY,
+  advertiser TEXT NOT NULL,
+  score      FLOAT,
+  klasse     TEXT,
+  content    TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- ── Seed-Skripte (im Ordner "Brand experte railway") ─────
+-- node seed_supabase.js    → brand_knowledge befüllen
+-- node seed_strategist.js  → strategist_knowledge befüllen
+-- node seed_analyst.js     → analyst_knowledge befüllen
