@@ -162,30 +162,28 @@ async function executeTool(name: string, input: Record<string, unknown>, targetP
 
   if (name === 'save_ad_research') {
     const db = getSupabaseAdmin()
-
-    // Alle Felder als strukturierten content-Text zusammenbauen (analyst_breakdowns hat nur content-Spalte)
-    const contentLines = [
-      `Advertiser: ${input.advertiser ?? 'nicht verfügbar'}`,
-      `Produkt: ${targetProduct}`,
-      `Format: ${input.adFormat ?? 'nicht verfügbar'}`,
-      `Start: ${input.startDate ?? 'nicht verfügbar'} | Laufzeit: ${input.laufzeitTage ?? 0} Tage`,
-      `Impressionen: ${input.impressionen ?? 'nicht verfügbar'} | Varianten: ${input.varianten ?? 1}`,
-      `Plattformen: ${input.plattformen ?? 'nicht verfügbar'}`,
-      ``,
-      `Headline: ${input.headline ?? 'nicht verfügbar'}`,
-      `Ad-Text: ${input.adText ?? 'nicht verfügbar'}`,
-      `CTA: ${input.ctaButton ?? 'nicht verfügbar'} → ${input.landingPage ?? 'nicht verfügbar'}`,
-      input.videoUrl ? `Video-URL: ${input.videoUrl}` : '',
-      ``,
-      input.videoBreakdown
-        ? `**VIDEO-BREAKDOWN:**\n${input.videoBreakdown}`
-        : '(Kein Video-Breakdown — nur Library-Daten verfügbar)',
-    ].filter(l => l !== null && l !== undefined)
-
-    const { error } = await db.from('analyst_breakdowns').upsert({
-      ad_id:      String(input.adId),
-      advertiser: String(input.advertiser ?? 'nicht verfügbar'),
-      content:    contentLines.join('\n'),
+    const { error } = await db.from('ad_research').upsert({
+      ad_id:             String(input.adId),
+      advertiser:        String(input.advertiser ?? 'nicht verfügbar (API)'),
+      target_product:    targetProduct,
+      ad_format:         String(input.adFormat ?? 'nicht verfügbar'),
+      start_date:        String(input.startDate ?? 'nicht verfügbar (API)'),
+      laufzeit_tage:     Number(input.laufzeitTage ?? 0),
+      impressionen:      String(input.impressionen ?? 'nicht verfügbar (API)'),
+      varianten:         Number(input.varianten ?? 1),
+      plattformen:       String(input.plattformen ?? 'nicht verfügbar (API)'),
+      ad_text:           String(input.adText ?? 'nicht verfügbar (API)'),
+      headline:          String(input.headline ?? 'nicht verfügbar (API)'),
+      cta_button:        String(input.ctaButton ?? 'nicht verfügbar (API)'),
+      landing_page:      String(input.landingPage ?? 'nicht verfügbar (API)'),
+      video_url:         String(input.videoUrl ?? 'nicht verfügbar'),
+      thumbnail_url:     String(input.thumbnailUrl ?? 'nicht verfügbar (API)'),
+      video_breakdown:   String(input.videoBreakdown ?? ''),
+      rohdaten:          input.rohdaten ?? {},
+      status:            input.videoBreakdown ? 'breakdown_complete' : 'research_complete',
+      datenstatus:       String(input.datenstatus ?? 'nur Library-Daten'),
+      bereit_fuer_analyst: true,
+      research_datum:    new Date().toISOString(),
     }, { onConflict: 'ad_id' })
 
     if (error) return JSON.stringify({ success: false, error: error.message })
