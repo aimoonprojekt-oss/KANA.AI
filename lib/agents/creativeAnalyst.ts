@@ -16,10 +16,12 @@ async function readAnalystRefs(): Promise<string> {
 async function readBreakdowns(): Promise<string> {
   const db = getSupabaseAdmin()
 
-  // Alle Breakdowns laden
+  // Breakdowns aus ad_research laden (Spalte: video_breakdown)
   const { data: breakdowns } = await db
-    .from('analyst_breakdowns')
-    .select('ad_id, advertiser, content, created_at')
+    .from('ad_research')
+    .select('ad_id, advertiser, video_breakdown, created_at')
+    .not('video_breakdown', 'is', null)
+    .neq('video_breakdown', '')
     .order('created_at', { ascending: false })
 
   if (!breakdowns || breakdowns.length === 0) return 'KEINE_BREAKDOWNS_VORHANDEN'
@@ -37,7 +39,7 @@ async function readBreakdowns(): Promise<string> {
   }
 
   return pending.map(b =>
-    `### BREAKDOWN: ${b.ad_id} | Advertiser: ${b.advertiser}\n\n${b.content}`
+    `### BREAKDOWN: ${b.ad_id} | Advertiser: ${b.advertiser}\n\n${b.video_breakdown}`
   ).join('\n\n═══════════════════════════════════════\n\n')
 }
 
