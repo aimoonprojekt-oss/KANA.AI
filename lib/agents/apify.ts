@@ -6,10 +6,13 @@ function token() {
   return t
 }
 
-/** Startet einen Apify Actor und wartet bis er fertig ist (max. 3 Minuten) */
+/** Startet einen Apify Actor und wartet bis er fertig ist.
+ *  Nutzt waitForFinish=120 damit Apify server-seitig wartet — spart Polling-Runden
+ *  und verhindert Railway-Timeout (maxDuration: 300s). */
 async function runActor(actorId: string, input: object): Promise<string> {
+  // waitForFinish=120: Apify hält die Verbindung bis zu 120s offen und gibt das Ergebnis direkt zurück
   const res = await fetch(
-    `${APIFY_BASE}/acts/${actorId}/runs?token=${token()}`,
+    `${APIFY_BASE}/acts/${actorId}/runs?token=${token()}&waitForFinish=120`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -21,8 +24,14 @@ async function runActor(actorId: string, input: object): Promise<string> {
   const runId: string = data.id
   const datasetId: string = data.defaultDatasetId
 
-  // Polling bis SUCCEEDED (max. 10 Minuten)
-  for (let i = 0; i < 120; i++) {
+  // Wenn der Actor bereits fertig ist (waitForFinish hat geholfen) — direkt zurück
+  if (data.status === 'SUCCEEDED') return datasetId
+  if (data.status === 'FAILED' || data.status === 'ABORTED') {
+    throw new Error(`Apify Actor fehlgeschlagen: ${data.status}`)
+  }
+
+  // Fallback-Polling: max. 90 Sekunden (18 × 5s) — Actor läuft noch
+  for (let i = 0; i < 18; i++) {
     await new Promise(r => setTimeout(r, 5000))
     const statusRes = await fetch(`${APIFY_BASE}/actor-runs/${runId}?token=${token()}`)
     const { data: runData } = await statusRes.json()
@@ -31,7 +40,7 @@ async function runActor(actorId: string, input: object): Promise<string> {
       throw new Error(`Apify Actor fehlgeschlagen: ${runData.status}`)
     }
   }
-  throw new Error('Apify Actor Timeout (3 Minuten)')
+  throw new Error('Apify Actor Timeout (210 Sekunden)')
 }
 
 /** Holt alle Items aus einem Apify Dataset */
