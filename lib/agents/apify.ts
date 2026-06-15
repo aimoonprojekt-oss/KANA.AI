@@ -6,13 +6,12 @@ function token() {
   return t
 }
 
-/** Startet einen Apify Actor und wartet bis er fertig ist.
- *  Nutzt waitForFinish=120 damit Apify server-seitig wartet — spart Polling-Runden
- *  und verhindert Railway-Timeout (maxDuration: 300s). */
+/** Startet einen Apify Actor async und pollt bis er fertig ist.
+ *  Polling: alle 10s, max. 55 Versuche = 550s — passt in Railway's 600s maxDuration.
+ *  Damit können auch große Jobs (viele Ads, lange Laufzeit) sicher abgeschlossen werden. */
 async function runActor(actorId: string, input: object): Promise<string> {
-  // waitForFinish=120: Apify hält die Verbindung bis zu 120s offen und gibt das Ergebnis direkt zurück
   const res = await fetch(
-    `${APIFY_BASE}/acts/${actorId}/runs?token=${token()}&waitForFinish=200`,
+    `${APIFY_BASE}/acts/${actorId}/runs?token=${token()}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -24,15 +23,14 @@ async function runActor(actorId: string, input: object): Promise<string> {
   const runId: string = data.id
   const datasetId: string = data.defaultDatasetId
 
-  // Wenn der Actor bereits fertig ist (waitForFinish hat geholfen) — direkt zurück
   if (data.status === 'SUCCEEDED') return datasetId
   if (data.status === 'FAILED' || data.status === 'ABORTED') {
     throw new Error(`Apify Actor fehlgeschlagen: ${data.status}`)
   }
 
-  // Fallback-Polling: max. 90 Sekunden (18 × 5s) — Actor läuft noch
-  for (let i = 0; i < 18; i++) {
-    await new Promise(r => setTimeout(r, 5000))
+  // Polling alle 10s — max. 55 × 10s = 550s (innerhalb Railway's 600s Limit)
+  for (let i = 0; i < 55; i++) {
+    await new Promise(r => setTimeout(r, 10000))
     const statusRes = await fetch(`${APIFY_BASE}/actor-runs/${runId}?token=${token()}`)
     const { data: runData } = await statusRes.json()
     if (runData.status === 'SUCCEEDED') return datasetId
@@ -40,7 +38,7 @@ async function runActor(actorId: string, input: object): Promise<string> {
       throw new Error(`Apify Actor fehlgeschlagen: ${runData.status}`)
     }
   }
-  throw new Error('Apify Actor Timeout (290 Sekunden)')
+  throw new Error('Apify Actor Timeout — läuft länger als 550 Sekunden')
 }
 
 /** Holt alle Items aus einem Apify Dataset */
@@ -75,7 +73,7 @@ export async function searchFacebookAds(input: {
 
   const datasetId = await runActor('curious_coder~facebook-ads-library-scraper', {
     urls,
-    maxResults: Math.min(input.maxResults, 10),
+    maxResults: input.maxResults,
   })
   return getDatasetItems(datasetId)
 }
