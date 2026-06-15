@@ -129,7 +129,7 @@ const TOOLS: Anthropic.Tool[] = [
 
 // ─── Tool-Ausführung ──────────────────────────────────────────────────────────
 
-async function executeTool(name: string, input: Record<string, unknown>, targetProduct: string, minImpressions = 0, maxVideoDuration = 0): Promise<string> {
+async function executeTool(name: string, input: Record<string, unknown>, targetProduct: string, minImpressions = 0, maxVideoDuration = 0, startDateMin?: string, startDateMax?: string): Promise<string> {
   if (name === 'search_facebook_ads') {
     const { searchTerms, adType, adCount } = input as { searchTerms: string[], adType: string, adCount: number }
 
@@ -138,7 +138,7 @@ async function executeTool(name: string, input: Record<string, unknown>, targetP
     const { data: existing } = await db.from('ad_research').select('ad_id')
     const existingIds = new Set((existing ?? []).map(r => r.ad_id))
 
-    let results = await searchFacebookAds({ searchTerms, adType, country: 'DE', maxResults: 30 })
+    let results = await searchFacebookAds({ searchTerms, adType, country: 'DE', maxResults: 30, startDateMin, startDateMax })
 
     // Zweiter Call falls zu wenig Ergebnisse — produktspezifische Fallback-Keywords
     if (results.length < (adCount as number)) {
@@ -300,7 +300,7 @@ QUALITÄTSREGELN:
 // ─── API Route ────────────────────────────────────────────────────────────────
 
 export async function POST(req: Request) {
-  const { targetProduct, adCount, adType, searchKeywords, minImpressions = 0, maxVideoDuration = 0 } = await req.json()
+  const { targetProduct, adCount, adType, searchKeywords, minImpressions = 0, maxVideoDuration = 0, startDateMin, startDateMax } = await req.json()
 
   if (!targetProduct || !adCount || !adType) {
     return new Response(JSON.stringify({ error: 'targetProduct, adCount und adType sind Pflichtfelder' }), { status: 400 })
@@ -355,7 +355,7 @@ export async function POST(req: Request) {
             if (block.type === 'tool_use') {
               send({ type: 'tool', message: `🔧 ${block.name}...` })
               try {
-                const result = await executeTool(block.name, block.input as Record<string, unknown>, targetProduct, minImpressions, maxVideoDuration)
+                const result = await executeTool(block.name, block.input as Record<string, unknown>, targetProduct, minImpressions, maxVideoDuration, startDateMin, startDateMax)
                 toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
                 send({ type: 'tool_done', message: `✅ ${block.name} fertig` })
               } catch (err) {

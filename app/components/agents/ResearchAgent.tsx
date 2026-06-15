@@ -22,6 +22,9 @@ export default function ResearchAgent() {
   const [adType, setAdType]     = useState<"VIDEO" | "IMAGE">("VIDEO");
   const [minImpressions, setMinImpressions] = useState(0);
   const [maxVideoDuration, setMaxVideoDuration] = useState(0);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [startDateMin, setStartDateMin] = useState("");
+  const [startDateMax, setStartDateMax] = useState("");
   const [running, setRunning]   = useState(false);
   const [log, setLog]           = useState<LogEntry[]>([]);
   const [done, setDone]         = useState(false);
@@ -40,7 +43,7 @@ export default function ResearchAgent() {
       const res = await fetch("/api/research/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetProduct: product, adCount, adType, minImpressions, maxVideoDuration }),
+        body: JSON.stringify({ targetProduct: product, adCount, adType, minImpressions, maxVideoDuration, startDateMin: startDateMin || undefined, startDateMax: startDateMax || undefined }),
       });
 
       const reader = res.body!.getReader();
@@ -180,6 +183,101 @@ export default function ResearchAgent() {
             </select>
           </div>
         )}
+
+        {/* Zeitraum-Button */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, position: "relative" }}>
+          <label style={{ fontSize: 12, color: "var(--text2)", fontWeight: 600 }}>Zeitraum</label>
+          <button
+            onClick={() => setShowDatePicker(v => !v)}
+            disabled={running}
+            style={{
+              background: (startDateMin || startDateMax) ? "rgba(147,51,234,0.2)" : "var(--surface)",
+              border: `1px solid ${(startDateMin || startDateMax) ? "rgba(147,51,234,0.6)" : "rgba(255,255,255,0.12)"}`,
+              borderRadius: 8, padding: "8px 14px", color: "var(--text-primary)",
+              fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
+            }}>
+            📅 {startDateMin && startDateMax
+              ? `${startDateMin} – ${startDateMax}`
+              : startDateMin
+              ? `ab ${startDateMin}`
+              : startDateMax
+              ? `bis ${startDateMax}`
+              : "Alle Zeiträume"}
+          </button>
+
+          {showDatePicker && (
+            <div style={{
+              position: "absolute", top: "calc(100% + 8px)", left: 0, zIndex: 100,
+              background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.15)",
+              borderRadius: 12, padding: 20, minWidth: 300,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 16, color: "var(--text-primary)" }}>
+                📅 Zeitraum auswählen
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <label style={{ fontSize: 11, color: "var(--text2)", fontWeight: 600 }}>VON</label>
+                  <input type="date" value={startDateMin} onChange={e => setStartDateMin(e.target.value)}
+                    style={{
+                      background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)",
+                      borderRadius: 8, padding: "8px 12px", color: "var(--text-primary)", fontSize: 14,
+                      colorScheme: "dark",
+                    }} />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <label style={{ fontSize: 11, color: "var(--text2)", fontWeight: 600 }}>BIS</label>
+                  <input type="date" value={startDateMax} onChange={e => setStartDateMax(e.target.value)}
+                    style={{
+                      background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)",
+                      borderRadius: 8, padding: "8px 12px", color: "var(--text-primary)", fontSize: 14,
+                      colorScheme: "dark",
+                    }} />
+                </div>
+
+                {/* Quick-Select Buttons */}
+                <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 12 }}>
+                  <div style={{ fontSize: 11, color: "var(--text2)", marginBottom: 8, fontWeight: 600 }}>SCHNELLAUSWAHL</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {[
+                      { label: "Black Friday 2024", from: "2024-11-18", to: "2024-11-30" },
+                      { label: "Q4 2024",           from: "2024-10-01", to: "2024-12-31" },
+                      { label: "Q1 2025",           from: "2025-01-01", to: "2025-03-31" },
+                      { label: "Letzter Monat",     from: new Date(new Date().setMonth(new Date().getMonth()-1, 1)).toISOString().slice(0,10), to: new Date(new Date().setDate(0)).toISOString().slice(0,10) },
+                    ].map(({ label, from, to }) => (
+                      <button key={label} onClick={() => { setStartDateMin(from); setStartDateMax(to); }}
+                        style={{
+                          background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                          borderRadius: 6, padding: "5px 10px", color: "var(--text-primary)",
+                          fontSize: 12, cursor: "pointer",
+                        }}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 12 }}>
+                  <button onClick={() => { setStartDateMin(""); setStartDateMax(""); setShowDatePicker(false); }}
+                    style={{
+                      background: "none", border: "1px solid rgba(255,255,255,0.15)",
+                      borderRadius: 8, padding: "7px 16px", color: "var(--text2)", fontSize: 13, cursor: "pointer",
+                    }}>
+                    Zurücksetzen
+                  </button>
+                  <button onClick={() => setShowDatePicker(false)}
+                    style={{
+                      background: "linear-gradient(135deg,#9333ea,#1d4ed8)",
+                      border: "none", borderRadius: 8, padding: "7px 16px",
+                      color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer",
+                    }}>
+                    Übernehmen
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Button */}
         <button onClick={startResearch} disabled={running}

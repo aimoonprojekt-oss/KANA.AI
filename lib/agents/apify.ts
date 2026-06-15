@@ -58,13 +58,20 @@ export async function searchFacebookAds(input: {
   adType: string
   country: string
   maxResults: number
+  startDateMin?: string  // YYYY-MM-DD
+  startDateMax?: string  // YYYY-MM-DD
 }): Promise<object[]> {
   const adTypeParam = input.adType.toLowerCase() === 'video' ? 'video' : 'image'
 
-  // Nur den ersten (spezifischsten) Suchbegriff verwenden — mehrere URLs verlängern die Actor-Laufzeit drastisch
-  const urls = [{
-    url: `https://www.facebook.com/ads/library/?active_status=active&ad_type=${adTypeParam}&country=${input.country}&q=${encodeURIComponent(input.searchTerms[0])}&search_type=keyword_unordered`,
-  }]
+  // Mit Datumsfilter: active_status=all + Datum-Parameter, sonst nur aktive Ads
+  const hasDateFilter = input.startDateMin || input.startDateMax
+  const activeStatus = hasDateFilter ? 'all' : 'active'
+
+  let urlStr = `https://www.facebook.com/ads/library/?active_status=${activeStatus}&ad_type=${adTypeParam}&country=${input.country}&q=${encodeURIComponent(input.searchTerms[0])}&search_type=keyword_unordered`
+  if (input.startDateMin) urlStr += `&start_date[min]=${input.startDateMin}`
+  if (input.startDateMax) urlStr += `&start_date[max]=${input.startDateMax}`
+
+  const urls = [{ url: urlStr }]
 
   const datasetId = await runActor('curious_coder~facebook-ads-library-scraper', {
     urls,
