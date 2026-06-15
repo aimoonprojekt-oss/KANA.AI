@@ -75,7 +75,7 @@ export async function searchFacebookAds(input: {
 
   const datasetId = await runActor('curious_coder~facebook-ads-library-scraper', {
     urls,
-    maxResults: input.maxResults,
+    maxResults: Math.min(input.maxResults, 10),
   })
   return getDatasetItems(datasetId)
 }

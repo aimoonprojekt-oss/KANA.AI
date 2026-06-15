@@ -140,8 +140,8 @@ async function executeTool(name: string, input: Record<string, unknown>, targetP
 
     let results = await searchFacebookAds({ searchTerms, adType, country: 'DE', maxResults: 30, startDateMin, startDateMax })
 
-    // Zweiter Call falls zu wenig Ergebnisse — produktspezifische Fallback-Keywords
-    if (results.length < (adCount as number)) {
+    // Zweiter Call nur wenn komplett 0 Ergebnisse — verhindert doppelte Apify-Laufzeit
+    if (results.length === 0) {
       const broader = await searchFacebookAds({
         searchTerms: getFallbackSearchTerms(targetProduct),
         adType, country: 'DE', maxResults: 30,
