@@ -12,7 +12,8 @@ export async function POST(req: Request) {
     return new Response(JSON.stringify({ error: 'Kein Zugriff — nur Admins' }), { status: 403 })
   }
 
-  void req
+  const body = await req.json().catch(() => ({}))
+  const sessionIds: string[] = body.sessionIds ?? []
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const encoder = new TextEncoder()
@@ -28,7 +29,9 @@ export async function POST(req: Request) {
 
         const messages: Anthropic.MessageParam[] = [{
           role: 'user',
-          content: "Starte die SNL Creative Analyse: lade REF-Dateien, lese alle ausstehenden Breakdowns aus der Datenbank, führe K1-K6 Scoring durch und speichere jede Analyse."
+          content: sessionIds.length > 0
+            ? `Starte die SNL Creative Analyse für Session(s): ${sessionIds.join(', ')}. Lade REF-Dateien, dann rufe read_breakdowns mit sessionIds: ${JSON.stringify(sessionIds)} auf, führe K1-K6 Scoring durch und speichere jede Analyse.`
+            : "Starte die SNL Creative Analyse: lade REF-Dateien, lese alle ausstehenden Breakdowns aus der Datenbank, führe K1-K6 Scoring durch und speichere jede Analyse."
         }]
 
         while (true) {

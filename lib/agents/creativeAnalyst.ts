@@ -13,14 +13,19 @@ async function readAnalystRefs(): Promise<string> {
   return data.map(r => `## ${r.title}\n\n${r.content}`).join('\n\n---\n\n')
 }
 
-async function readBreakdowns(): Promise<string> {
+async function readBreakdowns(sessionIds?: string[]): Promise<string> {
   const db = getSupabaseAdmin()
 
-  // Alle Ads aus ad_research laden — kein Filter auf video_breakdown
-  const { data: breakdowns, error: breakdownError } = await db
+  let query = db
     .from('ad_research')
-    .select('ad_id, advertiser, ad_text, headline, cta_button, landing_page, ad_format, laufzeit_tage, impressionen, varianten, plattformen, video_url, video_breakdown, research_datum')
+    .select('ad_id, advertiser, ad_text, headline, cta_button, landing_page, ad_format, laufzeit_tage, impressionen, varianten, plattformen, video_url, video_breakdown, research_datum, session_id')
     .order('research_datum', { ascending: false })
+
+  if (sessionIds && sessionIds.length > 0) {
+    query = query.in('session_id', sessionIds)
+  }
+
+  const { data: breakdowns, error: breakdownError } = await query
 
   if (breakdownError) return `FEHLER beim Laden: ${breakdownError.message}`
 
@@ -92,7 +97,7 @@ export async function executeAnalystTool(
 ): Promise<string> {
   if (name === 'read_analyst_refs')   return await readAnalystRefs()
   if (name === 'read_brand_knowledge') return await readBrandKnowledge()
-  if (name === 'read_breakdowns')     return await readBreakdowns()
+  if (name === 'read_breakdowns')     return await readBreakdowns((input.sessionIds as string[] | undefined))
   if (name === 'save_analysis')       return await saveAnalysis(input)
   return `Unbekanntes Tool: ${name}`
 }
@@ -112,8 +117,14 @@ export const CREATIVE_ANALYST_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'read_breakdowns',
-    description: 'Liest alle noch nicht analysierten Ads aus der ad_research Tabelle (Felder: ad_text, headline, cta_button, video_breakdown u.a.). Gibt KEINE_BREAKDOWNS_VORHANDEN zurück wenn die Tabelle leer ist, oder ALLE_ANALYSIERT wenn alle bereits verarbeitet wurden.',
-    input_schema: { type: 'object' as const, properties: {}, required: [] },
+    description: 'Liest noch nicht analysierte Ads aus der ad_research Tabelle. Wenn sessionIds angegeben sind, werden nur Ads dieser Sessions geladen.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        sessionIds: { type: 'array', items: { type: 'string' }, description: 'Optionale Liste von Session-IDs — nur Ads dieser Sessions laden' },
+      },
+      required: [],
+    },
   },
   {
     name: 'save_analysis',

@@ -1,16 +1,35 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 type LogEntry = { type: string; message: string; ts: number };
+type Session = { id: string; product: string; ad_format: string; ad_count: number; created_at: string };
 
 export default function CreativeAnalyst() {
   const router = useRouter();
   const [isRunning, setIsRunning] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [summary, setSummary] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
+  const [sessionsLoading, setSessionsLoading] = useState(true);
   const logRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch("/api/research/sessions")
+      .then(r => r.json())
+      .then(data => { setSessions(Array.isArray(data) ? data : []); setSessionsLoading(false); })
+      .catch(() => setSessionsLoading(false));
+  }, []);
+
+  const toggleSession = (id: string) => {
+    setSelectedSessions(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
   const addLog = useCallback((entry: LogEntry) => {
     setLogs(prev => [...prev, entry]);
@@ -21,9 +40,11 @@ export default function CreativeAnalyst() {
     if (isRunning) return;
     setIsRunning(true); setLogs([]); setSummary(null);
     const collected: string[] = [];
+    const sessionIds = selectedSessions.size > 0 ? Array.from(selectedSessions) : [];
     try {
       const res = await fetch("/api/creative-analyst/run", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionIds }),
       });
       if (!res.ok) { const e = await res.json(); addLog({ type: "error", message: e.error ?? "Fehler", ts: Date.now() }); return; }
       const reader = res.body!.getReader();
@@ -72,6 +93,64 @@ export default function CreativeAnalyst() {
       </div>
 
       <div style={{ maxWidth:720, margin:"0 auto", padding:"24px 20px" }}>
+
+        {/* Session-Auswahl */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, color: "var(--text2)", fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            Research Sessions
+            {selectedSessions.size > 0 && (
+              <span style={{ marginLeft: 8, background: "rgba(59,130,246,0.3)", color: "#93c5fd", padding: "2px 8px", borderRadius: 20, fontSize: 11 }}>
+                {selectedSessions.size} ausgewählt
+              </span>
+            )}
+          </div>
+
+          {sessionsLoading ? (
+            <div style={{ fontSize: 13, color: "var(--text3)", padding: "12px 0" }}>Lade Sessions…</div>
+          ) : sessions.length === 0 ? (
+            <div style={{ fontSize: 13, color: "var(--text3)", padding: "12px 16px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+              Noch keine Research Sessions vorhanden — starte zuerst den Creative Researcher.
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {sessions.map(s => {
+                const selected = selectedSessions.has(s.id);
+                const date = new Date(s.created_at);
+                const dateStr = date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+                const timeStr = date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+                return (
+                  <div key={s.id} onClick={() => !isRunning && toggleSession(s.id)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 12, padding: "12px 14px",
+                      borderRadius: 10, cursor: isRunning ? "not-allowed" : "pointer",
+                      background: selected ? "rgba(59,130,246,0.12)" : "rgba(255,255,255,0.03)",
+                      border: `1px solid ${selected ? "rgba(59,130,246,0.5)" : "rgba(255,255,255,0.08)"}`,
+                      transition: "all 0.15s",
+                    }}>
+                    <div style={{
+                      width: 18, height: 18, borderRadius: 5, border: `2px solid ${selected ? "#3b82f6" : "rgba(255,255,255,0.2)"}`,
+                      background: selected ? "#3b82f6" : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0, fontSize: 11,
+                    }}>
+                      {selected && "✓"}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{s.product}</div>
+                      <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>
+                        {dateStr} · {timeStr} · {s.ad_format} · {s.ad_count} {s.ad_count === 1 ? "Ad" : "Ads"}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {selectedSessions.size === 0 && (
+                <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 4 }}>
+                  Keine Session ausgewählt → alle unanalysierten Ads werden verarbeitet
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Main Button */}
         <button onClick={runAgent} disabled={isRunning}

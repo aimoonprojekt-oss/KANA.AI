@@ -129,7 +129,7 @@ const TOOLS: Anthropic.Tool[] = [
 
 // ─── Tool-Ausführung ──────────────────────────────────────────────────────────
 
-async function executeTool(name: string, input: Record<string, unknown>, targetProduct: string, minImpressions = 0, maxVideoDuration = 0, startDateMin?: string, startDateMax?: string): Promise<string> {
+async function executeTool(name: string, input: Record<string, unknown>, targetProduct: string, minImpressions = 0, maxVideoDuration = 0, startDateMin?: string, startDateMax?: string, sessionId?: string): Promise<string> {
   if (name === 'search_facebook_ads') {
     const { searchTerms, adType, adCount } = input as { searchTerms: string[], adType: string, adCount: number }
 
@@ -245,9 +245,17 @@ async function executeTool(name: string, input: Record<string, unknown>, targetP
       datenstatus:       String(input.datenstatus ?? 'nur Library-Daten'),
       bereit_fuer_analyst: true,
       research_datum:    new Date().toISOString(),
+      session_id:        sessionId ?? null,
     }, { onConflict: 'ad_id' })
 
     if (error) return JSON.stringify({ success: false, error: error.message })
+
+    // Session-Zähler hochzählen
+    if (sessionId) {
+      const { data: sess } = await db.from('research_sessions').select('ad_count').eq('id', sessionId).single()
+      await db.from('research_sessions').update({ ad_count: (sess?.ad_count ?? 0) + 1 }).eq('id', sessionId)
+    }
+
     return JSON.stringify({ success: true, adId: input.adId })
   }
 
@@ -302,6 +310,9 @@ QUALITÄTSREGELN:
 export async function POST(req: Request) {
   const { targetProduct, adCount, adType, searchKeywords, minImpressions = 0, maxVideoDuration = 0, startDateMin, startDateMax } = await req.json()
 
+  // Session-ID für diesen Run generieren
+  const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
   if (!targetProduct || !adCount || !adType) {
     return new Response(JSON.stringify({ error: 'targetProduct, adCount und adType sind Pflichtfelder' }), { status: 400 })
   }
@@ -318,6 +329,12 @@ export async function POST(req: Request) {
 
       try {
         send({ type: 'start', message: `Creative Research startet für: ${targetProduct}` })
+
+        // Session in research_sessions speichern
+        const db = getSupabaseAdmin()
+        await db.from('research_sessions').insert({
+          id: sessionId, product: targetProduct, ad_format: adType, ad_count: 0, created_at: new Date().toISOString(),
+        })
 
         const messages: Anthropic.MessageParam[] = [
           {
@@ -355,7 +372,7 @@ export async function POST(req: Request) {
             if (block.type === 'tool_use') {
               send({ type: 'tool', message: `🔧 ${block.name}...` })
               try {
-                const result = await executeTool(block.name, block.input as Record<string, unknown>, targetProduct, minImpressions, maxVideoDuration, startDateMin, startDateMax)
+                const result = await executeTool(block.name, block.input as Record<string, unknown>, targetProduct, minImpressions, maxVideoDuration, startDateMin, startDateMax, sessionId)
                 toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
                 send({ type: 'tool_done', message: `✅ ${block.name} fertig` })
               } catch (err) {
