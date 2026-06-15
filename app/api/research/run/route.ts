@@ -10,6 +10,53 @@ export const maxDuration = 600
 const SNL_KEYWORDS = ['sinsnlashes', 'sins n lashes', 'sins & lashes', 'sinsnlashes.com']
 const RETAILER_KEYWORDS = ['rossmann', 'müller', 'douglas', 'dm ', 'drogerie', 'amazon', 'otto']
 
+// Mindestens eines dieser Keywords muss im Ad-Text/Page-Name vorkommen
+function getProductRelevanceKeywords(product: string): string[] {
+  const p = product.toLowerCase()
+  if (p.includes('wimpernserum') || p.includes('lash serum') || p.includes('eyelash serum') || p.includes('lash growth')) {
+    return ['serum', 'lash serum', 'lash growth', 'wimper', 'eye lash', 'eyelash', 'growth serum']
+  }
+  if (p.includes('augenbrauen') || p.includes('brow serum') || p.includes('eyebrow')) {
+    return ['brow', 'eyebrow', 'augenbraue', 'brow serum']
+  }
+  if (p.includes('haarserum') || p.includes('hair serum') || p.includes('haaröl') || p.includes('hair oil')) {
+    return ['hair serum', 'haarserum', 'hair growth', 'hair oil', 'haaröl']
+  }
+  if (p.includes('rosmarin') || p.includes('rosemary')) {
+    return ['rosemary', 'rosmarin', 'rosemary oil', 'rosmarinöl']
+  }
+  if (p.includes('mascara')) {
+    return ['mascara']
+  }
+  if (p.includes('lifting') || p.includes('lash lift') || p.includes('wimpernlifting')) {
+    return ['lash lift', 'lifting', 'lash perm', 'wimpernlifting']
+  }
+  // Fallback: Produktname selbst als Keywords (Wörter mit >3 Zeichen)
+  return product.toLowerCase().split(/\s+/).filter(w => w.length > 3)
+}
+
+// Fallback-Keywords für zweiten Apify-Call — produktspezifisch statt generisch
+function getFallbackSearchTerms(product: string): string[] {
+  const p = product.toLowerCase()
+  if (p.includes('wimpernserum') || p.includes('lash serum') || p.includes('eyelash serum')) {
+    return ['lash growth serum', 'eyelash serum', 'lash booster']
+  }
+  if (p.includes('augenbrauen') || p.includes('brow')) {
+    return ['eyebrow growth serum', 'brow enhancer', 'augenbrauenserum']
+  }
+  if (p.includes('haar') || p.includes('hair') || p.includes('rosmarin') || p.includes('rosemary')) {
+    return ['hair growth serum', 'rosemary hair oil', 'haarwachstum serum']
+  }
+  if (p.includes('mascara')) {
+    return ['lash mascara', 'lengthening mascara', 'volumizing mascara']
+  }
+  if (p.includes('lifting') || p.includes('lash lift')) {
+    return ['lash lift kit', 'lash perm', 'wimperlifting kit']
+  }
+  // Fallback: Produktname direkt suchen
+  return [product]
+}
+
 // ─── Tool-Definitionen für Claude ─────────────────────────────────────────────
 
 const TOOLS: Anthropic.Tool[] = [
@@ -93,10 +140,10 @@ async function executeTool(name: string, input: Record<string, unknown>, targetP
 
     let results = await searchFacebookAds({ searchTerms, adType, country: 'DE', maxResults: 30 })
 
-    // Zweiter Call falls zu wenig Ergebnisse
+    // Zweiter Call falls zu wenig Ergebnisse — produktspezifische Fallback-Keywords
     if (results.length < (adCount as number)) {
       const broader = await searchFacebookAds({
-        searchTerms: ['lash', 'wimpern', 'eye serum', 'eyelash'],
+        searchTerms: getFallbackSearchTerms(targetProduct),
         adType, country: 'DE', maxResults: 30,
       })
       const seen = new Set((results as Record<string, unknown>[]).map(a => a.ad_archive_id))
@@ -104,6 +151,8 @@ async function executeTool(name: string, input: Record<string, unknown>, targetP
         if (!seen.has(ad.ad_archive_id)) results.push(ad)
       }
     }
+
+    const productKeywords = getProductRelevanceKeywords(targetProduct)
 
     // Filter
     const filtered = (results as Record<string, unknown>[]).filter(ad => {
@@ -114,6 +163,9 @@ async function executeTool(name: string, input: Record<string, unknown>, targetP
       if (RETAILER_KEYWORDS.some(k => text.includes(k))) return false
       const imp = parseInt(String(ad.impressions_text ?? '0')) || 0
       if (minImpressions > 0 && imp > 0 && imp < minImpressions) return false
+      // Produkt-Relevanz: mindestens ein Keyword muss im Ad-Text vorkommen
+      const fullText = JSON.stringify(ad).toLowerCase()
+      if (productKeywords.length > 0 && !productKeywords.some(k => fullText.includes(k))) return false
       // Bei VIDEO-Suche: Ad muss irgendwo im Objekt eine Video-URL enthalten
       if (adType === 'VIDEO') {
         const raw = JSON.stringify(ad).toLowerCase()
