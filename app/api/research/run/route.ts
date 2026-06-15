@@ -129,7 +129,7 @@ const TOOLS: Anthropic.Tool[] = [
 
 // ─── Tool-Ausführung ──────────────────────────────────────────────────────────
 
-async function executeTool(name: string, input: Record<string, unknown>, targetProduct: string, minImpressions = 0): Promise<string> {
+async function executeTool(name: string, input: Record<string, unknown>, targetProduct: string, minImpressions = 0, maxVideoDuration = 0): Promise<string> {
   if (name === 'search_facebook_ads') {
     const { searchTerms, adType, adCount } = input as { searchTerms: string[], adType: string, adCount: number }
 
@@ -171,6 +171,15 @@ async function executeTool(name: string, input: Record<string, unknown>, targetP
         const raw = JSON.stringify(ad).toLowerCase()
         const hasVideo = raw.includes('.mp4') || raw.includes('video_hd_url') || raw.includes('video_sd_url') || raw.includes('"video_url"') || raw.includes('"videourl"')
         if (!hasVideo) return false
+        // Dauer-Filter (nur wenn Apify das Feld liefert)
+        const durRaw = ad.video_duration ?? ad.duration ?? ad.video_length ?? ad.videoDuration ?? null
+        if (durRaw !== null && durRaw !== undefined) {
+          const dur = Number(durRaw)
+          if (!isNaN(dur)) {
+            if (dur < 5) return false                              // min. 5 Sek. immer
+            if (maxVideoDuration > 0 && dur > maxVideoDuration) return false
+          }
+        }
       }
       return true
     })
@@ -247,11 +256,14 @@ async function executeTool(name: string, input: Record<string, unknown>, targetP
 
 // ─── System-Prompt für Claude ─────────────────────────────────────────────────
 
-function buildSystemPrompt(targetProduct: string, adCount: number, adType: string): string {
+function buildSystemPrompt(targetProduct: string, adCount: number, adType: string, maxVideoDuration = 0): string {
+  const durationNote = adType === 'VIDEO'
+    ? `\nVIDEO-DAUER: Mindestens 5 Sekunden lang.${maxVideoDuration > 0 ? ` Maximal ${maxVideoDuration} Sekunden.` : ''} Videos die kürzer als 5 Sekunden sind überspringen.`
+    : ''
   return `Du bist der Creative Research Agent für Sins n Lashes (SNL).
 
 Deine Aufgabe: Competitor-Ads für "${targetProduct}" finden, filtern, ranken und in Supabase speichern.
-Gewünschte Anzahl: ${adCount} Ads. Format: ${adType}.
+Gewünschte Anzahl: ${adCount} Ads. Format: ${adType}.${durationNote}
 
 ABSOLUTES AUSSCHLUSS-PRINZIP: Ads von Sins n Lashes (sinsnlashes.com, @sinsnlashes) niemals aufnehmen.
 
@@ -288,7 +300,7 @@ QUALITÄTSREGELN:
 // ─── API Route ────────────────────────────────────────────────────────────────
 
 export async function POST(req: Request) {
-  const { targetProduct, adCount, adType, searchKeywords, minImpressions = 0 } = await req.json()
+  const { targetProduct, adCount, adType, searchKeywords, minImpressions = 0, maxVideoDuration = 0 } = await req.json()
 
   if (!targetProduct || !adCount || !adType) {
     return new Response(JSON.stringify({ error: 'targetProduct, adCount und adType sind Pflichtfelder' }), { status: 400 })
@@ -319,7 +331,7 @@ export async function POST(req: Request) {
           const response = await anthropic.messages.create({
             model:      'claude-sonnet-4-6',
             max_tokens: 8096,
-            system:     buildSystemPrompt(targetProduct, adCount, adType),
+            system:     buildSystemPrompt(targetProduct, adCount, adType, maxVideoDuration),
             tools:      TOOLS,
             messages,
           })
@@ -343,7 +355,7 @@ export async function POST(req: Request) {
             if (block.type === 'tool_use') {
               send({ type: 'tool', message: `🔧 ${block.name}...` })
               try {
-                const result = await executeTool(block.name, block.input as Record<string, unknown>, targetProduct, minImpressions)
+                const result = await executeTool(block.name, block.input as Record<string, unknown>, targetProduct, minImpressions, maxVideoDuration)
                 toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
                 send({ type: 'tool_done', message: `✅ ${block.name} fertig` })
               } catch (err) {

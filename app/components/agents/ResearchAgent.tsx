@@ -21,6 +21,7 @@ export default function ResearchAgent() {
   const [adCount, setAdCount]   = useState(3);
   const [adType, setAdType]     = useState<"VIDEO" | "IMAGE">("VIDEO");
   const [minImpressions, setMinImpressions] = useState(0);
+  const [maxVideoDuration, setMaxVideoDuration] = useState(0);
   const [running, setRunning]   = useState(false);
   const [log, setLog]           = useState<LogEntry[]>([]);
   const [done, setDone]         = useState(false);
@@ -39,7 +40,7 @@ export default function ResearchAgent() {
       const res = await fetch("/api/research/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetProduct: product, adCount, adType, minImpressions }),
+        body: JSON.stringify({ targetProduct: product, adCount, adType, minImpressions, maxVideoDuration }),
       });
 
       const reader = res.body!.getReader();
@@ -160,6 +161,25 @@ export default function ResearchAgent() {
             <option value={300000}>300.000+</option>
           </select>
         </div>
+
+        {/* Max. Videolänge — nur bei VIDEO */}
+        {adType === "VIDEO" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, width: 160 }}>
+            <label style={{ fontSize: 12, color: "var(--text2)", fontWeight: 600 }}>Max. Videolänge</label>
+            <select value={maxVideoDuration} onChange={e => setMaxVideoDuration(Number(e.target.value))} disabled={running}
+              style={{
+                background: "var(--surface)", border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 8, padding: "8px 12px", color: "var(--text-primary)", fontSize: 14,
+              }}>
+              <option value={0}>Keine Grenze</option>
+              <option value={20}>max. 20 Sek.</option>
+              <option value={30}>max. 30 Sek.</option>
+              <option value={45}>max. 45 Sek.</option>
+              <option value={60}>max. 60 Sek.</option>
+              <option value={90}>max. 90 Sek.</option>
+            </select>
+          </div>
+        )}
 
         {/* Button */}
         <button onClick={startResearch} disabled={running}
