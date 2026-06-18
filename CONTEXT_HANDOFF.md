@@ -1,6 +1,137 @@
 # KANA.AI — Vollständiger Kontext-Handoff
 > Für neues Chat-Fenster. Enthält alles was aus den vorherigen Sessions bekannt ist.
-> Stand: 2026-06-15
+> Stand: 2026-06-18
+
+---
+
+## 0. SESSION 2026-06-18 — Alle Änderungen dieser Session
+
+### Neue Features
+
+#### Produkt-Relevanz-Filter (Researcher)
+**Datei:** `app/api/research/run/route.ts`
+- Funktion `getProductRelevanceKeywords(product)` — gibt produktspezifische Must-Have-Keywords zurück
+- Für Wimpernserum: `['lash', 'serum', 'wimper', 'eyelash', 'wimpern', 'wachstum', 'growth']`
+- Verhindert dass z.B. Wimpernzangen-Ads bei Wimpernserum-Suche auftauchen
+- Filter scannt `JSON.stringify(ad)` — mindestens 1 Keyword muss vorkommen
+
+#### Produktspezifischer Fallback-Call (Researcher)
+**Datei:** `app/api/research/run/route.ts`
+- Funktion `getFallbackSearchTerms(product)` — produktspezifische Fallback-Keywords
+- Zweiter Apify-Call läuft jetzt nur noch wenn **exakt 0** Ergebnisse kommen (nicht schon bei "zu wenig")
+
+#### Video-Dauer-Filter (Researcher)
+**Datei:** `app/api/research/run/route.ts`, `app/components/agents/ResearchAgent.tsx`
+- Min. 5 Sekunden: immer aktiv, hardcoded
+- Max. Videolänge: Dropdown in UI (20s / 30s / 45s / 60s / 90s)
+- **+3 Sekunden Toleranz:** Wenn zu wenig Ads gefunden → Grenze wird einmalig um 3s erhöht (30s → 33s)
+- Dauer-Filter greift nur wenn Apify das Feld liefert (`video_duration`, `duration`, `video_length`, `videoDuration`)
+
+#### Zeitraum-Filter / Date Range Picker (Researcher)
+**Datei:** `app/api/research/run/route.ts`, `lib/agents/apify.ts`, `app/components/agents/ResearchAgent.tsx`
+- Neuer Button "📅 Zeitraum" in der Researcher-UI
+- Von/Bis Datumseingabe + Schnellauswahl (Black Friday 2024, Q4 2024, Q1 2025, Letzter Monat)
+- Mit Datumsfilter: `active_status=all` + `start_date[min]/[max]` in der Apify-URL
+- Ohne Datumsfilter: `active_status=active` (nur aktive Ads, wie bisher)
+
+#### Research Sessions (Researcher + Analyst)
+**Neue Supabase-Tabellen (SQL bereits ausgeführt):**
+```sql
+ALTER TABLE ad_research ADD COLUMN IF NOT EXISTS session_id TEXT;
+CREATE TABLE IF NOT EXISTS research_sessions (
+  id TEXT PRIMARY KEY, product TEXT, ad_format TEXT, ad_count INTEGER DEFAULT 0, created_at TIMESTAMPTZ
+);
+```
+**Neue API:** `app/api/research/sessions/route.ts` — GET, gibt alle Sessions zurück
+
+**Researcher** (`app/api/research/run/route.ts`):
+- Generiert beim Start eine `session_id` = `${Date.now()}-${random}`
+- Speichert Session in `research_sessions` (id, product, ad_format, ad_count=0)
+- Schreibt `session_id` zu jeder Ad in `ad_research`
+- Erhöht `ad_count` in `research_sessions` nach jeder gespeicherten Ad
+
+**Analyst UI** (`app/components/agents/CreativeAnalyst.tsx`):
+- Lädt beim Öffnen alle Sessions via `/api/research/sessions`
+- Zeigt Sessions als anklickbare Karten: Produkt · Datum · Uhrzeit · Format · Anzahl Ads
+- Mehrfachauswahl möglich (Checkboxen)
+- Keine Session ausgewählt → alle unanalysierten Ads (wie vorher)
+- Ausgewählte Sessions → nur Ads dieser Sessions werden analysiert
+
+**Analyst API** (`app/api/creative-analyst/run/route.ts`):
+- Empfängt `sessionIds[]` aus Request Body
+- Übergibt sie an `read_breakdowns` Tool
+
+**Analyst-Lib** (`lib/agents/creativeAnalyst.ts`):
+- `readBreakdowns(sessionIds?)` — filtert `ad_research` per `.in('session_id', sessionIds)` wenn angegeben
+
+### Bugfixes dieser Session
+
+#### Fix: Apify `count` statt `maxResults`
+**Datei:** `lib/agents/apify.ts`
+**Problem:** Parameter hieß `maxResults` aber der Actor erwartet `count` → Actor ignorierte die Grenze → scrafte tausende Ergebnisse (3.500–7.900) statt 30 → Laufzeit 7-18 Minuten
+**Fix:** `maxResults` → `count` im Actor-Input
+**Commits:** `a09f9fc`
+
+#### Fix: Apify Polling — async statt waitForFinish
+**Datei:** `lib/agents/apify.ts`
+**Problem:** `waitForFinish=200` + Fallback-Polling 18×5s = 290s → Timeout bei großen Jobs
+**Fix:** Actor wird async gestartet (kein waitForFinish), dann Polling alle 10s, max. 55×10s = 550s
+- Jeder Poll hat 15s Timeout per `AbortController`
+- Bei Netzwerkfehler während Polling: weiterpollen statt crashen
+**Commits:** `7869d27`, `609801c`
+
+#### Fix: maxResults auf 300 erhöht
+**Datei:** `app/api/research/run/route.ts`
+- Rohmaterial von 30 → 300 damit nach allen Filtern genug saubere Ads übrig bleiben
+
+#### Fix: Video-Download Headers
+**Datei:** `lib/agents/videoStorage.ts`
+**Problem:** Nur `User-Agent` Header → Facebook CDN blockt Requests ohne `Referer`
+**Fix:** Vollständige Browser-Headers hinzugefügt:
+```typescript
+'Referer': 'https://www.facebook.com/',
+'Accept': 'video/webm,video/mp4,video/*;q=0.9,*/*;q=0.8',
+'Sec-Fetch-Dest': 'video',
+'Sec-Fetch-Mode': 'no-cors',
+```
+Timeout: 60s → 90s
+
+#### Fix: Video-Erkennung erweitert
+**Datei:** `app/api/research/run/route.ts`
+Neue Patterns: `'"videos"'`, `'video_preview'`, `'"video":{'`
+
+#### Fix: Validierung vor Session-Erstellung
+**Datei:** `app/api/research/run/route.ts`
+- Pflichtfeld-Validierung jetzt vor Session-Insert (verhindert leere Sessions bei fehlendem targetProduct)
+
+### Aktueller Stand `lib/agents/apify.ts`
+```typescript
+// Async start, kein waitForFinish
+// Polling: alle 10s, max 55 Versuche = 550s
+// Jeder Poll: 15s AbortController Timeout
+// Bei Netzwerkfehler: weiterpollen
+// Parameter: count (nicht maxResults!)
+// 1 URL pro Call (searchTerms[0])
+// Mit Datumsfilter: active_status=all + start_date[min/max]
+```
+
+### Letzte Git-Commits dieser Session
+```
+4e30818  Fix duration tolerance: max +3s fallback only
+70ee95c  Relax video duration limit (wurde sofort korrigiert)
+03b7ac1  Fix video download: add Facebook CDN headers, add duration options
+dfdfadf  Broaden product relevance keywords + increase maxResults to 100
+609801c  Fix Apify polling: add 15s timeout + retry on network errors
+a09f9fc  Fix Apify: use 'count' instead of 'maxResults' parameter
+7869d27  Fix Apify timeout: async start + 550s polling window
+d91027e  Fix: move validation before session creation in research route
+b719fd1  Add research sessions: session tracking in researcher, session picker in analyst UI
+374d087  Fix Apify timeout: maxResults 30->10, fallback only on 0 results
+f181a6d  Add date range picker to researcher: Black Friday / historical ad search support
+6bdf04d  Add video duration filter: min 5s hardcoded, max duration UI dropdown
+7e22847  Fix researcher: add product-relevance filter and product-specific fallback keywords
+a67bd22  Increase raw material limit to 300 results from Apify
+```
 
 ---
 
@@ -49,6 +180,7 @@ Creative Strategist   → liest strategist_knowledge + brand_knowledge + analyst
 - **Helper-Libs:** `lib/agents/apify.ts`, `lib/agents/gemini.ts`, `lib/agents/videoStorage.ts`
 - **Supabase-Tabelle:** `ad_research` ← **speichert hier** (nicht analyst_breakdowns!)
 - **UI:** `app/components/agents/ResearchAgent.tsx`
+- **Sessions-API:** `app/api/research/sessions/route.ts`
 
 ### 3c. Creative Analyst
 - **Route:** `/chat/custom_creative_analyst`
@@ -57,7 +189,7 @@ Creative Strategist   → liest strategist_knowledge + brand_knowledge + analyst
 - **Supabase-Tabellen:** liest `analyst_knowledge` + `brand_knowledge` + `ad_research`, schreibt in `analyst_results`
 - **Seed-Script:** `Brand experte railway/seed_analyst.js`
 - **Admin-Sidebar:** ✅ `🔬 Creative Analyst`
-- **UI:** `app/components/agents/CreativeAnalyst.tsx` — blauer Theme, Single Button "🔬 Breakdowns analysieren"
+- **UI:** `app/components/agents/CreativeAnalyst.tsx` — blauer Theme, Session-Picker + "🔬 Breakdowns analysieren"
 
 ### 3d. Creative Strategist
 - **Route:** `/chat/custom_creative_strategist`
@@ -107,14 +239,17 @@ Datei: `KANA.AI/docs/supabase-schema.sql`
 | `analyst_breakdowns` | **NICHT VERWENDET** — war ursprünglich für Researcher, jetzt leer | — |
 | `analyst_results` | K1-K6 Scoring Ergebnisse (Input für Strategist) | Creative Analyst |
 | `ad_research` | Competitor-Ad Daten + Video-Breakdowns | Creative Researcher |
+| `research_sessions` | **NEU** — Session-Metadaten pro Researcher-Run | Creative Researcher |
 
 **Supabase URL:** `https://koffbdobhehdcthsrtyh.supabase.co`
 **Service Role Key:** in Railway ENV
 
-**WICHTIG `ad_research` Spalten** (was der Researcher speichert):
-`ad_id, advertiser, target_product, ad_format, start_date, laufzeit_tage, impressionen, varianten, plattformen, ad_text, headline, cta_button, landing_page, video_url, thumbnail_url, video_breakdown, rohdaten, status, datenstatus, bereit_fuer_analyst, research_datum`
+**WICHTIG `ad_research` Spalten:**
+`ad_id, advertiser, target_product, ad_format, start_date, laufzeit_tage, impressionen, varianten, plattformen, ad_text, headline, cta_button, landing_page, video_url, thumbnail_url, video_breakdown, rohdaten, status, datenstatus, bereit_fuer_analyst, research_datum, session_id`
 
 **KEIN `created_at`** — das Datumsfeld heißt `research_datum`! Queries müssen `.order('research_datum', ...)` nutzen.
+
+**`research_sessions` Spalten:** `id, product, ad_format, ad_count, created_at`
 
 ---
 
@@ -130,189 +265,121 @@ node seed_analyst.js     # analyst_knowledge     → Creative Analyst
 
 ## 8. Alle Bugfixes (chronologisch)
 
-### Fix 1: Research Route — Edge Runtime
-**Datei:** `app/api/research/run/route.ts`
-**Problem:** Route lief auf Edge Runtime → SSE-Verbindung brach sofort ab.
-**Fix:** `export const runtime = 'nodejs'` + `export const maxDuration = 600` (wurde von 300 auf 600 erhöht)
-**Commit:** `07ae08e`
+### Fix 1–7: (siehe vorherige Session, Stand 2026-06-15)
 
-### Fix 2: Strategist — 400 Error leere user-messages
-**Datei:** `app/api/creative-strategist/run/route.ts`
-**Fix:** `if (response.stop_reason !== 'tool_use') { break }` + `if (toolResults.length === 0) break`
-
-### Fix 3: Apify Timeout — waitForFinish
+### Fix 8: Apify Parameter `count` statt `maxResults`
 **Datei:** `lib/agents/apify.ts`
-**Problem:** `runActor` pollte bis zu 600s → Railway killt nach 300s → "TypeError: network error"
-**Fix:**
-- `waitForFinish=200` im Apify-Start-Call (Apify hält Verbindung server-seitig offen)
-- Fallback-Polling nur noch 18 × 5s = 90s
-- `maxResults` von 80 auf 30 reduziert
-**Commits:** `22ad3b5`, `7c14fbe`
+**Problem:** Actor ignorierte `maxResults` → scrafte tausende Ergebnisse → 7-18 Minuten Laufzeit
+**Fix:** Parameter heißt `count` beim `curious_coder~facebook-ads-library-scraper`
 
-### Fix 4: Apify — nur 1 URL pro Call
+### Fix 9: Apify — async Polling statt waitForFinish
 **Datei:** `lib/agents/apify.ts`
-**Problem:** Mehrere Keywords = mehrere URLs = Apify scrapet mehrere Facebook-Seiten gleichzeitig → >200s
-**Fix:** Nur `searchTerms[0]` als URL übergeben — 1 URL statt N
-**Commit:** `4ac0224`
+**Fix:** Actor async starten → Polling alle 10s × 55 = 550s Max, mit 15s AbortController + Netzwerkfehler-Retry
 
-### Fix 5: VIDEO-Filter filterte alle Ads raus
-**Datei:** `app/api/research/run/route.ts`
-**Problem:** Filter prüfte auf `video_hd_url`/`video_sd_url`/`video_preview_image_url` — Felder die Apify so nicht liefert → 0 Ergebnisse bei VIDEO-Suche
-**Fix:** Neuer robuster Filter: scannt komplettes Ad-Objekt als JSON-String nach `.mp4` oder `video_url`
-```typescript
-const raw = JSON.stringify(ad).toLowerCase()
-const hasVideo = raw.includes('.mp4') || raw.includes('video_hd_url') || raw.includes('video_sd_url') || raw.includes('"video_url"') || raw.includes('"videourl"')
-if (!hasVideo) return false
-```
-**Commit:** `745e040`
-
-### Fix 6: Min. Impressionen — UI-Feld
-**Dateien:** `app/components/agents/ResearchAgent.tsx`, `app/api/research/run/route.ts`
-**Feature:** Neues Dropdown "Min. Impressionen" (Keine Grenze / 10k / 50k / 150k / 300k)
-**Default:** 0 (keine Grenze) — vorher war 150.000 hardcoded
-**Commit:** `27d272a`
-
-### Fix 7: Analyst las falsche Tabelle
-**Datei:** `lib/agents/creativeAnalyst.ts`
-**Problem:** Analyst las aus `analyst_breakdowns` (leer) statt `ad_research` (wo Researcher speichert)
-**Fix:**
-- Query auf `ad_research` umgestellt
-- Alle Felder selektiert (nicht nur `video_breakdown`)
-- Order by `research_datum` (nicht `created_at` — existiert nicht in der Tabelle!)
-- Fehler-Logging hinzugefügt: `if (breakdownError) return 'FEHLER: ...'`
-- Analyst baut Breakdown-Text aus allen verfügbaren Feldern zusammen (funktioniert auch ohne Video-Breakdown)
-**Commits:** `8df4d0f`, `e7050af`, `3f3bc8d`, `9f882f6`, `cbd9fe6`
+### Fix 10: Video-Download Facebook CDN Headers
+**Datei:** `lib/agents/videoStorage.ts`
+**Fix:** `Referer: https://www.facebook.com/` + Browser-Headers → CDN blockiert nicht mehr
 
 ---
 
-## 9. Creative Researcher — Details
+## 9. Creative Researcher — Details (aktuell)
 
 **Datei:** `app/api/research/run/route.ts`
 **UI:** `app/components/agents/ResearchAgent.tsx`
 
 **4 Tools:**
-1. `search_facebook_ads` — Apify, filtert SNL-eigene Ads + Retailer, VIDEO-Check via JSON-Scan
-2. `download_video` — Facebook CDN → Supabase Storage
+1. `search_facebook_ads` — Apify (`count: 300`), Produkt-Relevanz-Filter, SNL/Retailer-Filter, VIDEO-Check
+2. `download_video` — Facebook CDN → Supabase Storage (mit Browser-Headers)
 3. `analyze_video` — Gemini AI Video-Analyse → Breakdown-Text
-4. `save_ad_research` — speichert in **`ad_research`** (upsert on `ad_id`)
+4. `save_ad_research` — speichert in **`ad_research`** + zählt Session-Counter hoch
 
 **Filter-Logik:**
-- SNL_KEYWORDS: `['sinsnlashes', 'sins n lashes', 'sins & lashes', 'sinsnlashes.com']` → raus
-- RETAILER_KEYWORDS: `['rossmann', 'müller', 'douglas', 'dm ', 'drogerie', 'amazon', 'otto']` → raus
-- `minImpressions` aus UI (default 0 = keine Grenze)
-- VIDEO-Filter: JSON.stringify(ad) auf `.mp4`/video-Felder scannen
+- SNL_KEYWORDS → raus
+- RETAILER_KEYWORDS → raus
+- `minImpressions` aus UI (default 0)
+- Produkt-Relevanz: mindestens 1 produktspezifisches Keyword im Ad-JSON
+- VIDEO-Filter: JSON-Scan auf `.mp4`/video-Felder
+- Dauer-Filter: min 5s, max aus UI, +3s Toleranz wenn zu wenig Ads
 
 **Apify-Details (`lib/agents/apify.ts`):**
-- `waitForFinish=200` → Apify wartet server-seitig
-- Fallback-Polling: 18 × 5s = 90s max
-- Nur `searchTerms[0]` wird als URL übergeben (1 URL = schnell)
-- `maxResults: 30`
+- Async start (kein `waitForFinish`)
+- Polling: alle 10s, max 550s, 15s Timeout pro Poll, Retry bei Netzwerkfehler
+- Parameter: `count` (nicht `maxResults`!)
+- Nur `searchTerms[0]` als URL (1 URL = schnell)
+- Mit Datum: `active_status=all` + `start_date[min/max]`
+- Ohne Datum: `active_status=active`
 
-**UI-Felder:** Produkt, Anzahl Ads, Format (VIDEO/IMAGE), **Min. Impressionen** (NEU)
+**UI-Felder:** Produkt · Anzahl Ads · Format · Min. Impressionen · Max. Videolänge · Zeitraum (Date Picker)
 
 **Ranking:** Laufzeit × 10 + Impressionen × 0.0001 + Varianten × 5
 
-**Status-Feld in `ad_research`:**
-- `'breakdown_complete'` wenn Video-Breakdown vorhanden
-- `'research_complete'` wenn nur Library-Daten
-
 ---
 
-## 10. Creative Analyst — Details
+## 10. Creative Analyst — Details (aktuell)
 
 **Datei:** `lib/agents/creativeAnalyst.ts`
 
 **4 Tools:**
-1. `read_analyst_refs` — Framework, Scoring-Rubrik, Hook-Swipe-File aus `analyst_knowledge`
-2. `read_brand_knowledge` — SNL Brand Intelligence (für Competitor-Benchmarking)
-3. `read_breakdowns` — liest aus **`ad_research`**, alle Felder, order by `research_datum`, filtert bereits analysierte IDs
-4. `save_analysis` — speichert in `analyst_results` mit upsert on `ad_id`
+1. `read_analyst_refs` — Framework, Scoring-Rubrik aus `analyst_knowledge`
+2. `read_brand_knowledge` — SNL Brand Intelligence
+3. `read_breakdowns(sessionIds?)` — liest `ad_research`, optional gefiltert nach `session_id`
+4. `save_analysis` — speichert in `analyst_results`
 
-**Was `read_breakdowns` zurückgibt:**
-- `KEINE_BREAKDOWNS_VORHANDEN` wenn `ad_research` leer
-- `FEHLER: [message]` wenn Supabase-Query fehlschlägt
-- `ALLE_ANALYSIERT` wenn alle IDs bereits in `analyst_results`
-- Sonst: strukturierter Text mit allen Feldern pro Ad, Video-Breakdown wenn vorhanden
+**Session-Logik:**
+- UI zeigt alle `research_sessions` als Karten
+- Auswahl → `sessionIds[]` → API → `read_breakdowns` filtert per `.in('session_id', sessionIds)`
+- Keine Auswahl → alle unanalysierten Ads
 
 **K1-K6 Scoring-Formel:**
 ```
 Gesamt = (K1×0.30) + (K2×0.20) + (K3×0.15) + (K4×0.20) + (K5×0.10) + (K6×0.05)
 ```
-Score-Klassen: 4.5–5.0 Ausnahme | 3.5–4.4 Stark | 2.5–3.4 Durchschnitt | 1.5–2.4 Schwach | 1.0–1.4 Keine Relevanz
-
-**ABSOLUTES AUSSCHLUSS-PRINZIP:** Ads von SNL selbst niemals analysieren.
 
 ---
 
 ## 11. Creative Strategist — Details
 
-**Datei:** `lib/agents/creativeStrategist.ts`
+*(unverändert gegenüber vorheriger Session)*
 
-**3 Tools:**
-1. `read_strategist_refs` — REF-Dateien (5 Stages Framework)
-2. `read_brand_knowledge` — komplette SNL Brand Intelligence
-3. `read_analyst_results` — K1-K6 Ergebnisse vom Analyst
-
-**3 Modi (UI: 3 Buttons):**
-- `"20"` → 5 Stages × 2 Image + 2 Video = 20 Briefs, max_tokens: 16000
-- `"10"` → 5 Stages × 1 Image + 1 Video = 10 Briefs, max_tokens: 10000
-- `"2"` → Stage 1 × 1 Image + 1 Video = 2 Briefs, max_tokens: 6000
-
-**PDF-Export:** jsPDF clientseitig, A4, goldenes Theme.
-Dateiname: `SinsNLashes_Ad-Strategy-Guide_YYYY-MM-DD.pdf`
+**3 Modi:** 20 Briefs / 10 Briefs / 2 Briefs
+**PDF-Export:** jsPDF, A4, goldenes Theme
 
 ---
 
-## 12. Offene TODOs
-
-1. **Researcher end-to-end testen** — mit "Keine Grenze" Impressionen, Wimpernserum, 2 Ads. Muss bis `save_ad_research` durchlaufen und Daten in `ad_research` speichern.
-2. **`node seed_analyst.js` ausführen** — falls noch nicht gemacht (aus `Brand experte railway/`)
-3. **Creative Analyst testen** — setzt voraus dass `ad_research` Daten hat
-4. **End-to-End:** Researcher → Analyst → Strategist komplett durchlaufen
-
-**Wahrscheinliche Ursache wenn Analyst "KEINE_BREAKDOWNS_VORHANDEN" zeigt:**
-`ad_research` ist leer weil der Researcher noch nie erfolgreich bis `save_ad_research` durchgelaufen ist (alle früheren Runs hatten Timeouts oder VIDEO-Filter-Bug).
-
----
-
-## 13. Datei-Struktur (relevante Dateien)
+## 12. Datei-Struktur (relevante Dateien, aktuell)
 
 ```
 KANA.AI/
 ├── app/
 │   ├── api/
 │   │   ├── brand-expert/run/route.ts
-│   │   ├── creative-strategist/run/route.ts  ← runtime=nodejs, maxDuration=300
-│   │   ├── creative-analyst/run/route.ts
-│   │   └── research/run/route.ts             ← runtime=nodejs, maxDuration=600
+│   │   ├── creative-strategist/run/route.ts     ← runtime=nodejs, maxDuration=300
+│   │   ├── creative-analyst/run/route.ts        ← empfängt sessionIds[]
+│   │   ├── research/
+│   │   │   ├── run/route.ts                     ← runtime=nodejs, maxDuration=600
+│   │   │   └── sessions/route.ts                ← GET /api/research/sessions (NEU)
 │   ├── chat/[agentId]/page.tsx
 │   └── components/
 │       ├── agents/
-│       │   ├── ResearchAgent.tsx              ← Produkt, Anzahl, Format, Min.Impressionen
-│       │   ├── CreativeStrategist.tsx         ← 3-Button Grid, jsPDF, goldener Theme
-│       │   └── CreativeAnalyst.tsx            ← Blauer Theme, Single Button
+│       │   ├── ResearchAgent.tsx                ← Produkt, Anzahl, Format, Min.Impressionen, Max.Videolänge, Zeitraum
+│       │   ├── CreativeStrategist.tsx
+│       │   └── CreativeAnalyst.tsx              ← Session-Picker + Analyse-Button
 │       └── dashboard/
 │           └── PortalDashboard.tsx
 ├── lib/
 │   └── agents/
-│       ├── apify.ts                           ← waitForFinish=200, maxResults=30, 1 URL pro Call
+│       ├── apify.ts                             ← async polling, count param, date filter
 │       ├── creativeStrategist.ts
-│       ├── creativeAnalyst.ts                 ← liest ad_research, order by research_datum
+│       ├── creativeAnalyst.ts                   ← readBreakdowns(sessionIds?)
 │       ├── gemini.ts
-│       └── videoStorage.ts
+│       └── videoStorage.ts                      ← Facebook CDN Headers
 └── docs/
-    ├── supabase-schema.sql                    ← Schema (ad_research ist NICHT drin — existiert aber!)
-    └── ANLEITUNG.md
-
-Brand experte railway/
-├── seed_supabase.js
-├── seed_strategist.js
-└── seed_analyst.js
+    └── supabase-schema.sql
 ```
 
 ---
 
-## 14. SSE Streaming Pattern (alle Agent-Routes)
+## 13. SSE Streaming Pattern (alle Agent-Routes)
 
 ```typescript
 export const runtime = 'nodejs'
@@ -349,7 +416,7 @@ const stream = new ReadableStream({
 
 ---
 
-## 15. Tech-Stack
+## 14. Tech-Stack
 
 | Tool | Version/Details |
 |---|---|
@@ -360,23 +427,5 @@ const stream = new ReadableStream({
 | Railway | Auto-deploy, `maxDuration: 600` für Research-Route |
 | Anthropic | `claude-sonnet-4-6`, Tool Use, SSE Streaming |
 | jsPDF | Client-seitig, PDF-Export im Strategist |
-| Apify | `curious_coder~facebook-ads-library-scraper`, `waitForFinish=200` |
+| Apify | `curious_coder~facebook-ads-library-scraper`, async polling, `count` Parameter |
 | Gemini | Video-Analyse für Researcher |
-
----
-
-## 16. Letzte Git-Commits (aktuell, Stand 2026-06-15)
-
-```
-cbd9fe6  Fix analyst: order by research_datum not created_at, add error logging
-9f882f6  Fix: researcher→ad_research, analyst reads all fields from ad_research
-3f3bc8d  Fix analyst: read all ad_research fields, not just video_breakdown
-745e040  Fix VIDEO filter: scan full ad object for .mp4/video URLs
-27d272a  Add minImpressions filter to Creative Researcher UI and API
-4ac0224  Fix Apify speed: only use first search term per call (1 URL instead of N)
-7c14fbe  Fix Apify timeout: waitForFinish=200, maxResults 80→30, maxDuration 300→600
-22ad3b5  Fix Apify timeout: use waitForFinish=120 to prevent Railway 300s limit
-07ae08e  Fix research route: add nodejs runtime, maxDuration, stop_reason guard
-```
-
-Branch: `main` → deployed auf Railway
