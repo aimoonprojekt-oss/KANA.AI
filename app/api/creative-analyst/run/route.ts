@@ -41,13 +41,24 @@ export async function POST(req: Request) {
         }]
 
         while (true) {
-          const response = await anthropic.messages.create({
-            model:      'claude-sonnet-4-6',
-            max_tokens: 16000,
-            system:     buildAnalystSystemPrompt(),
-            tools:      CREATIVE_ANALYST_TOOLS,
-            messages,
-          })
+          let keepaliveStop = false
+          const keepalive = setInterval(() => {
+            if (!keepaliveStop) controller.enqueue(encoder.encode(': keepalive\n\n'))
+          }, 20000)
+
+          let response: Anthropic.Message
+          try {
+            response = await anthropic.messages.create({
+              model:      'claude-sonnet-4-6',
+              max_tokens: 16000,
+              system:     buildAnalystSystemPrompt(),
+              tools:      CREATIVE_ANALYST_TOOLS,
+              messages,
+            })
+          } finally {
+            keepaliveStop = true
+            clearInterval(keepalive)
+          }
 
           for (const block of response.content) {
             if (block.type === 'text' && block.text) {
