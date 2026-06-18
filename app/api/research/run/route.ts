@@ -269,7 +269,7 @@ async function executeTool(name: string, input: Record<string, unknown>, targetP
 
 function buildSystemPrompt(targetProduct: string, adCount: number, adType: string, maxVideoDuration = 0): string {
   const durationNote = adType === 'VIDEO'
-    ? `\nVIDEO-DAUER: Mindestens 5 Sekunden lang.${maxVideoDuration > 0 ? ` Maximal ${maxVideoDuration} Sekunden.` : ''} Videos die kürzer als 5 Sekunden sind überspringen.`
+    ? `\nVIDEO-DAUER: Mindestens 5 Sekunden lang.${maxVideoDuration > 0 ? ` Maximal ${maxVideoDuration + 3} Sekunden (Toleranz eingebaut — Grenze ist ${maxVideoDuration}s aber bis zu ${maxVideoDuration + 3}s sind erlaubt).` : ''} Videos die kürzer als 5 Sekunden sind überspringen.`
     : ''
   return `Du bist der Creative Research Agent für Sins n Lashes (SNL).
 
