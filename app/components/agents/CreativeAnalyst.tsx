@@ -74,7 +74,7 @@ export default function CreativeAnalyst() {
       else if (full.includes("KEINE_BREAKDOWNS") || full.includes("ALLE_ANALYSIERT")) setSummary(full.slice(full.lastIndexOf("\n\n") + 2) || full);
     } catch (err) { addLog({ type: "error", message: String(err), ts: Date.now() }); }
     finally { setIsRunning(false); }
-  }, [isRunning, addLog]);
+  }, [isRunning, addLog, selectedSessions]);
 
   const downloadPdf = useCallback(() => {
     if (!fullAnalysis) return;
