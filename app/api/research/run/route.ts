@@ -181,14 +181,10 @@ async function executeTool(name: string, input: Record<string, unknown>, targetP
       })
     }
 
-    // Erst mit gesetzter Grenze filtern — wenn zu wenig, Grenze schrittweise +30s lockern
+    // Erst exakt filtern — wenn zu wenig, max. 3 Sekunden Toleranz erlauben
     let filtered = applyFilters(results as Record<string, unknown>[], maxVideoDuration)
     if (maxVideoDuration > 0 && filtered.length < (adCount as number)) {
-      for (let extra = 30; extra <= 120; extra += 30) {
-        const relaxed = applyFilters(results as Record<string, unknown>[], maxVideoDuration + extra)
-        if (relaxed.length >= (adCount as number)) { filtered = relaxed; break }
-        filtered = relaxed // nimm was wir haben, auch wenn noch nicht genug
-      }
+      filtered = applyFilters(results as Record<string, unknown>[], maxVideoDuration + 3)
     }
 
     // Ranking: Laufzeit × 10 + Impressionen × 0.0001 + Varianten × 5
