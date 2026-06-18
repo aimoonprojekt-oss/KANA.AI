@@ -180,8 +180,6 @@ export default function ResearchAgent() {
               <option value={45}>max. 45 Sek.</option>
               <option value={60}>max. 60 Sek.</option>
               <option value={90}>max. 90 Sek.</option>
-              <option value={180}>max. 3 Min.</option>
-              <option value={300}>max. 5 Min.</option>
             </select>
           </div>
         )}
