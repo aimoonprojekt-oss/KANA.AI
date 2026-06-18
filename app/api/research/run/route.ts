@@ -153,34 +153,43 @@ async function executeTool(name: string, input: Record<string, unknown>, targetP
       }
     }
 
-    // Filter
-    const filtered = (results as Record<string, unknown>[]).filter(ad => {
-      if (!ad.ad_archive_id) return false
-      if (existingIds.has(String(ad.ad_archive_id))) return false
-      const text = `${ad.page_name ?? ''} ${ad.link_url ?? ''} ${ad.ad_creative_body ?? ''}`.toLowerCase()
-      if (SNL_KEYWORDS.some(k => text.includes(k))) return false
-      if (RETAILER_KEYWORDS.some(k => text.includes(k))) return false
-      const imp = parseInt(String(ad.impressions_text ?? '0')) || 0
-      if (minImpressions > 0 && imp > 0 && imp < minImpressions) return false
-      // Bei VIDEO-Suche: Ad muss irgendwo im Objekt eine Video-URL enthalten
-      if (adType === 'VIDEO') {
-        const raw = JSON.stringify(ad).toLowerCase()
-        const hasVideo = raw.includes('.mp4') || raw.includes('video_hd_url') || raw.includes('video_sd_url')
-          || raw.includes('"video_url"') || raw.includes('"videourl"') || raw.includes('"videos"')
-          || raw.includes('video_preview') || raw.includes('"video":{')
-        if (!hasVideo) return false
-        // Dauer-Filter (nur wenn Apify das Feld liefert)
-        const durRaw = ad.video_duration ?? ad.duration ?? ad.video_length ?? ad.videoDuration ?? null
-        if (durRaw !== null && durRaw !== undefined) {
-          const dur = Number(durRaw)
-          if (!isNaN(dur)) {
-            if (dur < 5) return false
-            if (maxVideoDuration > 0 && dur > maxVideoDuration) return false
+    function applyFilters(adList: Record<string, unknown>[], durLimit: number) {
+      return adList.filter(ad => {
+        if (!ad.ad_archive_id) return false
+        if (existingIds.has(String(ad.ad_archive_id))) return false
+        const text = `${ad.page_name ?? ''} ${ad.link_url ?? ''} ${ad.ad_creative_body ?? ''}`.toLowerCase()
+        if (SNL_KEYWORDS.some(k => text.includes(k))) return false
+        if (RETAILER_KEYWORDS.some(k => text.includes(k))) return false
+        const imp = parseInt(String(ad.impressions_text ?? '0')) || 0
+        if (minImpressions > 0 && imp > 0 && imp < minImpressions) return false
+        if (adType === 'VIDEO') {
+          const raw = JSON.stringify(ad).toLowerCase()
+          const hasVideo = raw.includes('.mp4') || raw.includes('video_hd_url') || raw.includes('video_sd_url')
+            || raw.includes('"video_url"') || raw.includes('"videourl"') || raw.includes('"videos"')
+            || raw.includes('video_preview') || raw.includes('"video":{')
+          if (!hasVideo) return false
+          const durRaw = ad.video_duration ?? ad.duration ?? ad.video_length ?? ad.videoDuration ?? null
+          if (durRaw !== null && durRaw !== undefined) {
+            const dur = Number(durRaw)
+            if (!isNaN(dur)) {
+              if (dur < 5) return false
+              if (durLimit > 0 && dur > durLimit) return false
+            }
           }
         }
+        return true
+      })
+    }
+
+    // Erst mit gesetzter Grenze filtern — wenn zu wenig, Grenze schrittweise +30s lockern
+    let filtered = applyFilters(results as Record<string, unknown>[], maxVideoDuration)
+    if (maxVideoDuration > 0 && filtered.length < (adCount as number)) {
+      for (let extra = 30; extra <= 120; extra += 30) {
+        const relaxed = applyFilters(results as Record<string, unknown>[], maxVideoDuration + extra)
+        if (relaxed.length >= (adCount as number)) { filtered = relaxed; break }
+        filtered = relaxed // nimm was wir haben, auch wenn noch nicht genug
       }
-      return true
-    })
+    }
 
     // Ranking: Laufzeit × 10 + Impressionen × 0.0001 + Varianten × 5
     const ranked = filtered.sort((a, b) => {
