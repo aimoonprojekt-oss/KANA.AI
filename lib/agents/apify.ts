@@ -31,11 +31,21 @@ async function runActor(actorId: string, input: object): Promise<string> {
   // Polling alle 10s — max. 55 × 10s = 550s (innerhalb Railway's 600s Limit)
   for (let i = 0; i < 55; i++) {
     await new Promise(r => setTimeout(r, 10000))
-    const statusRes = await fetch(`${APIFY_BASE}/actor-runs/${runId}?token=${token()}`)
-    const { data: runData } = await statusRes.json()
-    if (runData.status === 'SUCCEEDED') return datasetId
-    if (runData.status === 'FAILED' || runData.status === 'ABORTED') {
-      throw new Error(`Apify Actor fehlgeschlagen: ${runData.status}`)
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 15000) // 15s Timeout pro Poll
+      const statusRes = await fetch(`${APIFY_BASE}/actor-runs/${runId}?token=${token()}`, { signal: controller.signal })
+      clearTimeout(timeout)
+      if (!statusRes.ok) continue // Bei HTTP-Fehler: nächste Runde versuchen
+      const { data: runData } = await statusRes.json()
+      if (runData.status === 'SUCCEEDED') return datasetId
+      if (runData.status === 'FAILED' || runData.status === 'ABORTED') {
+        throw new Error(`Apify Actor fehlgeschlagen: ${runData.status}`)
+      }
+    } catch (err) {
+      // Bei FAILED/ABORTED Error weiterwerfen, bei Netzwerkfehler weiterpollen
+      if (err instanceof Error && err.message.startsWith('Apify Actor fehlgeschlagen')) throw err
+      // Netzwerkfehler / Timeout → nächste Polling-Runde
     }
   }
   throw new Error('Apify Actor Timeout — läuft länger als 550 Sekunden')
