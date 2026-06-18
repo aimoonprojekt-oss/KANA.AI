@@ -2,7 +2,6 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import jsPDF from "jspdf";
 
 type LogEntry = { type: string; message: string; ts: number };
 type Session = { id: string; product: string; ad_format: string; ad_count: number; created_at: string };
@@ -76,63 +75,23 @@ export default function CreativeAnalyst() {
     finally { setIsRunning(false); }
   }, [isRunning, addLog, selectedSessions]);
 
-  const downloadPdf = useCallback(() => {
+  const downloadPdf = useCallback(async () => {
     if (!fullAnalysis) return;
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    const pageW = doc.internal.pageSize.getWidth();
-    const pageH = doc.internal.pageSize.getHeight();
-    const margin = 18;
-    const maxW = pageW - margin * 2;
-
-    // Header
-    doc.setFillColor(30, 64, 175);
-    doc.rect(0, 0, pageW, 22, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(13);
-    doc.setFont("helvetica", "bold");
-    doc.text("SNL Creative Analyst — K1-K6 Scoring Report", margin, 14);
-
-    const date = new Date().toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.text(date, pageW - margin, 14, { align: "right" });
-
-    let y = 32;
-    doc.setTextColor(30, 30, 30);
-
-    const lines = fullAnalysis.split("\n");
-    for (const line of lines) {
-      if (y > pageH - 20) { doc.addPage(); y = 20; }
-      const trimmed = line.trim();
-      if (trimmed.startsWith("## ") || trimmed.startsWith("### ")) {
-        if (y > 28) y += 3;
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(trimmed.startsWith("## ") ? 11 : 10);
-        doc.setTextColor(30, 64, 175);
-        const wrapped = doc.splitTextToSize(trimmed.replace(/^#+\s*/, ""), maxW);
-        doc.text(wrapped, margin, y);
-        y += wrapped.length * (trimmed.startsWith("## ") ? 6 : 5.5) + 2;
-        doc.setTextColor(30, 30, 30);
-      } else if (trimmed === "---" || trimmed.startsWith("═══")) {
-        doc.setDrawColor(200, 200, 200);
-        doc.line(margin, y, pageW - margin, y);
-        y += 4;
-      } else if (trimmed === "") {
-        y += 3;
-      } else {
-        doc.setFont("helvetica", trimmed.startsWith("**") && trimmed.endsWith("**") ? "bold" : "normal");
-        doc.setFontSize(9);
-        const text = trimmed.replace(/\*\*/g, "");
-        const wrapped = doc.splitTextToSize(text, maxW);
-        if (y + wrapped.length * 4.5 > pageH - 20) { doc.addPage(); y = 20; }
-        doc.text(wrapped, margin, y);
-        y += wrapped.length * 4.5 + 1;
-      }
-    }
-
-    const sessionLabel = selectedSessions.size > 0 ? `_session${Array.from(selectedSessions)[0].slice(0,8)}` : "";
-    doc.save(`SNL_Creative_Analyst_${date.replace(/\./g, "-")}${sessionLabel}.pdf`);
-  }, [fullAnalysis, selectedSessions]);
+    try {
+      const { buildPDF, parseAgentOutput, THEMES } = await import("@/lib/pdf/pdfEngine");
+      const now  = new Date();
+      const date = now.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+      const sessionLabel = selectedSessions.size > 0 ? `_${Array.from(selectedSessions)[0].slice(0, 8)}` : "";
+      const doc = await buildPDF({
+        theme:    THEMES.analyst,
+        title:    "Creative Analyst Report",
+        subtitle: `K1-K6 Scoring · Competitor-Analyse · ${date}`,
+        date,
+        sections: parseAgentOutput(fullAnalysis),
+      });
+      doc.save(`SNL_Creative_Analyst_${now.toISOString().slice(0, 10)}${sessionLabel}.pdf`);
+    } catch (err) { addLog({ type: "error", message: "PDF: " + String(err), ts: Date.now() }); }
+  }, [fullAnalysis, selectedSessions, addLog]);
 
   const logIcon = (t: string) => ({ tool:"🔧", tool_done:"✅", tool_error:"❌", error:"❌", done:"🏁", start:"🔬" }[t] ?? "💬");
   const logColor = (t: string) => t === "error" || t === "tool_error" ? "rgba(239,68,68,0.8)" : t === "done" ? "rgba(96,165,250,0.9)" : t === "start" ? "rgba(96,165,250,0.9)" : t === "tool" ? "rgba(251,191,36,0.8)" : t === "tool_done" ? "rgba(34,197,94,0.8)" : "rgba(255,255,255,0.85)";
