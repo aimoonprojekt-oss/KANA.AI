@@ -27,10 +27,16 @@ export async function POST(req: Request) {
       try {
         send({ type: 'start', message: '🔬 Creative Analyst startet...' })
 
+        if (sessionIds.length > 0) {
+          send({ type: 'progress', message: `🔒 Session-Filter aktiv: nur Ads aus Session(s) ${sessionIds.join(', ')} werden analysiert.` })
+        } else {
+          send({ type: 'progress', message: '📂 Kein Session-Filter — alle unanalysierten Ads werden geladen.' })
+        }
+
         const messages: Anthropic.MessageParam[] = [{
           role: 'user',
           content: sessionIds.length > 0
-            ? `Starte die SNL Creative Analyse für Session(s): ${sessionIds.join(', ')}. Lade REF-Dateien, dann rufe read_breakdowns mit sessionIds: ${JSON.stringify(sessionIds)} auf, führe K1-K6 Scoring durch und speichere jede Analyse.`
+            ? `Starte die SNL Creative Analyse. Rufe zuerst read_analyst_refs auf, dann read_brand_knowledge, dann read_breakdowns (die Daten sind bereits auf Session ${sessionIds.join(', ')} gefiltert — du erhältst NUR die Ads dieser Session). Analysiere AUSSCHLIESSLICH die Ads die read_breakdowns zurückgibt — keine anderen. Führe K1-K6 Scoring durch und speichere jede Analyse mit save_analysis.`
             : "Starte die SNL Creative Analyse: lade REF-Dateien, lese alle ausstehenden Breakdowns aus der Datenbank, führe K1-K6 Scoring durch und speichere jede Analyse."
         }]
 
