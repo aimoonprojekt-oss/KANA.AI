@@ -139,7 +139,7 @@ async function executeTool(name: string, input: Record<string, unknown>, targetP
     const { data: existing } = await db.from('ad_research').select('ad_id')
     const existingIds = new Set((existing ?? []).map(r => r.ad_id))
 
-    let results = await searchFacebookAds({ searchTerms, adType, country: 'DE', maxResults: 100, startDateMin, startDateMax })
+    let results = await searchFacebookAds({ searchTerms, adType, country: 'DE', maxResults: 300, startDateMin, startDateMax })
 
     // Zweiter Call nur wenn komplett 0 Ergebnisse — verhindert doppelte Apify-Laufzeit
     if (results.length === 0) {
