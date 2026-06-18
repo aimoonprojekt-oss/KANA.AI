@@ -305,11 +305,12 @@ ABLAUF — führe diese Schritte der Reihe nach aus:
 PFLICHT — ANZAHL MUSS ERREICHT WERDEN:
 - Du MUSST exakt ${adCount} Ads finden und speichern. Nicht weniger.
 - Wenn nach dem ersten search_facebook_ads Aufruf zu wenig valide Ads übrig sind:
-  → Rufe search_facebook_ads ERNEUT auf mit anderen/breiteren Keywords
+  → Rufe search_facebook_ads ERNEUT auf mit ANDEREN Keywords aus der Liste (nicht dieselben nochmal)
   → Wiederhole bis du ${adCount} Ads hast — du darfst so oft suchen wie nötig
-- Verwende bei Folgesuchen breitere Keywords, z.B.:
-  Wimpernserum: "lash", "eyelash", "serum", "wimpern", "growth serum", "lash growth"
-  Dann noch breiter: "beauty serum", "lash boost", "wimper"
+- Verwende bei Folgesuchen ANDERE Keywords aus derselben Produktkategorie, z.B.:
+  Wimpernserum Runde 1: "lash serum", Runde 2: "eyelash growth serum", Runde 3: "lash growth", Runde 4: "wimpernserum"
+  Nie dasselbe Keyword zweimal verwenden.
+- Bereits gesehene Ad-IDs überspringen — keine Duplikate speichern.
 - Zähle nach jeder Suche: Wie viele valide Ads habe ich bisher? Wenn < ${adCount} → weitersuchen.
 - NIEMALS aufhören bevor ${adCount} Ads gespeichert wurden.
 - Erst wenn ${adCount} Ads in Supabase gespeichert sind → Zusammenfassung ausgeben.
