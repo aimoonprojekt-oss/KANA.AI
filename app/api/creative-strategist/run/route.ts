@@ -4,7 +4,7 @@ import { isAdminUser } from '@/lib/platform/supabase'
 import { CREATIVE_STRATEGIST_TOOLS, executeStrategistTool, buildStrategistSystemPrompt } from '@/lib/agents/creativeStrategist'
 
 export const runtime = 'nodejs'
-export const maxDuration = 300
+export const maxDuration = 600
 
 export async function POST(req: Request) {
   const { userId } = await auth()
