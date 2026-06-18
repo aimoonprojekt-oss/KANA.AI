@@ -110,11 +110,6 @@ export default function PortalDashboard({
   const [view, setView]             = useState<View>("agents");
   const [activeDept, setActiveDept] = useState<Dept>("all");
 
-  /* ── Trigger Modal ── */
-  const [trigger, setTrigger]     = useState<TriggerState | null>(null);
-  const [taskInput, setTaskInput] = useState("");
-  const [inputError, setInputError] = useState(false);
-
   /* ── Sync ── */
   const [syncing, setSyncing]   = useState(false);
   const [syncMsg, setSyncMsg]   = useState<string | null>(null);
@@ -187,19 +182,7 @@ export default function PortalDashboard({
 
   /* ── Handlers ── */
   function openTrigger(agent: DBAgent) {
-    setTaskInput(""); setInputError(false);
-    setTrigger({
-      agentId:   agent.anthropic_agent_id,
-      agentName: agent.name,
-      agentDept: getTag(agent),
-      icon:      getIcon(agent.name, agent.category),
-    });
-  }
-
-  function startAgent() {
-    if (!taskInput.trim()) { setInputError(true); return; }
-    if (!trigger) return;
-    router.push(`/chat/${trigger.agentId}?task=${encodeURIComponent(taskInput.trim())}`);
+    router.push(`/chat/${agent.anthropic_agent_id}`);
   }
 
   async function buyAgent(agent: DBAgent) {
@@ -867,42 +850,6 @@ export default function PortalDashboard({
         </div>
       </main>
 
-      {/* ══ TRIGGER MODAL ══ */}
-      {trigger && (
-        <div className="trigger-modal"
-          onClick={e => { if (e.target === e.currentTarget) setTrigger(null); }}>
-          <div className="trigger-modal-content">
-            <div className="trigger-modal-header">
-              <div>
-                <div className="trigger-modal-icon">{trigger.icon}</div>
-                <div className="trigger-modal-title">{trigger.agentName}</div>
-                <div className="trigger-modal-sub">{trigger.agentDept} — Neuen Auftrag starten</div>
-              </div>
-              <button className="modal-close-btn" onClick={() => setTrigger(null)}><X size={18} /></button>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Ihre Aufgabe *</label>
-              <textarea className="form-textarea"
-                value={taskInput}
-                onChange={e => { setTaskInput(e.target.value); setInputError(false); }}
-                placeholder="Beschreiben Sie Ihren Auftrag — z.B. 'Analysiere unsere Konkurrenz auf Instagram und erstelle 3 Ad-Ideen'"
-                rows={4}
-                style={inputError ? { borderColor: "#F87171" } : {}}
-              />
-              {inputError && <div style={{ fontSize: "0.75rem", color: "#F87171", marginTop: 6 }}>Bitte beschreibe deinen Auftrag.</div>}
-            </div>
-            <div className="form-group">
-              <label className="form-label">Kontext / Zusatzinfos (optional)</label>
-              <textarea className="form-textarea" placeholder="Zielgruppe, Tonalität, besondere Anforderungen…" style={{ minHeight: 72 }} />
-            </div>
-            <button className="btn btn-primary btn-full"
-              style={{ padding: "13px", fontSize: ".95rem", marginTop: 18 }}
-              onClick={startAgent}>
-              Agent starten <Play size={15} />
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* ══ ONBOARDING MODAL ══ */}
       {showOnboarding && (
