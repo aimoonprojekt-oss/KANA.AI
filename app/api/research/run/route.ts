@@ -10,6 +10,22 @@ export const maxDuration = 600
 const SNL_KEYWORDS = ['sinsnlashes', 'sins n lashes', 'sins & lashes', 'sinsnlashes.com']
 const RETAILER_KEYWORDS = ['rossmann', 'müller', 'douglas', 'dm ', 'drogerie', 'amazon', 'otto']
 
+// Produktkategorie-Ausschlüsse — verhindert dass falsche Produkttypen durchkommen
+function getProductExcludeKeywords(product: string): string[] {
+  const p = product.toLowerCase()
+  if (p.includes('wimpernserum') || p.includes('lash serum') || p.includes('eyelash serum') || p.includes('lash growth')) {
+    // Wimpernserum ≠ Zangen, Extensions, Kleber, Wimperntusche, Lifting-Kits
+    return ['eyelash curler', 'wimpernzange', 'lash curler', 'lash extension', 'lash glue', 'lash adhesive', 'lash kit', 'lash lift kit', 'lash perm', 'false lash', 'false eyelash', 'mascara wand', 'lash applicator', 'lash tool']
+  }
+  if (p.includes('augenbrauen') || p.includes('brow serum') || p.includes('eyebrow')) {
+    return ['brow pencil', 'brow gel', 'brow stamp', 'brow kit', 'eyebrow pencil', 'eyebrow stencil']
+  }
+  if (p.includes('haarserum') || p.includes('hair serum') || p.includes('haaröl') || p.includes('hair oil')) {
+    return ['hair dye', 'hair color', 'hair straightener', 'hair curler', 'hair dryer', 'haarfarbe']
+  }
+  return []
+}
+
 // Mindestens eines dieser Keywords muss im gesamten Ad-JSON vorkommen
 // Breit genug um auch Ads mit wenig Text zu erfassen, eng genug um falsches Produkt auszuschließen
 function getProductRelevanceKeywords(product: string): string[] {
@@ -153,6 +169,9 @@ async function executeTool(name: string, input: Record<string, unknown>, targetP
       }
     }
 
+    const relevanceKeywords = getProductRelevanceKeywords(targetProduct)
+    const excludeKeywords = getProductExcludeKeywords(targetProduct)
+
     function applyFilters(adList: Record<string, unknown>[], durLimit: number) {
       return adList.filter(ad => {
         if (!ad.ad_archive_id) return false
@@ -160,6 +179,11 @@ async function executeTool(name: string, input: Record<string, unknown>, targetP
         const text = `${ad.page_name ?? ''} ${ad.link_url ?? ''} ${ad.ad_creative_body ?? ''}`.toLowerCase()
         if (SNL_KEYWORDS.some(k => text.includes(k))) return false
         if (RETAILER_KEYWORDS.some(k => text.includes(k))) return false
+        // Produktkategorie-Check: mindestens 1 Relevanz-Keyword muss vorkommen
+        const fullJson = JSON.stringify(ad).toLowerCase()
+        if (relevanceKeywords.length > 0 && !relevanceKeywords.some(k => fullJson.includes(k))) return false
+        // Falsches Produktformat ausschließen (z.B. Wimpernzange bei Wimpernserum-Suche)
+        if (excludeKeywords.some(k => fullJson.includes(k))) return false
         const imp = parseInt(String(ad.impressions_text ?? '0')) || 0
         if (minImpressions > 0 && imp > 0 && imp < minImpressions) return false
         if (adType === 'VIDEO') {
