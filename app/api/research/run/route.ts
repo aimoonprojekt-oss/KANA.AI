@@ -10,28 +10,29 @@ export const maxDuration = 600
 const SNL_KEYWORDS = ['sinsnlashes', 'sins n lashes', 'sins & lashes', 'sinsnlashes.com']
 const RETAILER_KEYWORDS = ['rossmann', 'müller', 'douglas', 'dm ', 'drogerie', 'amazon', 'otto']
 
-// Mindestens eines dieser Keywords muss im Ad-Text/Page-Name vorkommen
+// Mindestens eines dieser Keywords muss im gesamten Ad-JSON vorkommen
+// Breit genug um auch Ads mit wenig Text zu erfassen, eng genug um falsches Produkt auszuschließen
 function getProductRelevanceKeywords(product: string): string[] {
   const p = product.toLowerCase()
   if (p.includes('wimpernserum') || p.includes('lash serum') || p.includes('eyelash serum') || p.includes('lash growth')) {
-    return ['serum', 'lash serum', 'lash growth', 'wimper', 'eye lash', 'eyelash', 'growth serum']
+    // 'lash' allein reicht — jede Wimpernserum-Ad enthält irgendwo 'lash'
+    return ['lash', 'serum', 'wimper', 'eyelash', 'wimpern', 'wachstum', 'growth']
   }
   if (p.includes('augenbrauen') || p.includes('brow serum') || p.includes('eyebrow')) {
-    return ['brow', 'eyebrow', 'augenbraue', 'brow serum']
+    return ['brow', 'eyebrow', 'augenbraue', 'augenbrauen']
   }
   if (p.includes('haarserum') || p.includes('hair serum') || p.includes('haaröl') || p.includes('hair oil')) {
-    return ['hair serum', 'haarserum', 'hair growth', 'hair oil', 'haaröl']
+    return ['hair', 'haar', 'haarserum', 'haaröl']
   }
   if (p.includes('rosmarin') || p.includes('rosemary')) {
-    return ['rosemary', 'rosmarin', 'rosemary oil', 'rosmarinöl']
+    return ['rosemary', 'rosmarin']
   }
   if (p.includes('mascara')) {
     return ['mascara']
   }
   if (p.includes('lifting') || p.includes('lash lift') || p.includes('wimpernlifting')) {
-    return ['lash lift', 'lifting', 'lash perm', 'wimpernlifting']
+    return ['lift', 'lash lift', 'wimpernlifting']
   }
-  // Fallback: Produktname selbst als Keywords (Wörter mit >3 Zeichen)
   return product.toLowerCase().split(/\s+/).filter(w => w.length > 3)
 }
 
@@ -138,7 +139,7 @@ async function executeTool(name: string, input: Record<string, unknown>, targetP
     const { data: existing } = await db.from('ad_research').select('ad_id')
     const existingIds = new Set((existing ?? []).map(r => r.ad_id))
 
-    let results = await searchFacebookAds({ searchTerms, adType, country: 'DE', maxResults: 30, startDateMin, startDateMax })
+    let results = await searchFacebookAds({ searchTerms, adType, country: 'DE', maxResults: 100, startDateMin, startDateMax })
 
     // Zweiter Call nur wenn komplett 0 Ergebnisse — verhindert doppelte Apify-Laufzeit
     if (results.length === 0) {
@@ -152,8 +153,6 @@ async function executeTool(name: string, input: Record<string, unknown>, targetP
       }
     }
 
-    const productKeywords = getProductRelevanceKeywords(targetProduct)
-
     // Filter
     const filtered = (results as Record<string, unknown>[]).filter(ad => {
       if (!ad.ad_archive_id) return false
@@ -163,20 +162,19 @@ async function executeTool(name: string, input: Record<string, unknown>, targetP
       if (RETAILER_KEYWORDS.some(k => text.includes(k))) return false
       const imp = parseInt(String(ad.impressions_text ?? '0')) || 0
       if (minImpressions > 0 && imp > 0 && imp < minImpressions) return false
-      // Produkt-Relevanz: mindestens ein Keyword muss im Ad-Text vorkommen
-      const fullText = JSON.stringify(ad).toLowerCase()
-      if (productKeywords.length > 0 && !productKeywords.some(k => fullText.includes(k))) return false
       // Bei VIDEO-Suche: Ad muss irgendwo im Objekt eine Video-URL enthalten
       if (adType === 'VIDEO') {
         const raw = JSON.stringify(ad).toLowerCase()
-        const hasVideo = raw.includes('.mp4') || raw.includes('video_hd_url') || raw.includes('video_sd_url') || raw.includes('"video_url"') || raw.includes('"videourl"')
+        const hasVideo = raw.includes('.mp4') || raw.includes('video_hd_url') || raw.includes('video_sd_url')
+          || raw.includes('"video_url"') || raw.includes('"videourl"') || raw.includes('"videos"')
+          || raw.includes('video_preview') || raw.includes('"video":{')
         if (!hasVideo) return false
         // Dauer-Filter (nur wenn Apify das Feld liefert)
         const durRaw = ad.video_duration ?? ad.duration ?? ad.video_length ?? ad.videoDuration ?? null
         if (durRaw !== null && durRaw !== undefined) {
           const dur = Number(durRaw)
           if (!isNaN(dur)) {
-            if (dur < 5) return false                              // min. 5 Sek. immer
+            if (dur < 5) return false
             if (maxVideoDuration > 0 && dur > maxVideoDuration) return false
           }
         }
