@@ -103,10 +103,8 @@ export async function buildPDF(opts: {
   doc.text(title, ML, 110)
 
   // Subtitle
-  doc.setFont("helvetica", "normal"); doc.setFontSize(13); ink([255, 255, 255])
-  doc.setGState(new doc.GState({ opacity: 0.75 }))
+  doc.setFont("helvetica", "normal"); doc.setFontSize(13); ink([200, 210, 255] as RGB)
   doc.text(subtitle, ML, 140)
-  doc.setGState(new doc.GState({ opacity: 1 }))
 
   // Meta block
   const metaY = 220
