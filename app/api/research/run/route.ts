@@ -302,6 +302,18 @@ ABLAUF — führe diese Schritte der Reihe nach aus:
 
 4. Gib am Ende eine Zusammenfassung aus: wie viele Ads gefunden, wie viele gespeichert, wie viele mit Video-Breakdown.
 
+PFLICHT — ANZAHL MUSS ERREICHT WERDEN:
+- Du MUSST exakt ${adCount} Ads finden und speichern. Nicht weniger.
+- Wenn nach dem ersten search_facebook_ads Aufruf zu wenig valide Ads übrig sind:
+  → Rufe search_facebook_ads ERNEUT auf mit anderen/breiteren Keywords
+  → Wiederhole bis du ${adCount} Ads hast — du darfst so oft suchen wie nötig
+- Verwende bei Folgesuchen breitere Keywords, z.B.:
+  Wimpernserum: "lash", "eyelash", "serum", "wimpern", "growth serum", "lash growth"
+  Dann noch breiter: "beauty serum", "lash boost", "wimper"
+- Zähle nach jeder Suche: Wie viele valide Ads habe ich bisher? Wenn < ${adCount} → weitersuchen.
+- NIEMALS aufhören bevor ${adCount} Ads gespeichert wurden.
+- Erst wenn ${adCount} Ads in Supabase gespeichert sind → Zusammenfassung ausgeben.
+
 QUALITÄTSREGELN:
 - Niemals Daten erfinden oder raten
 - Jeden Schritt klar ankündigen
