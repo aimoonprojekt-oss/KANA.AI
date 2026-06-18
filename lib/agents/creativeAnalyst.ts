@@ -31,16 +31,16 @@ async function readBreakdowns(sessionIds?: string[]): Promise<string> {
 
   if (!breakdowns || breakdowns.length === 0) return 'KEINE_BREAKDOWNS_VORHANDEN'
 
-  // Bereits analysierte IDs laden
-  const { data: done } = await db
-    .from('analyst_results')
-    .select('ad_id')
-
-  const doneIds = new Set((done ?? []).map(r => r.ad_id))
-  const pending = breakdowns.filter(b => !doneIds.has(b.ad_id))
-
-  if (pending.length === 0) {
-    return `ALLE_ANALYSIERT: Alle ${breakdowns.length} Breakdowns wurden bereits analysiert. ad_ids: ${breakdowns.map(b => b.ad_id).join(', ')}`
+  // Wenn spezifische Sessions ausgewählt: ALLE Ads dieser Sessions analysieren (auch bereits analysierte)
+  // Wenn keine Session: nur unanalysierte Ads laden
+  let pending = breakdowns
+  if (!sessionIds || sessionIds.length === 0) {
+    const { data: done } = await db.from('analyst_results').select('ad_id')
+    const doneIds = new Set((done ?? []).map(r => r.ad_id))
+    pending = breakdowns.filter(b => !doneIds.has(b.ad_id))
+    if (pending.length === 0) {
+      return `ALLE_ANALYSIERT: Alle ${breakdowns.length} Breakdowns wurden bereits analysiert. ad_ids: ${breakdowns.map(b => b.ad_id).join(', ')}`
+    }
   }
 
   return pending.map(b => [

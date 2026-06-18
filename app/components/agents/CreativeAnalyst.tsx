@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import jsPDF from "jspdf";
 
 type LogEntry = { type: string; message: string; ts: number };
 type Session = { id: string; product: string; ad_format: string; ad_count: number; created_at: string };
@@ -11,6 +12,7 @@ export default function CreativeAnalyst() {
   const [isRunning, setIsRunning] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [summary, setSummary] = useState<string | null>(null);
+  const [fullAnalysis, setFullAnalysis] = useState<string | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
   const [sessionsLoading, setSessionsLoading] = useState(true);
@@ -38,7 +40,7 @@ export default function CreativeAnalyst() {
 
   const runAgent = useCallback(async () => {
     if (isRunning) return;
-    setIsRunning(true); setLogs([]); setSummary(null);
+    setIsRunning(true); setLogs([]); setSummary(null); setFullAnalysis(null);
     const collected: string[] = [];
     const sessionIds = selectedSessions.size > 0 ? Array.from(selectedSessions) : [];
     try {
@@ -66,12 +68,71 @@ export default function CreativeAnalyst() {
         }
       }
       const full = collected.join("\n");
+      setFullAnalysis(full);
       const idx = full.indexOf("✅ SNL Creative Analyst");
       if (idx !== -1) setSummary(full.slice(idx));
       else if (full.includes("KEINE_BREAKDOWNS") || full.includes("ALLE_ANALYSIERT")) setSummary(full.slice(full.lastIndexOf("\n\n") + 2) || full);
     } catch (err) { addLog({ type: "error", message: String(err), ts: Date.now() }); }
     finally { setIsRunning(false); }
   }, [isRunning, addLog]);
+
+  const downloadPdf = useCallback(() => {
+    if (!fullAnalysis) return;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 18;
+    const maxW = pageW - margin * 2;
+
+    // Header
+    doc.setFillColor(30, 64, 175);
+    doc.rect(0, 0, pageW, 22, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.text("SNL Creative Analyst — K1-K6 Scoring Report", margin, 14);
+
+    const date = new Date().toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text(date, pageW - margin, 14, { align: "right" });
+
+    let y = 32;
+    doc.setTextColor(30, 30, 30);
+
+    const lines = fullAnalysis.split("\n");
+    for (const line of lines) {
+      if (y > pageH - 20) { doc.addPage(); y = 20; }
+      const trimmed = line.trim();
+      if (trimmed.startsWith("## ") || trimmed.startsWith("### ")) {
+        if (y > 28) y += 3;
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(trimmed.startsWith("## ") ? 11 : 10);
+        doc.setTextColor(30, 64, 175);
+        const wrapped = doc.splitTextToSize(trimmed.replace(/^#+\s*/, ""), maxW);
+        doc.text(wrapped, margin, y);
+        y += wrapped.length * (trimmed.startsWith("## ") ? 6 : 5.5) + 2;
+        doc.setTextColor(30, 30, 30);
+      } else if (trimmed === "---" || trimmed.startsWith("═══")) {
+        doc.setDrawColor(200, 200, 200);
+        doc.line(margin, y, pageW - margin, y);
+        y += 4;
+      } else if (trimmed === "") {
+        y += 3;
+      } else {
+        doc.setFont("helvetica", trimmed.startsWith("**") && trimmed.endsWith("**") ? "bold" : "normal");
+        doc.setFontSize(9);
+        const text = trimmed.replace(/\*\*/g, "");
+        const wrapped = doc.splitTextToSize(text, maxW);
+        if (y + wrapped.length * 4.5 > pageH - 20) { doc.addPage(); y = 20; }
+        doc.text(wrapped, margin, y);
+        y += wrapped.length * 4.5 + 1;
+      }
+    }
+
+    const sessionLabel = selectedSessions.size > 0 ? `_session${Array.from(selectedSessions)[0].slice(0,8)}` : "";
+    doc.save(`SNL_Creative_Analyst_${date.replace(/\./g, "-")}${sessionLabel}.pdf`);
+  }, [fullAnalysis, selectedSessions]);
 
   const logIcon = (t: string) => ({ tool:"🔧", tool_done:"✅", tool_error:"❌", error:"❌", done:"🏁", start:"🔬" }[t] ?? "💬");
   const logColor = (t: string) => t === "error" || t === "tool_error" ? "rgba(239,68,68,0.8)" : t === "done" ? "rgba(96,165,250,0.9)" : t === "start" ? "rgba(96,165,250,0.9)" : t === "tool" ? "rgba(251,191,36,0.8)" : t === "tool_done" ? "rgba(34,197,94,0.8)" : "rgba(255,255,255,0.85)";
@@ -165,11 +226,21 @@ export default function CreativeAnalyst() {
           Liest Competitor-Breakdowns aus der Datenbank · Führt K1-K6 Scoring durch · Analysiert Hook, Copy, Format, Trust, CTA · Speichert Ergebnisse für den Creative Strategist
         </div>
 
-        {/* Ergebnis-Zusammenfassung */}
+        {/* Ergebnis-Zusammenfassung + PDF-Button */}
         {summary && !isRunning && (
-          <div style={{ padding:"16px", borderRadius:10, background:"rgba(59,130,246,0.08)", border:"1px solid rgba(59,130,246,0.25)", marginBottom:20 }}>
-            <div style={{ fontSize:11, color:"rgba(147,197,253,0.7)", marginBottom:8, textTransform:"uppercase", letterSpacing:"0.08em" }}>Ergebnis</div>
-            <pre style={{ fontSize:12, color:"rgba(255,255,255,0.85)", whiteSpace:"pre-wrap", wordBreak:"break-word", margin:0, lineHeight:1.6 }}>{summary}</pre>
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ padding:"16px", borderRadius:10, background:"rgba(59,130,246,0.08)", border:"1px solid rgba(59,130,246,0.25)", marginBottom:10 }}>
+              <div style={{ fontSize:11, color:"rgba(147,197,253,0.7)", marginBottom:8, textTransform:"uppercase", letterSpacing:"0.08em" }}>Ergebnis</div>
+              <pre style={{ fontSize:12, color:"rgba(255,255,255,0.85)", whiteSpace:"pre-wrap", wordBreak:"break-word", margin:0, lineHeight:1.6 }}>{summary}</pre>
+            </div>
+            {fullAnalysis && (
+              <button onClick={downloadPdf}
+                style={{ width:"100%", padding:"14px", borderRadius:10, fontSize:14, fontWeight:700, cursor:"pointer", border:"1px solid rgba(59,130,246,0.4)", background:"rgba(59,130,246,0.12)", color:"#93c5fd", display:"flex", alignItems:"center", justifyContent:"center", gap:8, transition:"all 0.15s" }}
+                onMouseEnter={e => (e.currentTarget.style.background = "rgba(59,130,246,0.22)")}
+                onMouseLeave={e => (e.currentTarget.style.background = "rgba(59,130,246,0.12)")}>
+                📄 Analyse als PDF herunterladen
+              </button>
+            )}
           </div>
         )}
 

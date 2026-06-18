@@ -59,7 +59,11 @@ export async function POST(req: Request) {
             if (block.type === 'tool_use') {
               send({ type: 'tool', message: `🔧 ${block.name}...` })
               try {
-                const result = await executeAnalystTool(block.name, block.input as Record<string, unknown>)
+                // Für read_breakdowns: sessionIds aus dem Request IMMER erzwingen — Agent darf das nicht ignorieren
+                const toolInput = block.name === 'read_breakdowns' && sessionIds.length > 0
+                  ? { ...(block.input as Record<string, unknown>), sessionIds }
+                  : block.input as Record<string, unknown>
+                const result = await executeAnalystTool(block.name, toolInput)
                 toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
                 send({ type: 'tool_done', message: `✅ ${block.name}` })
               } catch (err) {
