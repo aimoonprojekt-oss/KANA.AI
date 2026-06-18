@@ -310,12 +310,12 @@ QUALITÄTSREGELN:
 export async function POST(req: Request) {
   const { targetProduct, adCount, adType, searchKeywords, minImpressions = 0, maxVideoDuration = 0, startDateMin, startDateMax } = await req.json()
 
-  // Session-ID für diesen Run generieren
-  const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-
   if (!targetProduct || !adCount || !adType) {
     return new Response(JSON.stringify({ error: 'targetProduct, adCount und adType sind Pflichtfelder' }), { status: 400 })
   }
+
+  // Session-ID für diesen Run generieren
+  const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
