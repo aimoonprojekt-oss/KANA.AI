@@ -1,10 +1,109 @@
 # KANA.AI — Vollständiger Kontext-Handoff
 > Für neues Chat-Fenster. Enthält alles was aus den vorherigen Sessions bekannt ist.
-> Stand: 2026-06-18
+> Stand: 2026-06-18 (Session 2 — Nachmittag)
 
 ---
 
-## 0. SESSION 2026-06-18 — Alle Änderungen dieser Session
+## 0. SESSION 2026-06-18 (Session 2) — Alle Änderungen dieser Session
+
+### WICHTIG: Build-Status
+**PDF-Redesign-Commit schlägt auf Railway fehl** — TypeScript-Fehler in `lib/pdf/pdfEngine.ts`:
+- `new doc.GState({ opacity: 0.75 })` hat keine Typdefinition in jsPDF
+- Fix wurde lokal gemacht (GState entfernt, Subtitle-Farbe auf `[200, 210, 255]`) aber **noch nicht gepusht**
+- **Nächste Session muss zuerst `npx tsc --noEmit` prüfen und dann pushen**
+
+### Neue Features
+
+#### Video-Dauer +3s Toleranz im System-Prompt (Researcher)
+**Datei:** `app/api/research/run/route.ts`
+- System-Prompt zeigt Agent jetzt `Maximal 33s (Toleranz eingebaut — Grenze ist 30s aber bis zu 33s erlaubt)`
+- Vorher: Agent hat 31s-Ads selbst ausgeschlossen weil er nur `Maximal 30s` sah
+- Fix: `maxVideoDuration + 3` im Prompt-Text
+
+#### Pflicht-Retry bis Zielanzahl erreicht (Researcher)
+**Datei:** `app/api/research/run/route.ts` — System-Prompt
+- Agent muss exakt `adCount` Ads finden, darf nicht früher aufhören
+- Retry mit ANDEREN Keywords aus derselben Kategorie (nicht breiteren)
+- Bereits gesehene Ad-IDs überspringen (keine Duplikate)
+- Nie dasselbe Keyword zweimal verwenden
+
+#### Produktkategorie-Ausschluss-Filter (Researcher)
+**Datei:** `app/api/research/run/route.ts`
+- Neue Funktion `getProductExcludeKeywords(product)` — verhindert falsche Produkttypen
+- Für Wimpernserum: `['eyelash curler', 'wimpernzange', 'lash curler', 'lash extension', 'lash glue', 'lash adhesive', 'lash kit', 'lash lift kit', 'lash perm', 'false lash', 'false eyelash', 'mascara wand', 'lash applicator', 'lash tool']`
+- Filter läuft in `applyFilters()` — zusätzlich zum Relevanz-Check
+- **Relevanz-Check war vorher nicht in `applyFilters` verdrahtet** — jetzt auch gefixt
+
+#### Session-Filter erzwingen (Analyst)
+**Datei:** `app/api/creative-analyst/run/route.ts`
+- Route überschreibt Agent-Input für `read_breakdowns` mit den echten sessionIds
+- Agent kann sessionIds nicht mehr ignorieren
+- Debug-Log: `🔒 Session-Filter aktiv` / `📂 Kein Session-Filter` am Anfang sichtbar
+
+#### Session-Logik in readBreakdowns geändert (Analyst)
+**Datei:** `lib/agents/creativeAnalyst.ts`
+- Session ausgewählt → ALLE Ads dieser Session analysieren (auch bereits analysierte)
+- Kein Session ausgewählt → nur unanalysierte Ads (wie vorher)
+
+#### Stale Closure Bug Fix (Analyst UI)
+**Datei:** `app/components/agents/CreativeAnalyst.tsx`
+- `selectedSessions` fehlte in `useCallback`-Dependencies → Session-Filter wurde nie gesendet
+- Fix: `[isRunning, addLog, selectedSessions]` als Dependencies
+
+#### PDF-Export für Creative Analyst (Analyst)
+**Datei:** `app/components/agents/CreativeAnalyst.tsx`
+- Button `📄 Analyse als PDF herunterladen` nach Analyse
+- Nutzt neue shared PDF-Engine
+
+#### Keepalive-Pings gegen SSE-Timeout (Strategist + Analyst)
+**Datei:** `app/api/creative-strategist/run/route.ts`, `app/api/creative-analyst/run/route.ts`
+- Alle 20s wird `: keepalive\n\n` an SSE gesendet während Anthropic API arbeitet
+- Verhindert dass Browser/Railway die Verbindung killt bei langen Generierungen
+- Strategist `maxDuration` auf 600s erhöht (war 300s)
+
+#### Trigger-Modal entfernt (Dashboard)
+**Datei:** `app/components/dashboard/PortalDashboard.tsx`
+- Modal ("IHRE AUFGABE", "KONTEXT / ZUSATZINFOS") wurde komplett entfernt
+- Agent-Klick navigiert jetzt direkt zu `/chat/[agentId]`
+- `openTrigger()`, `startAgent()`, `trigger`/`taskInput`/`inputError` States entfernt
+
+#### Shared PDF-Engine (ALLE AGENTS)
+**Neue Datei:** `lib/pdf/pdfEngine.ts`
+- Einheitliche PDF-Engine für Brand Expert, Creative Analyst, Creative Strategist
+- Weißer Hintergrund (druckbar), Cover-Seite, farbige Akzente pro Agent
+- Funktionen: `buildPDF()`, `parseAgentOutput()`, `THEMES`
+- Agent-Farben: Brand Expert = Indigo, Analyst = Blau, Strategist = Gold
+- **⚠️ Build schlägt fehl wegen `doc.GState` TypeScript-Fehler — noch zu fixen!**
+
+### Bugfixes dieser Session
+
+#### Fix: Immer pushen nach commit
+- Commits lagen mehrfach nur lokal — Railway hat nichts deployed
+- Ab sofort: `git commit && git push origin main` immer zusammen
+
+### Letzte Git-Commits (Session 2)
+```
+27ce571  Remove trigger modal: clicking agent navigates directly to chat page  [FAILED BUILD]
+9db7e4b  Redesign all agent PDFs: professional white layout, shared engine     [FAILED BUILD]
+8b6a2d7  Fix SSE timeout: add keepalive pings every 20s during Anthropic API calls
+5036201  Increase strategist maxDuration to 600s
+2e77cef  Fix: add selectedSessions to useCallback deps so session filter actually gets sent
+5791c20  Add session filter debug log + strengthen user message
+603c8cf  Fix analyst: force sessionIds in tool call, analyze all session ads, add PDF export button
+ec751c0  Add product category exclusion filter: block lash curlers, extensions, glue etc
+78eab17  Fix retry: use different keywords per round, not broader ones, skip already seen ads
+2743419  Force agent to retry search until exact ad count is reached
+51cfec2  Fix duration tolerance: show +3s limit in system prompt so agent doesn't self-exclude borderline ads
+```
+
+### Offene Punkte / Nächste Session muss zuerst:
+1. **`npx tsc --noEmit` in `KANA.AI/` ausführen** → TypeScript-Fehler in `lib/pdf/pdfEngine.ts` fixen
+2. **Dann pushen** → Railway-Build reparieren (aktuell FAILED)
+3. Testen ob Strategist-PDF und Analyst-PDF korrekt generiert werden
+
+---
+
+## 0b. SESSION 2026-06-18 (Session 1) — Alle Änderungen der ersten Session
 
 ### Neue Features
 

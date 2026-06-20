@@ -132,7 +132,7 @@ export default function ResearchAgent() {
               background: "var(--surface)", border: "1px solid rgba(255,255,255,0.12)",
               borderRadius: 8, padding: "8px 12px", color: "var(--text-primary)", fontSize: 14,
             }}>
-            {[2, 3, 5, 7, 10].map(n => <option key={n} value={n}>{n} Ads</option>)}
+            {[2, 3, 5, 7, 10, 15, 20].map(n => <option key={n} value={n}>{n} Ads</option>)}
           </select>
         </div>
 
