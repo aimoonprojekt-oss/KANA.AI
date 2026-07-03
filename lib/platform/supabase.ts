@@ -159,8 +159,8 @@ export async function getDBAgentById(anthropicAgentId: string): Promise<DBAgent 
 
 /** Agents, auf die ein User Zugang hat — via agent_access1 + organizations */
 export async function getUserAccessedAgents(userId: string): Promise<DBAgent[]> {
-  // Admins haben Zugang zu ALLEN veröffentlichten Agents
-  if (isAdminUser(userId)) return getAllAgents();
+  // Admins sehen nur published agents (gleiche Ansicht wie reguläre User)
+  if (isAdminUser(userId)) return getPublishedAgents();
 
   const db = getSupabaseAdmin();
 
