@@ -65,6 +65,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Vaults liefern dem Agent seine Credentials (z.B. SUPABASE_SERVICE_ROLE_KEY
+  // für den Brand Expert). Sie lassen sich NUR beim Anlegen der Session
+  // anhängen — nachträglich nicht mehr. Agents ohne Credentials (Support,
+  // Widget) bekommen eine leere Liste und verhalten sich unverändert.
+  const vaultIds =
+    (agentDef as { vault_ids?: string[] } | null)?.vault_ids ??
+    process.env.ANTHROPIC_VAULT_IDS?.split(",").map((s) => s.trim()).filter(Boolean) ??
+    [];
+
   // ── 5. Anthropic Managed Agents API aufrufen ───────────────────────────────
   // Beta-Felder werden als `any` getypt, da die SDK-TS-Definitionen je nach
   // Version unterschiedlich sind und wir direkt gegen die Laufzeit-API gehen.
@@ -80,6 +89,7 @@ export async function POST(req: NextRequest) {
       const session = await beta.sessions.create({
         agent: activeAgentId,   // Kundenkopie statt Master
         environment_id: environmentId,
+        ...(vaultIds.length ? { vault_ids: vaultIds } : {}),
         title: `${agentName} — ${userId}`,
       });
       activeSessionId = session.id;
