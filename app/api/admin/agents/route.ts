@@ -1,20 +1,14 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
-import { getAllAgents, getSupabaseAdmin } from "@/lib/platform/supabase";
+import { getAllAgents, getSupabaseAdmin, isAdminUser } from "@/lib/platform/supabase";
 
 export const runtime = "nodejs";
-
-function isAdmin(userId: string): boolean {
-  const adminIds = (process.env.ADMIN_USER_IDS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-  if (adminIds.length === 0) return true;
-  return adminIds.includes(userId);
-}
 
 /** GET /api/admin/agents — alle Agents aus Supabase */
 export async function GET() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Nicht eingeloggt" }, { status: 401 });
-  if (!isAdmin(userId)) return NextResponse.json({ error: "Kein Zugriff" }, { status: 403 });
+  if (!isAdminUser(userId)) return NextResponse.json({ error: "Kein Zugriff" }, { status: 403 });
 
   const agents = await getAllAgents();
   return NextResponse.json({ agents });
@@ -31,7 +25,7 @@ export async function GET() {
 export async function PATCH(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Nicht eingeloggt" }, { status: 401 });
-  if (!isAdmin(userId)) return NextResponse.json({ error: "Kein Zugriff" }, { status: 403 });
+  if (!isAdminUser(userId)) return NextResponse.json({ error: "Kein Zugriff" }, { status: 403 });
 
   const body = await req.json();
   const { anthropic_agent_id, ...fields } = body;
