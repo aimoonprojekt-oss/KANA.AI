@@ -43,6 +43,9 @@ export type DBAgent = {
   featured:           boolean;
   stripe_price_id:    string | null;  // Stripe Price ID (price_xxx)
   created_at:         string;
+  workspace:          string | null;  // Console-Workspace, z.B. "KANA AI". NULL = unbekannt
+  last_seen_at:       string | null;  // zuletzt beim Sync in der Console gefunden
+  archived:           boolean;        // true = in der Console nicht mehr vorhanden
 };
 
 /** Organisation — ein User hat genau eine Organisation */
@@ -127,22 +130,28 @@ export function isAdminUser(userId: string): boolean {
 // AGENTS — Katalog
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/** Alle veröffentlichten Agents — für Landing Page (öffentlich) */
+/** Alle veröffentlichten Agents — für Landing Page (öffentlich)
+ *  Archivierte bleiben aussen vor: sie existieren in der Console nicht mehr
+ *  und wuerden beim Start eines Laufs ins Leere zeigen. */
 export async function getPublishedAgents(): Promise<DBAgent[]> {
   const { data } = await getSupabaseAdmin()
     .from("agents")
     .select("*")
     .eq("published", true)
+    .eq("archived", false)
     .order("featured", { ascending: false })
     .order("created_at");
   return data ?? [];
 }
 
-/** Alle Agents (auch unveröffentlichte) — für Admin */
+/** Alle Agents inklusive unveröffentlichter und archivierter — nur für Admin.
+ *  Der Admin soll die Karteileichen sehen, sonst kann er sie nicht aufräumen. */
 export async function getAllAgents(): Promise<DBAgent[]> {
   const { data } = await getSupabaseAdmin()
     .from("agents")
     .select("*")
+    .order("archived")
+    .order("workspace", { nullsFirst: false })
     .order("created_at");
   return data ?? [];
 }
@@ -220,7 +229,8 @@ export async function getLockedAgentsForUser(userId: string): Promise<DBAgent[]>
   const { data: allPublished } = await db
     .from("agents")
     .select("*")
-    .eq("published", true);
+    .eq("published", true)
+    .eq("archived", false);
 
   return (allPublished ?? []).filter((a) => !purchasedUuids.has(a.id));
 }
@@ -233,8 +243,10 @@ export async function upsertAgent(agent: {
   slug:               string;
   description?:       string;
   category?:          string;
+  workspace?:         string;   // Console-Workspace, aus dem der Agent stammt
 }): Promise<void> {
   const db = getSupabaseAdmin();
+  const jetzt = new Date().toISOString();
 
   const { data: existing } = await db
     .from("agents")
@@ -250,9 +262,15 @@ export async function upsertAgent(agent: {
       name:           agent.name,
       slug:           agent.slug,
       description:    agent.description ?? null,
+      last_seen_at:   jetzt,
+      // Wieder in der Console aufgetaucht → Archivmarke fällt weg.
+      archived:       false,
     };
     if (agent.category !== undefined) {
       updatePayload.category = agent.category;
+    }
+    if (agent.workspace !== undefined) {
+      updatePayload.workspace = agent.workspace;
     }
     const { error } = await db
       .from("agents")
@@ -264,14 +282,57 @@ export async function upsertAgent(agent: {
       .from("agents")
       .insert({
         ...agent,
-        description: agent.description ?? null,
-        category:    agent.category ?? null,
-        published:   false,
-        featured:    false,
-        price_eur:   0,
+        description:  agent.description ?? null,
+        category:     agent.category ?? null,
+        workspace:    agent.workspace ?? null,
+        published:    false,
+        featured:     false,
+        price_eur:    0,
+        archived:     false,
+        last_seen_at: jetzt,
       });
     if (error) throw new Error(`Insert fehlgeschlagen: ${error.message}`);
   }
+}
+
+/**
+ * Archiviert Agenten, die beim Sync nicht mehr in der Console auftauchten.
+ *
+ * Nur Agenten aus den TATSÄCHLICH synchronisierten Workspaces werden
+ * angefasst — plus solche ohne Workspace-Zuordnung, weil das der Altbestand
+ * von vor der Workspace-Migration ist. Fehlt der Schlüssel eines Workspace,
+ * bleiben dessen Agenten unberührt: Ein vergessener Schlüssel darf nicht den
+ * halben Katalog abräumen.
+ *
+ * Bewusst kein DELETE — an Agenten hängen Zugänge und Sitzungen.
+ */
+export async function archiviereVerschwundeneAgenten(
+  gesehenIds: string[],
+  synchronisierteWorkspaces: string[],
+): Promise<{ id: string; name: string; workspace: string | null }[]> {
+  const db = getSupabaseAdmin();
+
+  const { data: kandidaten } = await db
+    .from("agents")
+    .select("anthropic_agent_id, name, workspace, archived")
+    .eq("archived", false);
+
+  const gesehen = new Set(gesehenIds);
+  const zuArchivieren = (kandidaten ?? []).filter(a =>
+    !gesehen.has(a.anthropic_agent_id) &&
+    (a.workspace === null || synchronisierteWorkspaces.includes(a.workspace))
+  );
+
+  for (const a of zuArchivieren) {
+    await db
+      .from("agents")
+      .update({ archived: true, published: false })
+      .eq("anthropic_agent_id", a.anthropic_agent_id);
+  }
+
+  return zuArchivieren.map(a => ({
+    id: a.anthropic_agent_id, name: a.name, workspace: a.workspace,
+  }));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -1,7 +1,12 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { upsertAgent, getSupabaseAdmin, isAdminUser } from "@/lib/platform/supabase";
+import {
+  upsertAgent,
+  archiviereVerschwundeneAgenten,
+  isAdminUser,
+} from "@/lib/platform/supabase";
+import { konfigurierteWorkspaces } from "@/lib/anthropic/workspaces";
 
 export const runtime = "nodejs";
 
@@ -13,73 +18,103 @@ function slugify(name: string): string {
     .replace(/^-|-$/g, "");
 }
 
+/** Agenten eines Workspace laden. Der Schlüssel bestimmt den Workspace. */
+async function agentenLaden(apiKey: string): Promise<Record<string, unknown>[]> {
+  const anthropic = new Anthropic({ apiKey });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const beta = (anthropic as any).beta;
+
+  const liste: Record<string, unknown>[] = [];
+  try {
+    for await (const agent of beta.agents.list()) {
+      liste.push(agent as Record<string, unknown>);
+    }
+  } catch {
+    // Ältere SDK-Fassungen liefern keine iterierbare Seite
+    const resp = await beta.agents.list();
+    const page: Record<string, unknown>[] =
+      resp?.data ?? resp?.agents ?? (Array.isArray(resp) ? resp : []);
+    liste.push(...page);
+  }
+  return liste;
+}
+
 /**
  * POST /api/admin/sync-agents
  *
- * Vollständige Synchronisation mit der Anthropic Console:
- * 1. Alle Master-Agents aus Anthropic laden (auto-paginiert)
- * 2. Neue Agents in Supabase einfügen / bestehende aktualisieren
- * 3. Agents die in Anthropic gelöscht wurden → in Supabase auf published=false setzen
- *    (Soft-Delete: Preis, Stripe-ID und Einstellungen bleiben erhalten)
+ * Gleicht den Agenten-Katalog mit der Claude Console ab — über ALLE
+ * Workspaces, für die ein Schlüssel hinterlegt ist (siehe
+ * lib/anthropic/workspaces.ts).
+ *
+ * 1. Je Workspace die Agenten laden
+ * 2. Einfügen bzw. aktualisieren, mit Workspace-Zugehörigkeit
+ * 3. Was nirgends mehr auftaucht: archivieren, nicht löschen
+ *
+ * Neu angelegte Agenten sind immer `published = false`. Die Freigabe zum
+ * Verkauf ist eine bewusste Entscheidung im Admin-Bereich, kein Nebeneffekt
+ * eines Syncs.
  */
 export async function POST() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ message: "Nicht eingeloggt" }, { status: 401 });
   if (!isAdminUser(userId)) return NextResponse.json({ message: "Kein Zugriff — nur Admins." }, { status: 403 });
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json({ message: "ANTHROPIC_API_KEY nicht gesetzt." }, { status: 500 });
+  const workspaces = konfigurierteWorkspaces();
+
+  if (workspaces.length === 0) {
+    return NextResponse.json({
+      message: "Kein Workspace konfiguriert. Es fehlt mindestens ANTHROPIC_API_KEY.",
+    }, { status: 500 });
   }
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const beta = (anthropic as any).beta;
+  const synced:  { id: string; name: string; workspace: string }[] = [];
+  const skipped: string[] = [];
+  const errors:  string[] = [];
+  const gesehen: string[] = [];
+  const erfolgreicheWorkspaces: string[] = [];
+  const proWorkspace: Record<string, number> = {};
 
-  try {
-    // ── 1. Alle Agents aus Anthropic Console laden (auto-paginiert) ──────────
-    const agentList: Record<string, unknown>[] = [];
-
+  for (const ws of workspaces) {
+    let liste: Record<string, unknown>[];
     try {
-      for await (const agent of beta.agents.list()) {
-        agentList.push(agent as Record<string, unknown>);
-      }
-    } catch {
-      const resp = await beta.agents.list();
-      const page: Record<string, unknown>[] =
-        resp?.data ?? resp?.agents ?? (Array.isArray(resp) ? resp : []);
-      agentList.push(...page);
+      liste = await agentenLaden(ws.apiKey);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // Workspace nicht lesbar → seine Agenten bleiben unangetastet und er
+      // zählt nicht als synchronisiert. Sonst würde ein abgelaufener
+      // Schlüssel den halben Katalog archivieren.
+      errors.push(`Workspace "${ws.name}" nicht lesbar: ${msg}`);
+      console.error(`[sync-agents] Workspace ${ws.name}:`, msg);
+      continue;
     }
 
-    console.log(`[sync-agents] ${agentList.length} Agent(en) aus Anthropic Console geladen`);
+    erfolgreicheWorkspaces.push(ws.name);
+    proWorkspace[ws.name] = liste.length;
+    console.log(`[sync-agents] ${ws.name}: ${liste.length} Agent(en) geladen`);
 
-    // ── 2. Master-Agents filtern (Kundenkopien und Test-Agents überspringen) ─
-    const masterAgents = agentList.filter((agent) => {
+    // Kundenkopien und Testagenten überspringen
+    const master = liste.filter((agent) => {
       const name = (agent.name ?? agent.display_name ?? "") as string;
-      return !/ — user_\w+/.test(name) && !name.startsWith("TEST_COPY_DELETE_ME");
+      const ueberspringen = / — user_\w+/.test(name) || name.startsWith("TEST_COPY_DELETE_ME");
+      if (ueberspringen) skipped.push(`${name} (${ws.name})`);
+      return !ueberspringen;
     });
-
-    const anthropicIds = new Set(
-      masterAgents.map((a) => (a.id ?? a.agent_id ?? "") as string).filter(Boolean)
-    );
 
     const fallbackEnvId =
       process.env.ANTHROPIC_ENVIRONMENT_ID ??
-      (masterAgents[0]?.environment_id as string) ??
+      (master[0]?.environment_id as string) ??
       "default";
 
-    const synced:     { id: string; name: string }[] = [];
-    const skipped:    string[]                         = [];
-    const errors:     string[]                         = [];
-
-    // ── 3. Upsert: neue/geänderte Agents in Supabase schreiben ──────────────
-    for (const agent of masterAgents) {
+    for (const agent of master) {
       const agentId   = (agent.id ?? agent.agent_id ?? "") as string;
       const agentName = (agent.name ?? agent.display_name ?? agentId) as string;
 
       if (!agentId) {
-        errors.push(`Agent ohne ID übersprungen: ${JSON.stringify(agent)}`);
+        errors.push(`Agent ohne ID übersprungen (${ws.name})`);
         continue;
       }
+
+      gesehen.push(agentId);
 
       try {
         await upsertAgent({
@@ -92,64 +127,44 @@ export async function POST() {
             (agent as Record<string, Record<string, unknown>>).metadata?.category as string ??
             (agent.category as string) ??
             undefined,
+          workspace:          ws.name,
         });
-        synced.push({ id: agentId, name: agentName });
-        console.log(`[sync-agents] ✓ upsert: ${agentName}`);
+        synced.push({ id: agentId, name: agentName, workspace: ws.name });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error(`[sync-agents] ✗ ${agentName}:`, msg);
         errors.push(`${agentName}: ${msg}`);
       }
     }
-
-    // ── 4. Soft-Delete: Agents die in Anthropic gelöscht wurden ─────────────
-    //    → published=false setzen (Einstellungen wie Preis bleiben erhalten)
-    const db = getSupabaseAdmin();
-
-    const { data: supabaseAgents } = await db
-      .from("agents")
-      .select("anthropic_agent_id, name, published")
-      .not("anthropic_agent_id", "is", null);
-
-    const unpublished: string[] = [];
-
-    for (const row of supabaseAgents ?? []) {
-      const isInConsole = anthropicIds.has(row.anthropic_agent_id);
-      // War der Agent vorher published und ist jetzt weg → auf false setzen
-      if (!isInConsole && row.published) {
-        await db
-          .from("agents")
-          .update({ published: false })
-          .eq("anthropic_agent_id", row.anthropic_agent_id);
-        unpublished.push(row.name ?? row.anthropic_agent_id);
-        console.log(`[sync-agents] ↓ unpublished (nicht mehr in Console): ${row.name}`);
-      }
-    }
-
-    // Skipped zählen (Kundenkopien)
-    for (const agent of agentList) {
-      const name = (agent.name ?? agent.display_name ?? "") as string;
-      if (/ — user_\w+/.test(name) || name.startsWith("TEST_COPY_DELETE_ME")) {
-        skipped.push(name);
-      }
-    }
-
-    return NextResponse.json({
-      message: [
-        `${synced.length} Agent(en) synchronisiert.`,
-        unpublished.length > 0 ? `${unpublished.length} Agent(en) deaktiviert (nicht mehr in Console).` : "",
-        skipped.length > 0 ? `${skipped.length} Kundenkopie(n) übersprungen.` : "",
-        errors.length > 0 ? `${errors.length} Fehler.` : "",
-      ].filter(Boolean).join(" "),
-      synced,
-      unpublished: unpublished.length > 0 ? unpublished : undefined,
-      skipped:     skipped.length > 0     ? skipped     : undefined,
-      errors:      errors.length > 0      ? errors      : undefined,
-    });
-
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : "Unbekannter Fehler";
-    console.error("[sync-agents] Kritischer Fehler:", error);
-    return NextResponse.json({ message: msg, detail: String(error) }, { status: 500 });
   }
+
+  // Karteileichen archivieren — nur aus Workspaces, die wir wirklich gelesen
+  // haben, plus Altbestand ohne Zuordnung.
+  let archiviert: { id: string; name: string; workspace: string | null }[] = [];
+  if (erfolgreicheWorkspaces.length > 0) {
+    try {
+      archiviert = await archiviereVerschwundeneAgenten(gesehen, erfolgreicheWorkspaces);
+      archiviert.forEach(a => console.log(`[sync-agents] ↓ archiviert: ${a.name}`));
+    } catch (e) {
+      errors.push(`Archivierung fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  const wsZusammenfassung = Object.entries(proWorkspace)
+    .map(([name, n]) => `${name}: ${n}`)
+    .join(", ");
+
+  return NextResponse.json({
+    message: [
+      `${synced.length} Agent(en) synchronisiert (${wsZusammenfassung}).`,
+      archiviert.length > 0 ? `${archiviert.length} archiviert (nicht mehr in der Console).` : "",
+      skipped.length    > 0 ? `${skipped.length} Kundenkopie(n) übersprungen.` : "",
+      errors.length     > 0 ? `${errors.length} Fehler.` : "",
+    ].filter(Boolean).join(" "),
+    workspaces: erfolgreicheWorkspaces,
+    synced,
+    archiviert: archiviert.length > 0 ? archiviert : undefined,
+    skipped:    skipped.length    > 0 ? skipped    : undefined,
+    errors:     errors.length     > 0 ? errors     : undefined,
+  });
 }

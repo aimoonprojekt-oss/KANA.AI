@@ -107,7 +107,9 @@ export default function AdminDashboard({ agents: initial }: AdminDashboardProps)
     }
   }
 
-  const published = agents.filter((a) => a.published).length;
+  const published  = agents.filter((a) => a.published && !a.archived).length;
+  const archiviert = agents.filter((a) => a.archived).length;
+  const ohneWs     = agents.filter((a) => !a.workspace && !a.archived).length;
 
   return (
     <div style={{ minHeight: "100vh", background: "#F8F9FB", fontFamily: "system-ui, sans-serif" }}>
@@ -131,7 +133,7 @@ export default function AdminDashboard({ agents: initial }: AdminDashboardProps)
               Agent-Verwaltung
             </h1>
             <p style={{ color: "#64748B", fontSize: 14 }}>
-              {agents.length} Agent(en) gesamt · {published} veröffentlicht
+              {agents.length} Agent(en) gesamt · {published} verkäuflich{archiviert > 0 ? ` · ${archiviert} archiviert` : ""}{ohneWs > 0 ? ` · ${ohneWs} ohne Workspace` : ""}
             </p>
           </div>
           <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
@@ -178,9 +180,11 @@ export default function AdminDashboard({ agents: initial }: AdminDashboardProps)
 
         {/* ── Info Box ── */}
         <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 10, padding: "12px 16px", marginBottom: 24, fontSize: 13, color: "#1E40AF", lineHeight: 1.6 }}>
-          <strong>Wie es funktioniert:</strong> Drücke "Sync" um alle Agents aus der Anthropic Console zu laden.
-          Danach kannst du jeden Agent aktivieren (Sichtbar auf der Website), als Featured markieren, den Preis setzen
-          und die Stripe Price ID eintragen. Klicke "Speichern" um Änderungen zu sichern.
+          <strong>Wie es funktioniert:</strong> „Sync" liest alle konfigurierten Console-Workspaces und schreibt sie hier hinein.
+          Neue Agents sind immer erst <em>unsichtbar</em> — Freigabe zum Verkauf ist eine bewusste Entscheidung.
+          Danach: „Sichtbar" einschalten, Preis und Stripe Price ID setzen, „Speichern".
+          Mit „Für mich freischalten" bekommst du den Agent ohne Zahlung ins eigene Portal, um die Kundensicht zu prüfen.
+          Agents, die in der Console nicht mehr existieren, werden <em>archiviert</em> statt gelöscht.
         </div>
 
         {agents.length === 0 ? (
@@ -243,18 +247,39 @@ function AgentCard({
 
   return (
     <div style={{
-      background: "#fff",
+      background: agent.archived ? "#F8FAFC" : "#fff",
       borderRadius: 12,
-      border: agent._dirty ? "1px solid #F59E0B" : "1px solid #E2E8F0",
+      border: agent._dirty ? "1px solid #F59E0B" : agent.archived ? "1px dashed #CBD5E1" : "1px solid #E2E8F0",
       padding: "18px 20px",
+      opacity: agent.archived ? 0.72 : 1,
       transition: "border-color 0.15s",
     }}>
+      {agent.archived && (
+        <div style={{
+          background: "#FEF3C7", border: "1px solid #FDE68A", color: "#92400E",
+          borderRadius: 8, padding: "7px 12px", fontSize: 12, marginBottom: 14, lineHeight: 1.5,
+        }}>
+          <strong>Archiviert</strong> — dieser Agent liegt nicht mehr in der Claude Console.
+          Er ist aus allen Kundenansichten verschwunden. Die Zeile bleibt erhalten, weil
+          Zugänge und Sitzungen daran hängen. Taucht er in der Console wieder auf, hebt der
+          nächste Sync das Archiv automatisch auf.
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
 
         {/* Name + IDs */}
         <div style={{ flex: "1 1 200px", minWidth: 180 }}>
-          <div style={{ fontWeight: 600, fontSize: 15, color: "#0D1F3C", marginBottom: 4 }}>
+          <div style={{ fontWeight: 600, fontSize: 15, color: "#0D1F3C", marginBottom: 4, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             {agent.name}
+            <span style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase",
+              padding: "2px 8px", borderRadius: 100,
+              background: agent.workspace ? "#E0E7FF" : "#FEE2E2",
+              color:      agent.workspace ? "#3730A3" : "#991B1B",
+            }}>
+              {agent.workspace ?? "kein Workspace"}
+            </span>
           </div>
           <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "monospace", marginBottom: 2 }}>
             {agent.anthropic_agent_id}
