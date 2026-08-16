@@ -1,17 +1,27 @@
 WEEKLY UPDATE — Scrapt alle Kanäle neu, vergleicht mit dem gespeicherten Stand und markiert Änderungen.
 
+Hinweis: Die Quellenliste unten ist noch fest verdrahtet (Mandant SNL). Sobald
+die Mandantenfähigkeit steht, kommen Kanäle und Wettbewerber aus den Einträgen
+`brand_social` und `brand_competitors` der Wissensbasis.
+
 WICHTIGE REGEL FÜR MARKIERUNGEN:
-- Alles was NEU ist (nicht in DB vorhanden) → mit [NEU] am Anfang der Zeile markieren
+- Alles was NEU ist (nicht in der Wissensbasis vorhanden) → mit [NEU] am Anfang der Zeile markieren
 - Alles was sich GEÄNDERT hat (andere Zahl, anderer Text) → mit [GEÄNDERT] markieren
 - Was unverändert ist → normal ausgeben, kein Tag
 - Beispiel: "[NEU] TikTok Follower: 312.000 (war: 302.300)"
 - Beispiel: "[GEÄNDERT] Preis Wimpernserum: €39,99 (war: €36,99)"
 
-═══ PHASE 1: AKTUELLEN STAND LADEN ═══
+═══ PHASE 1: BASELINE LADEN ═══
 
-Schritt 1 — Alle gespeicherten brand_knowledge-Einträge laden (das ist die Vergleichs-Baseline).
-Schreibe sie nach /workspace/baseline.json und lies gezielt mit jq.
-Merke dir die wichtigsten Zahlen: Follower TikTok/IG, Preise, Lagerstand, aktive Ads
+Schritt 1 — /workspace/wissensbasis.json ist die Vergleichs-Baseline. Sie liegt
+bereits im Container; du musst sie nicht abrufen.
+Lies gezielt mit jq, statt alles in den Kontext zu ziehen:
+
+    jq -r '.[] | select(.key=="brand_social") | .content' /workspace/wissensbasis.json
+
+Merke dir die wichtigsten Zahlen: Follower TikTok/IG, Preise, Lagerstand, aktive Ads.
+Fehlt die Datei, gibt es keine Baseline — dann ist alles [NEU], und du sagst das
+im Report deutlich.
 
 ═══ PHASE 2: NEU SCRAPEN ═══
 
@@ -24,7 +34,10 @@ Schritt 7 — Apify Ad Library "Orphica" — Konkurrenz-Änderungen
 Schritt 8 — Apify Ad Library "nanolash" — Konkurrenz-Änderungen
 Schritt 9 — Apify RAG Browser gutefrage.net "sins n lashes" — Neue Community-Stimmen
 
-Erkenntnisse mit [NEU]/[GEÄNDERT] Tags speichern: Upsert für alle betroffenen keys
+Erkenntnisse mit [NEU]/[GEÄNDERT] Tags in die betroffenen Einträge einarbeiten und
+je Eintrag eine Datei nach /mnt/session/outputs/wissensbasis/<key>.json schreiben.
+`content` enthält den vollständigen neuen Text, nicht nur die Änderung.
+Jede Datei anschließend mit `jq . <datei>` prüfen.
 
 ═══ PHASE 3: UPDATE-REPORT (EXAKT dieses Format) ═══
 
@@ -77,6 +90,9 @@ Community-Stimmung: [positiv/neutral/negativ + Grund]
 
 ─── FRÜHWARNSIGNALE ───────────────────────────────────
 [Potenzielle Risiken oder "Keine"]
+
+─── GESCHRIEBENE EINTRÄGE ────────────────────────────
+[Je Datei eine Zeile: <key>.json — <was sich geändert hat>]
 
 ─── NÄCHSTE WOCHE ─────────────────────────────────────
 Zu beobachten: [Details]

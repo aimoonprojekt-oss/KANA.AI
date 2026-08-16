@@ -1,5 +1,10 @@
 BRAND SETUP — Einmaliger vollständiger Aufbau der Wissensbasis von Grund auf.
-Ziel: Nach diesem Lauf ist die Datenbank zu 100% befüllt. Kein Datenpunkt darf fehlen.
+Ziel: Nach diesem Lauf ist die Wissensbasis zu 100% befüllt. Kein Datenpunkt darf fehlen.
+
+Hinweis: Die Quellenliste unten ist noch fest verdrahtet (Mandant SNL). Sobald
+die Mandantenfähigkeit steht, kommen Kanäle und Wettbewerber aus den Einträgen
+`brand_social` und `brand_competitors` der Wissensbasis. Siehe agents/README.md,
+Abschnitt „Offene Punkte".
 
 ═══ PHASE 1: VOLLSTÄNDIGER SCRAPE (alle Kanäle) ═══
 
@@ -20,13 +25,16 @@ bevor du es auswertest.
 
 ═══ PHASE 2: WISSENSBASIS AUFBAUEN ═══
 
-Speichere alle Erkenntnisse vollständig (Upsert auf brand_knowledge):
+Schreibe je Eintrag eine Datei nach /mnt/session/outputs/wissensbasis/<key>.json:
+
 - "overview" — Marke auf einen Blick, alle Kennzahlen
 - "brand_products" — Alle Produkte, Preise, Lagerstand, Inhaltsstoffe
 - "brand_social" — Alle Plattformen, Follower, Top-Content
 - "brand_website" — Komplette Website-Analyse
 - "brand_audience" — Zielgruppe, Trustpilot, Community-Stimmen
 - "brand_competitors" — Vollständige Konkurrenz-Analyse
+
+Jede Datei anschließend mit `jq . <datei>` prüfen.
 
 ═══ PHASE 3: VOLLSTÄNDIGER SETUP-REPORT ═══
 
@@ -80,6 +88,9 @@ Risiken: [Liste]
 3. [Aktion] — Priorität: Mittel
 4. [Aktion] — Priorität: Mittel
 5. [Aktion] — Priorität: Niedrig
+
+─── GESCHRIEBENE EINTRÄGE ────────────────────────────
+[Je Datei eine Zeile: <key>.json — <kurz, was drinsteht>]
 
 ─── NÄCHSTE SCHRITTE ─────────────────────────────────
 Erster Weekly Update empfohlen: [Datum + 7 Tage]
