@@ -1,0 +1,107 @@
+name: CI
+
+# Läuft bei jedem Pull Request und bei jedem Push auf die geschützten Branches.
+# Ein roter Check bedeutet: das kommt nicht live.
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pruefung:
+    name: Typprüfung und Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Node einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Abhängigkeiten installieren
+        run: npm ci --no-audit --no-fund
+
+      - name: Typprüfung
+        run: npx tsc --noEmit
+
+      - name: Build
+        # Platzhalterwerte: Der Build darf nicht an fehlenden Secrets scheitern.
+        # Echte Werte liegen ausschließlich in Railway.
+        env:
+          # Clerk prüft das Format des Publishable Key beim Build.
+          # Dieser Wert ist syntaktisch gültig und zeigt auf nichts.
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2ktcGxhdHpoYWx0ZXIuY2xlcmsuYWNjb3VudHMuZGV2JA==
+          CLERK_SECRET_KEY: sk_test_ci_platzhalter
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-platzhalter.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci_platzhalter
+          SUPABASE_SERVICE_ROLE_KEY: ci_platzhalter
+          ANTHROPIC_API_KEY: sk-ant-ci-platzhalter
+          ANTHROPIC_ENVIRONMENT_ID: env_ci_platzhalter
+          STRIPE_SECRET_KEY: sk_test_ci_platzhalter
+          STRIPE_WEBHOOK_SECRET: whsec_ci_platzhalter
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+        run: npm run build
+
+  geheimnisse:
+    name: Suche nach Zugangsdaten
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Muster prüfen
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          # Bekannte Schlüsselformate der von uns genutzten Anbieter.
+          # Beispieldateien sind ausgenommen, dort stehen absichtlich Platzhalter.
+          muster='sk-ant-api[0-9]{2}-|sk_live_[0-9a-zA-Z]{20,}|rk_live_[0-9a-zA-Z]{20,}|whsec_[0-9a-zA-Z]{32,}|eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9|apify_api_[0-9a-zA-Z]{20,}|AIza[0-9A-Za-z_\-]{35}'
+
+          treffer=$(grep -rInE "$muster" . \
+            --exclude-dir=.git \
+            --exclude-dir=node_modules \
+            --exclude-dir=.next \
+            --exclude='*.example' \
+            --exclude='*.lock' \
+            --exclude='package-lock.json' \
+            --exclude='ci.yml' || true)
+
+          if [ -n "$treffer" ]; then
+            echo "::error::Mögliche Zugangsdaten im Code gefunden."
+            echo "$treffer"
+            echo ""
+            echo "Wenn das ein echter Schlüssel ist: SOFORT beim Anbieter widerrufen"
+            echo "und neu erzeugen. Löschen allein genügt nicht - die Git-Historie"
+            echo "vergisst nichts."
+            exit 1
+          fi
+
+          echo "Keine bekannten Schlüsselmuster gefunden."
+
+      - name: .env-Dateien prüfen
+        shell: bash
+        run: |
+          set -uo pipefail
+          verdaechtig=$(git ls-files | grep -E '(^|/)\.env(\.|$)' | grep -v '\.example$' || true)
+          if [ -n "$verdaechtig" ]; then
+            echo "::error::Eine .env-Datei ist versioniert:"
+            echo "$verdaechtig"
+            exit 1
+          fi
+          echo "Keine versionierten .env-Dateien."
