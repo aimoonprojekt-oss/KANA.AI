@@ -416,6 +416,42 @@ input, textarea, select { font-family: inherit; outline: none; }
   border: 1px solid var(--accent-border); padding: 1px 7px;
   border-radius: 100px; font-weight: 700;
 }
+
+/* ── Aufklappbares Abteilungsmenue ───────────────────────── */
+.item-chevron {
+  flex-shrink: 0; display: flex; align-items: center;
+  opacity: 0.55; transition: opacity 0.15s;
+}
+.sidebar-item:hover .item-chevron { opacity: 1; }
+
+.sidebar-group { font-weight: 700; color: var(--text-primary); }
+
+.sidebar-subtree {
+  margin: 2px 0 6px 0;
+  /* Leitlinie, damit die Verschachtelung auf einen Blick lesbar ist */
+  border-left: 1px solid var(--border);
+  margin-left: 14px; padding-left: 6px;
+}
+
+.sidebar-item.level-2 {
+  font-size: 0.81rem; padding: 7px 10px; gap: 8px;
+}
+.sidebar-item.level-3 {
+  font-size: 0.78rem; padding: 6px 10px 6px 24px; gap: 8px;
+  color: var(--text-muted); font-weight: 500;
+}
+.sidebar-item.level-3:hover { color: var(--text-primary); }
+.sidebar-item.level-3.is-locked { opacity: 0.72; }
+.sidebar-item.level-3.is-locked:hover { opacity: 1; }
+
+.item-label {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.sidebar-empty {
+  padding: 6px 10px 8px 16px;
+  font-size: 0.74rem; color: var(--text-muted); font-style: italic;
+}
 .sidebar-footer {
   padding: 14px 10px; border-top: 1px solid var(--border); margin-top: auto;
 }
