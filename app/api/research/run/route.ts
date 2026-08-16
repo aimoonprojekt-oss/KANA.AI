@@ -5,7 +5,13 @@ import { analyzeVideoUrl } from '@/lib/agents/gemini'
 import { downloadAndStoreVideo } from '@/lib/agents/videoStorage'
 
 export const runtime = 'nodejs'
-export const maxDuration = 600
+// 300 ist das Maximum des Vercel-Hobby-Tarifs. Hoehere Werte lassen den
+// gesamten Build fehlschlagen, nicht nur diese Route.
+// ACHTUNG: Das Apify-Polling in lib/agents/apify.ts wartet bis zu 550s.
+// Ein Research-Lauf kann damit in einen Timeout laufen. Die Loesung ist
+// nicht ein hoeherer Wert, sondern die getrennte Laufsteuerung aus der
+// Zielarchitektur: starten, sofort antworten, Ende per Webhook.
+export const maxDuration = 300
 
 const SNL_KEYWORDS = ['sinsnlashes', 'sins n lashes', 'sins & lashes', 'sinsnlashes.com']
 const RETAILER_KEYWORDS = ['rossmann', 'müller', 'douglas', 'dm ', 'drogerie', 'amazon', 'otto']

@@ -4,7 +4,11 @@ import { isAdminUser } from '@/lib/platform/supabase'
 import { CREATIVE_STRATEGIST_TOOLS, executeStrategistTool, buildStrategistSystemPrompt } from '@/lib/agents/creativeStrategist'
 
 export const runtime = 'nodejs'
-export const maxDuration = 600
+// 300 ist das Maximum des Vercel-Hobby-Tarifs. Hoehere Werte lassen den
+// gesamten Build fehlschlagen, nicht nur diese Route.
+// Laeufe ueber fuenf Minuten brauchen die getrennte Steuerung aus der
+// Zielarchitektur: starten, sofort antworten, Ende per Webhook.
+export const maxDuration = 300
 
 export async function POST(req: Request) {
   const { userId } = await auth()
