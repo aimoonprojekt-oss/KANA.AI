@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { upsertAgent, getSupabaseAdmin } from "@/lib/platform/supabase";
+import { upsertAgent, getSupabaseAdmin, isAdminUser } from "@/lib/platform/supabase";
 
 export const runtime = "nodejs";
 
@@ -11,12 +11,6 @@ function slugify(name: string): string {
     .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
-}
-
-function isAdmin(userId: string): boolean {
-  const adminIds = (process.env.ADMIN_USER_IDS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-  if (adminIds.length === 0) return true;
-  return adminIds.includes(userId);
 }
 
 /**
@@ -31,7 +25,7 @@ function isAdmin(userId: string): boolean {
 export async function POST() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ message: "Nicht eingeloggt" }, { status: 401 });
-  if (!isAdmin(userId)) return NextResponse.json({ message: "Kein Zugriff — nur Admins." }, { status: 403 });
+  if (!isAdminUser(userId)) return NextResponse.json({ message: "Kein Zugriff — nur Admins." }, { status: 403 });
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ message: "ANTHROPIC_API_KEY nicht gesetzt." }, { status: 500 });

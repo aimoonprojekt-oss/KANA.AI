@@ -40,6 +40,35 @@ export default function AdminDashboard({ agents: initial }: AdminDashboardProps)
     }
   }
 
+  // ── Fuer den eingeloggten Admin freischalten ─────────────────────────────
+  //    Legt einen Eintrag in agent_access1 an, ohne Zahlung. Damit wandert der
+  //    Agent im Portal von "Alle Agents" nach "Meine Agents" — der Weg, um die
+  //    Kundensicht zu pruefen, ohne echt zu kaufen.
+  const [granting, setGranting] = useState<string | null>(null);
+  const [grantMsg, setGrantMsg] = useState<{ id: string; text: string; ok: boolean } | null>(null);
+
+  async function grantToMe(agent: AgentRow) {
+    setGranting(agent.anthropic_agent_id);
+    setGrantMsg(null);
+    try {
+      const res  = await fetch("/api/admin/grant-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ anthropicAgentId: agent.anthropic_agent_id }),
+      });
+      const data = await res.json();
+      setGrantMsg({
+        id: agent.anthropic_agent_id,
+        text: res.ok ? "✓ freigeschaltet — im Portal unter „Meine Agents“" : (data.message ?? "Fehlgeschlagen"),
+        ok: res.ok,
+      });
+    } catch {
+      setGrantMsg({ id: agent.anthropic_agent_id, text: "Netzwerkfehler", ok: false });
+    } finally {
+      setGranting(null);
+    }
+  }
+
   // ── Field change ─────────────────────────────────────────────────────────
   function updateField(agentId: string, field: keyof AgentRow, value: unknown) {
     setAgents((prev) =>
@@ -168,6 +197,9 @@ export default function AdminDashboard({ agents: initial }: AdminDashboardProps)
                 agent={agent}
                 onChange={(field, value) => updateField(agent.anthropic_agent_id, field, value)}
                 onSave={() => saveAgent(agent)}
+                onGrant={() => grantToMe(agent)}
+                granting={granting === agent.anthropic_agent_id}
+                grantMsg={grantMsg?.id === agent.anthropic_agent_id ? grantMsg : null}
               />
             ))}
           </div>
@@ -187,10 +219,16 @@ function AgentCard({
   agent,
   onChange,
   onSave,
+  onGrant,
+  granting,
+  grantMsg,
 }: {
   agent: AgentRow;
   onChange: (field: keyof AgentRow, value: unknown) => void;
   onSave: () => void;
+  onGrant: () => void;
+  granting: boolean;
+  grantMsg: { text: string; ok: boolean } | null;
 }) {
   const inputStyle: React.CSSProperties = {
     border: "1px solid #CBD5E1",
@@ -297,6 +335,36 @@ function AgentCard({
           >
             {agent._saving ? "Speichert…" : agent._dirty ? "Speichern" : "Gespeichert"}
           </button>
+
+          {/* Ohne Zahlung fuer den eingeloggten Admin freischalten —
+              zum Pruefen der Kundensicht. */}
+          <button
+            onClick={onGrant}
+            disabled={granting || !agent.published}
+            title={
+              agent.published
+                ? "Diesen Agenten ohne Zahlung fuer dich freischalten"
+                : "Erst sichtbar schalten und speichern"
+            }
+            style={{
+              background: "transparent",
+              color:      agent.published ? "#0D1F3C" : "#94A3B8",
+              border: `1px solid ${agent.published ? "#CBD5E1" : "#E2E8F0"}`,
+              borderRadius: 7,
+              padding: "6px 14px",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: granting || !agent.published ? "not-allowed" : "pointer",
+            }}
+          >
+            {granting ? "Schalte frei…" : "Für mich freischalten"}
+          </button>
+
+          {grantMsg && (
+            <span style={{ fontSize: 11, color: grantMsg.ok ? "#059669" : "#DC2626", maxWidth: 240, textAlign: "right" }}>
+              {grantMsg.text}
+            </span>
+          )}
         </div>
       </div>
     </div>

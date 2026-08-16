@@ -159,9 +159,15 @@ export async function getDBAgentById(anthropicAgentId: string): Promise<DBAgent 
 
 /** Agents, auf die ein User Zugang hat — via agent_access1 + organizations */
 export async function getUserAccessedAgents(userId: string): Promise<DBAgent[]> {
-  // Admins sehen nur published agents (gleiche Ansicht wie reguläre User)
-  if (isAdminUser(userId)) return getPublishedAgents();
-
+  // Bewusst KEINE Sonderbehandlung fuer Admins.
+  //
+  // Frueher bekam ein Admin hier alle veroeffentlichten Agenten zurueck. Damit
+  // stand im Portal alles unter "Meine Agents" und "Alle Agents" blieb immer
+  // leer — ein Admin konnte die Kundensicht also nie pruefen.
+  //
+  // Der Zugriff eines Admins ist davon unberuehrt: checkAgentAccess() laesst
+  // Admins weiterhin jeden Agenten oeffnen. Nur die Anzeige entspricht jetzt
+  // der Wirklichkeit. Zum Testen schaltet man sich ueber /admin frei.
   const db = getSupabaseAdmin();
 
   // 1. Organisation des Users finden
@@ -194,8 +200,9 @@ export async function getUserAccessedAgents(userId: string): Promise<DBAgent[]> 
 
 /** Veröffentlichte Agents, die der User noch NICHT gekauft hat (für Locked-Karten) */
 export async function getLockedAgentsForUser(userId: string): Promise<DBAgent[]> {
-  // Admins haben keine gesperrten Agents
-  if (isAdminUser(userId)) return [];
+  // Auch hier keine Sonderbehandlung fuer Admins — siehe
+  // getUserAccessedAgents(). Ein Admin sieht die noch nicht freigeschalteten
+  // Agenten genauso wie ein Kunde.
   const db = getSupabaseAdmin();
 
   const { data: org } = await db
