@@ -41,4 +41,12 @@ declare module 'lucide-react' {
   export const TrendingDown: Icon;
   export const Zap: Icon;
   export const Calendar: Icon;
+  export const ChevronRight: Icon;
+  export const ChevronDown: Icon;
+  export const FlaskConical: Icon;
 }
+
+// Hinweis: Diese Datei ueberschreibt die mitgelieferten Typen von
+// lucide-react vollstaendig. Ein Icon, das hier nicht steht, laesst sich
+// nicht importieren — auch wenn es das Paket kennt. Wer ein neues Icon
+// verwendet, traegt es hier nach.

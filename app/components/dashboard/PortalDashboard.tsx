@@ -9,7 +9,7 @@ import {
   Play, Lock, CreditCard, Activity, Plus, X,
   Search, Scissors, Send, Lightbulb, Gem, BarChart2,
   TrendingUp, TrendingDown, Zap, Calendar, CheckCircle,
-  ArrowRight,
+  ArrowRight, ChevronRight, ChevronDown, FlaskConical,
 } from "lucide-react";
 import type { DBAgent, UsageOverview } from "@/lib/platform/supabase";
 
@@ -54,6 +54,42 @@ const DEPT_LABELS: Record<Dept, string> = {
   all: "Alle Agenten", marketing: "Marketing", sales: "Sales",
   procurement: "Procurement", operations: "Operations", research: "Research",
 };
+
+/* ─── Abteilungsbaum in der Seitenleiste ─────────────────
+   Reihenfolge der Abteilungen im aufklappbaren Menue.
+   "sonstige" faengt Agenten ohne erkennbare Abteilung auf,
+   damit keiner unsichtbar wird.                              */
+const TREE_DEPTS = ["marketing", "sales", "procurement", "operations", "research", "sonstige"] as const;
+type TreeDept = (typeof TREE_DEPTS)[number];
+
+const TREE_DEPT_LABELS: Record<TreeDept, string> = {
+  marketing: "Marketing", sales: "Sales", procurement: "Procurement",
+  operations: "Operations", research: "Research", sonstige: "Sonstige",
+};
+
+function deptIcon(dept: TreeDept): React.ReactNode {
+  if (dept === "marketing")   return <Megaphone size={15} />;
+  if (dept === "sales")       return <Briefcase size={15} />;
+  if (dept === "procurement") return <Package size={15} />;
+  if (dept === "operations")  return <Settings2 size={15} />;
+  if (dept === "research")    return <FlaskConical size={15} />;
+  return <LayoutGrid size={15} />;
+}
+
+/* Agenten nach Abteilung buendeln — Reihenfolge nach TREE_DEPTS,
+   leere Abteilungen fallen raus. */
+function byDept(list: DBAgent[]): { dept: TreeDept; agents: DBAgent[] }[] {
+  const buckets = new Map<TreeDept, DBAgent[]>();
+  list.forEach(a => {
+    const d = getDept(a);
+    const key: TreeDept = d === "all" ? "sonstige" : d;
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key)!.push(a);
+  });
+  return TREE_DEPTS
+    .filter(d => (buckets.get(d)?.length ?? 0) > 0)
+    .map(d => ({ dept: d, agents: buckets.get(d)! }));
+}
 
 /* ─── Helfer ─────────────────────────────────────────── */
 function getDept(agent: DBAgent): Dept {
@@ -110,6 +146,21 @@ export default function PortalDashboard({
   const [view, setView]             = useState<View>("agents");
   const [activeDept, setActiveDept] = useState<Dept>("all");
 
+  /* ── Aufklappbares Abteilungsmenue ──
+     "Meine Agents" startet offen, "Alle Agents" zu — der haeufigste Fall
+     zuerst. openDepts wird mit "gruppe:abteilung" geschluesselt, damit
+     dieselbe Abteilung in beiden Gruppen unabhaengig auf- und zuklappt. */
+  const [openGroups, setOpenGroups] = useState<{ my: boolean; all: boolean }>({ my: true, all: false });
+  const [openDepts, setOpenDepts]   = useState<Record<string, boolean>>({});
+
+  function toggleGroup(g: "my" | "all") {
+    setOpenGroups(prev => ({ ...prev, [g]: !prev[g] }));
+  }
+  function toggleDept(g: "my" | "all", dept: TreeDept) {
+    const key = `${g}:${dept}`;
+    setOpenDepts(prev => ({ ...prev, [key]: !prev[key] }));
+  }
+
   /* ── Sync ── */
   const [syncing, setSyncing]   = useState(false);
   const [syncMsg, setSyncMsg]   = useState<string | null>(null);
@@ -132,11 +183,9 @@ export default function PortalDashboard({
   const remaining      = Math.max(0, MONTHLY_LIMIT - usedThisMonth);
   const usedPct        = Math.min(100, Math.round((usedThisMonth / MONTHLY_LIMIT) * 100));
 
-  const deptCounts: Record<string, number> = {};
-  userAgents.forEach(a => {
-    const d = getDept(a);
-    if (d !== "all") deptCounts[d] = (deptCounts[d] ?? 0) + 1;
-  });
+  /* Baumdaten fuer die Seitenleiste */
+  const myTree     = byDept(userAgents);
+  const lockedTree = byDept(lockedAgents);
 
   const visibleAgents = activeDept === "all"
     ? userAgents
@@ -241,6 +290,90 @@ export default function PortalDashboard({
     setShowOnboarding(false);
   }
 
+  /* Springt in die Kachelansicht der Abteilung — dort steht bei
+     noch nicht gekauften Agenten der Kaufen-Button. Bewusst KEIN
+     direkter Checkout aus der Seitenleiste. */
+  function showDept(dept: TreeDept) {
+    setView("agents");
+    setActiveDept(dept === "sonstige" ? "all" : (dept as Dept));
+  }
+
+  /* ── Ein aufklappbarer Menuepunkt mit Abteilungen und Agenten ── */
+  function renderAgentTree(
+    group: "my" | "all",
+    title: string,
+    icon: React.ReactNode,
+    tree: { dept: TreeDept; agents: DBAgent[] }[],
+    total: number,
+    locked: boolean,
+  ) {
+    const groupOpen = openGroups[group];
+    return (
+      <>
+        <button
+          type="button"
+          className="sidebar-item sidebar-group"
+          aria-expanded={groupOpen}
+          onClick={() => toggleGroup(group)}
+        >
+          <span className="item-chevron">
+            {groupOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </span>
+          <span className="item-icon">{icon}</span>
+          {title}
+          <span className="item-count">{total}</span>
+        </button>
+
+        {groupOpen && (
+          <div className="sidebar-subtree">
+            {tree.length === 0 && (
+              <div className="sidebar-empty">
+                {locked ? "Alle Agenten bereits gebucht" : "Noch keine Agenten gebucht"}
+              </div>
+            )}
+
+            {tree.map(({ dept, agents }) => {
+              const key      = `${group}:${dept}`;
+              const deptOpen = !!openDepts[key];
+              return (
+                <div key={key}>
+                  <button
+                    type="button"
+                    className="sidebar-item level-2"
+                    aria-expanded={deptOpen}
+                    onClick={() => toggleDept(group, dept)}
+                  >
+                    <span className="item-chevron">
+                      {deptOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                    </span>
+                    <span className="item-icon">{deptIcon(dept)}</span>
+                    {TREE_DEPT_LABELS[dept]}
+                    <span className="item-count">{agents.length}</span>
+                  </button>
+
+                  {deptOpen && agents.map(agent => (
+                    <button
+                      key={agent.anthropic_agent_id}
+                      type="button"
+                      className={`sidebar-item level-3 ${locked ? "is-locked" : ""}`}
+                      title={locked ? `${agent.name} — noch nicht gebucht` : agent.name}
+                      onClick={() => (locked ? showDept(dept) : openTrigger(agent))}
+                    >
+                      <span className="item-icon">
+                        {locked ? <Lock size={13} /> : <Play size={13} />}
+                      </span>
+                      <span className="item-label">{agent.name}</span>
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </>
+    );
+  }
+
   /* ════════════════════════════════════════════════════════
      RENDER
   ════════════════════════════════════════════════════════ */
@@ -283,20 +416,14 @@ export default function PortalDashboard({
           </button>
 
           <span className="sidebar-section-title">Abteilungen</span>
-          {(["marketing", "sales", "procurement", "operations"] as Dept[]).map(dept => (
-            <button key={dept}
-              className={`sidebar-item ${view === "agents" && activeDept === dept ? "active" : ""}`}
-              onClick={() => { setView("agents"); setActiveDept(dept); }}>
-              <span className="item-icon">
-                {dept === "marketing"   && <Megaphone size={16} />}
-                {dept === "sales"       && <Briefcase size={16} />}
-                {dept === "procurement" && <Package size={16} />}
-                {dept === "operations"  && <Settings2 size={16} />}
-              </span>
-              {DEPT_LABELS[dept]}
-              {(deptCounts[dept] ?? 0) > 0 && <span className="item-count">{deptCounts[dept]}</span>}
-            </button>
-          ))}
+          {renderAgentTree(
+            "my", "Meine Agents", <CheckCircle size={16} />,
+            myTree, userAgents.length, false,
+          )}
+          {renderAgentTree(
+            "all", "Alle Agents", <ShoppingCart size={16} />,
+            lockedTree, lockedAgents.length, true,
+          )}
 
           <span className="sidebar-section-title" style={{ marginTop: 28 }}>Konto</span>
           <button className="sidebar-item" onClick={() => setView("agents")}>
