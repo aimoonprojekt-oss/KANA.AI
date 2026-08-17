@@ -464,18 +464,15 @@ export default function PortalDashboard({
                 </span>
                 Agent-Verwaltung
               </a>
-              <a href="/chat/custom_brand_expert" className="sidebar-item" style={{ textDecoration: "none" }}>
-                <span className="item-icon">🧠</span>
-                Brand Expert
-              </a>
-              <a href="/chat/custom_creative_strategist" className="sidebar-item" style={{ textDecoration: "none" }}>
-                <span className="item-icon">🎯</span>
-                Creative Strategist
-              </a>
-              <a href="/chat/custom_creative_analyst" className="sidebar-item" style={{ textDecoration: "none" }}>
-                <span className="item-icon">🔬</span>
-                Creative Analyst
-              </a>
+              {/* Hier standen drei fest verdrahtete Links auf
+                  /chat/custom_brand_expert, custom_creative_strategist und
+                  custom_creative_analyst. Diese Agenten gibt es nicht mehr —
+                  die Links liefen ins Leere.
+
+                  Bewusst nicht durch neue feste Links ersetzt: Welche Agenten
+                  es gibt, steht im Katalog. Sie erscheinen ueber "Meine Agents"
+                  bzw. "Alle Agents" von selbst, sobald sie synchronisiert und
+                  freigeschaltet sind. */}
             </>
           )}
         </nav>
