@@ -159,69 +159,199 @@ export async function POST(req: NextRequest) {
     const encoder = new TextEncoder();
     let fullResponse = "";
 
+    // Vercel kappt eine Anfrage hart bei maxDuration. Wird sie gekappt, laeuft
+    // KEINE Zeile mehr, die hinter der Schleife steht — die Dateien werden nie
+    // abgeholt, der Lauf nie abgeschlossen.
+    //
+    // Genau das ist am 17.08.2026 passiert: Der Lauf dauerte rund sieben
+    // Minuten, beide Dateien lagen fertig bei Anthropic, im Chatfenster kam
+    // nichts an. Deshalb hoeren wir 20 s vor dem Limit von SELBST auf, holen
+    // was da ist und schliessen sauber. Die Session laeuft bei Anthropic
+    // weiter — verloren geht nichts, es wird nur nicht mehr zugeschaut.
+    const ZEITGRENZE_MS = (maxDuration - 20) * 1000;
+    const beginn = Date.now();
+
     const stream = new ReadableStream({
       async start(controller) {
-        try {
-          for await (const event of eventStream) {
-            // Agent-Text streamen (kommt als agent.message.delta oder agent.message)
-            if (event.type === "agent.message.delta" && event.delta?.text) {
-              fullResponse += event.delta.text;
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`)
-              );
-            } else if (event.type === "agent.message" && Array.isArray(event.content)) {
-              // Volltext-Variante (kein Delta-Stream): Blöcke einzeln rausgeben
-              for (const block of event.content) {
-                if (block?.type === "text" && typeof block.text === "string") {
-                  fullResponse += block.text;
-                  controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify({ text: block.text })}\n\n`)
-                  );
-                }
-              }
-            } else if (event.type === "agent.tool_use") {
-              // Tool-Name als separates Event senden (kein Text — wird im UI als Status angezeigt)
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ tool: event.name ?? "tool" })}\n\n`)
-              );
-            } else if (event.type === "session.status_idle") {
-              // Agent ist fertig
-              break;
-            }
-          }
-
-          // ── 6. Output-Dateien via Files API abholen ────────────────────
-          // Agent schreibt Dateien nach /mnt/session/outputs/ im Container.
-          // Nach session.status_idle sind sie über die Files API abrufbar.
+        let offen = true;
+        const sende = (nutzlast: Record<string, unknown>) => {
+          if (!offen) return;
           try {
-            const fileList = await beta.files.list({ scope_id: activeSessionId });
-            if (fileList?.data?.length > 0) {
-              const files = fileList.data.map((f: { id: string; filename?: string }) => ({
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(nutzlast)}\n\n`));
+          } catch {
+            // Browser hat den Tab geschlossen. Kein Fehler — nur niemand mehr da.
+            // Ohne dieses Fangen wuerde der Herzschlag die Funktion abstuerzen
+            // lassen und die Dateiabholung mitreissen.
+            offen = false;
+          }
+        };
+
+        // Statuszeile des Chatfensters. Der Herzschlag wiederholt sie mit der
+        // verstrichenen Zeit, damit ein langer Modellaufruf nicht wie ein
+        // Absturz aussieht. Am 17.08. stand die Anzeige drei Minuten still.
+        let status = "startet";
+        const verstrichen = () => {
+          const s = Math.floor((Date.now() - beginn) / 1000);
+          return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+        };
+        const herzschlag = setInterval(() => {
+          sende({ tool: `${status} · ${verstrichen()}` });
+        }, 10_000);
+
+        // Dateiabholung. Wird an mehreren Stellen aufgerufen und darf deshalb
+        // unter keinen Umstaenden werfen.
+        const dateienSenden = async () => {
+          try {
+            const liste = await beta.files.list({ scope_id: activeSessionId });
+            const dateien = (liste?.data ?? []).map(
+              (f: { id: string; filename?: string }) => ({
                 id: f.id,
                 filename: f.filename ?? f.id,
-              }));
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ files })}\n\n`)
-              );
+              })
+            );
+            if (dateien.length) sende({ files: dateien });
+          } catch (fehler) {
+            console.warn("Files API:", fehler);
+          }
+        };
+
+        let abgelaufen = false;
+
+        try {
+          const ereignisse = eventStream[Symbol.asyncIterator]();
+
+          while (true) {
+            const rest = ZEITGRENZE_MS - (Date.now() - beginn);
+            if (rest <= 0) {
+              abgelaufen = true;
+              break;
             }
-          } catch (filesError) {
-            // Files API nicht verfügbar oder keine Dateien — kein fataler Fehler
-            console.warn("Files API:", filesError);
+
+            // Auf das naechste Ereignis warten, aber hoechstens bis zur
+            // Zeitgrenze — sonst haengt die Schleife im Modellaufruf fest und
+            // die Plattform kappt uns mitten darin.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const naechstes: any = await Promise.race([
+              ereignisse.next(),
+              new Promise((r) => setTimeout(() => r({ __frist: true }), rest)),
+            ]);
+
+            if (naechstes?.__frist) {
+              abgelaufen = true;
+              break;
+            }
+            if (naechstes?.done) break;
+
+            const event = naechstes.value;
+
+            switch (event.type) {
+              // ── Text des Agenten ─────────────────────────────────────────
+              case "agent.message.delta":
+                if (event.delta?.text) {
+                  fullResponse += event.delta.text;
+                  sende({ text: event.delta.text });
+                }
+                break;
+
+              case "agent.message":
+                if (Array.isArray(event.content)) {
+                  for (const block of event.content) {
+                    if (block?.type === "text" && typeof block.text === "string") {
+                      fullResponse += block.text;
+                      sende({ text: block.text });
+                    }
+                  }
+                }
+                break;
+
+              // ── Denkschritte: NUR als Status, niemals im Wortlaut ────────
+              // Der Gedankengang des Agenten ist Betriebsgeheimnis.
+              // Siehe claude/18_Laufakte_und_Kundenansicht.md, Abschnitt 3.
+              case "agent.thinking":
+                status = "denkt nach";
+                sende({ tool: status });
+                break;
+
+              // ── Werkzeuge ────────────────────────────────────────────────
+              case "agent.tool_use": {
+                const pfad =
+                  typeof event.input?.file_path === "string" ? event.input.file_path : "";
+                status =
+                  event.name === "write" && pfad.startsWith("/mnt/session/outputs/")
+                    ? `schreibt ${pfad.split("/").pop()}`
+                    : (event.name ?? "arbeitet");
+                sende({ tool: status });
+                break;
+              }
+
+              // ── Unteragenten ─────────────────────────────────────────────
+              // Ohne diese vier Faelle ist die gesamte Uebergabe an einen
+              // Unteragenten im Chatfenster unsichtbar. Beim Lauf vom 17.08.
+              // waren das vier von sieben Minuten Funkstille.
+              case "session.thread_status_running":
+                status = `${event.agent_name ?? "Unteragent"} uebernimmt`;
+                sende({ tool: status });
+                break;
+
+              case "agent.thread_message_received":
+                status = `${event.agent_name ?? "Unteragent"} hat den Auftrag`;
+                sende({ tool: status });
+                break;
+
+              case "agent.thread_message_sent":
+                status = "Unteragent meldet zurueck";
+                sende({ tool: status });
+                break;
+
+              case "session.thread_status_idle":
+                status = `${event.agent_name ?? "Unteragent"} fertig`;
+                sende({ tool: status });
+                break;
+
+              default:
+                break;
+            }
+
+            // Hauptagent fertig — hier und nur hier endet die Schleife regulaer.
+            // NICHT bei session.thread_status_idle: das ist ein Unteragent.
+            if (event.type === "session.status_idle") break;
           }
 
-          // Run als completed markieren
+          clearInterval(herzschlag);
+
+          // Dateien IMMER holen — auch nach Zeitueberschreitung.
+          await dateienSenden();
+
+          if (abgelaufen) {
+            sende({
+              text:
+                `\n\n⏱ Nach ${verstrichen()} wurde die Verbindung geschlossen — ` +
+                `das Zeitlimit des Hostings. Der Agent arbeitet bei Anthropic ` +
+                `weiter. Alles, was bis hierhin fertig war, steht oben zum ` +
+                `Herunterladen bereit.`,
+            });
+          }
+
           if (runId) {
-            const summary = fullResponse.slice(0, 500) || undefined;
-            await completeRun(runId, summary);
+            const zusammenfassung = fullResponse.slice(0, 500) || undefined;
+            await completeRun(
+              runId,
+              abgelaufen ? (zusammenfassung ?? "ABGEBROCHEN: Zeitlimit") : zusammenfassung
+            );
           }
 
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          offen = false;
           controller.close();
         } catch (streamError) {
-          // Run als failed markieren wenn möglich
+          clearInterval(herzschlag);
+          // Auch im Fehlerfall zuerst die Dateien retten — sie sind das
+          // Ergebnis, der Fehler ist nur der Transportweg.
+          await dateienSenden();
           if (runId) await completeRun(runId, "ERROR").catch(() => {});
           const msg = streamError instanceof Error ? streamError.message : "Stream-Fehler";
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: msg })}\n\n`));
+          sende({ error: msg });
+          offen = false;
           controller.close();
         }
       },
