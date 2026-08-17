@@ -5,13 +5,23 @@ import {
   checkAgentAccess,
   saveSession,
   getDBAgentById,
-  getCustomerAgentId,
   createRun,
   completeRun,
 } from "@/lib/platform/supabase";
 
 // Managed Agents brauchen pro Request einen langen Lauf — Edge-Runtime
-// würde nach ~30s schließen. Daher Node-Runtime + max. Laufzeit hochsetzen.
+// würde nach ~30s schließen. Daher Node-Runtime.
+//
+// 300 s ist das HARTE Maximum des Vercel-Hobby-Tarifs und nicht erhöhbar.
+// Pro erlaubt 800 s, erweitert bis 1800 s.
+// Gemessen am 17.08.2026: Strategy Guide mit 20 Briefs + PDF = 536 s.
+// Auf Hobby passt deshalb nur ein kleiner Lauf (Modus 2) in eine Anfrage.
+//
+// Die eigentliche Lösung ist unabhängig vom Tarif: Starten und Zuhören
+// trennen — Lauf starten, sofort antworten, Ende per Webhook. Solange die
+// Abholung der Dateien unten im Stream-Handler steht, geht bei einem
+// Verbindungsabbruch das Ergebnis verloren, obwohl die Session bei
+// Anthropic weiterläuft. Siehe claude/18_Laufakte_und_Kundenansicht.md.
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
@@ -43,19 +53,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── 4. Agent-Definition + Kundenkopie laden ────────────────────────────────
+  // ── 4. Agent-Definition laden ──────────────────────────────────────────────
   const agentDef = await getDBAgentById(agentId);
   const agentName = agentDef?.name ?? "Agent";
 
-  // Kundenkopie verwenden falls vorhanden, sonst Master als Fallback
-  // Jeder Kunde hat nach dem Kauf seinen eigenen anthropic_agent_id
-  const customerAgentId = await getCustomerAgentId(userId, agentId);
-  const activeAgentId   = customerAgentId ?? agentId;
-
-  if (activeAgentId === agentId) {
-    // Kein Kunden-Agent → entweder Admin-Zugang oder noch keine Kopie
-    console.warn(`User ${userId} nutzt Master-Agent ${agentId} (keine Kundenkopie)`);
-  }
+  // Ein Master-Agent je Produkt, keine Kundenkopien mehr.
+  // Entscheidung vom 16.08.2026: Kopien erreichen Verbesserungen am Master
+  // nie, und bei 50 Kunden × 6 Agenten wären es 300 Definitionen.
+  // Unterschieden wird zur Laufzeit — über Kontext, Vaults und Metadaten.
+  const activeAgentId = agentId;
 
   const environmentId = agentDef?.environment_id ?? process.env.ANTHROPIC_ENVIRONMENT_ID;
   if (!environmentId) {
@@ -74,6 +80,18 @@ export async function POST(req: NextRequest) {
     process.env.ANTHROPIC_VAULT_IDS?.split(",").map((s) => s.trim()).filter(Boolean) ??
     [];
 
+  // Memory-Stores tragen das Kundenwissen. Sie werden als Verzeichnis unter
+  // /mnt/memory/<name>/ eingehängt und lassen sich — wie Vaults — NUR beim
+  // Anlegen der Session anhängen, nicht nachträglich.
+  //
+  // read_only ist Absicht: Nur der Datenpfleger schreibt hinein, und zwar
+  // über das Backend mit Validierung. Ein Agent, der die Wissensbasis eines
+  // Mandanten überschreiben kann, ist ein Agent zu viel.
+  const memoryStoreIds =
+    (agentDef as { memory_store_ids?: string[] } | null)?.memory_store_ids ??
+    process.env.ANTHROPIC_MEMORY_STORE_IDS?.split(",").map((s) => s.trim()).filter(Boolean) ??
+    [];
+
   // ── 5. Anthropic Managed Agents API aufrufen ───────────────────────────────
   // Beta-Felder werden als `any` getypt, da die SDK-TS-Definitionen je nach
   // Version unterschiedlich sind und wir direkt gegen die Laufzeit-API gehen.
@@ -87,9 +105,30 @@ export async function POST(req: NextRequest) {
     // Neue Session starten wenn noch keine vorhanden
     if (!activeSessionId) {
       const session = await beta.sessions.create({
-        agent: activeAgentId,   // Kundenkopie statt Master
+        agent: activeAgentId,
         environment_id: environmentId,
         ...(vaultIds.length ? { vault_ids: vaultIds } : {}),
+        ...(memoryStoreIds.length
+          ? {
+              resources: memoryStoreIds.map((id) => ({
+                type: "memory_store",
+                memory_store_id: id,
+                access: "read_only",
+              })),
+            }
+          : {}),
+        // Harter Kostendeckel je Lauf, in ganzen CENT als String.
+        // Ohne ihn ist eine Endlosschleife im Agenten ein unbegrenztes
+        // Kostenrisiko. Gemessen: ein Strategy Guide mit 20 Briefs = 40 Cent.
+        budget: {
+          type: "limit",
+          max_list_cost: {
+            amount: process.env.ANTHROPIC_MAX_LIST_COST_CENT ?? "300",
+            currency: "USD",
+          },
+        },
+        // Für die spätere Zuordnung in der Laufakte.
+        metadata: { tenant: userId, agent_key: agentId },
         title: `${agentName} — ${userId}`,
       });
       activeSessionId = session.id;
