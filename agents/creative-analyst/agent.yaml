@@ -26,17 +26,17 @@ system: |
   Session als Datei bereit. Lies die Dateien gezielt mit jq, statt sie komplett
   in den Kontext zu ziehen.
 
-    /workspace/referenzen.json    REF-Dateien (key, title, content)
-    /workspace/wissensbasis.json  Brand Knowledge (key, title, content)
-    /workspace/breakdowns.json    Die zu analysierenden Ads
+    /mnt/session/uploads/referenzen.json    REF-Dateien (key, title, content)
+    /mnt/session/uploads/wissensbasis.json  Brand Knowledge (key, title, content)
+    /mnt/session/uploads/breakdowns.json    Die zu analysierenden Ads
 
   Nützliche Aufrufe:
 
-    jq -r '.[].key' /workspace/referenzen.json
-    jq -r '.[] | select(.key=="scoring") | .content' /workspace/referenzen.json
-    jq -r '.status, .hinweis' /workspace/breakdowns.json
-    jq -r '.ads[].ad_id' /workspace/breakdowns.json
-    jq -r '.ads[] | select(.ad_id=="<ID>")' /workspace/breakdowns.json
+    jq -r '.[].key' /mnt/session/uploads/referenzen.json
+    jq -r '.[] | select(.key=="scoring") | .content' /mnt/session/uploads/referenzen.json
+    jq -r '.status, .hinweis' /mnt/session/uploads/breakdowns.json
+    jq -r '.ads[].ad_id' /mnt/session/uploads/breakdowns.json
+    jq -r '.ads[] | select(.ad_id=="<ID>")' /mnt/session/uploads/breakdowns.json
 
   ═══ ERGEBNISSE SCHREIBEN ═══
 
@@ -69,7 +69,7 @@ system: |
   Die Gewichtung ist Rechnung, keine Einschätzung. Rechne sie nicht im Kopf,
   sondern rufe das Skript auf:
 
-    node /workspace/werkzeuge/score.js <K1> <K2> <K3> <K4> <K5> <K6>
+    node /mnt/session/uploads/score.js <K1> <K2> <K3> <K4> <K5> <K6>
 
   Es gibt den gewichteten Gesamt-Score und die Score-Klasse zurück. Übernimm
   beide Werte unverändert in die Analysedatei. Die zugrunde liegende Formel und
@@ -81,10 +81,10 @@ system: |
   ## Workflow
 
   ### Schritt 1 — REF-Dateien laden
-  Lies /workspace/referenzen.json. Lade: Analyse-Framework (8 Schritte), Scoring-Rubrik (K1-K6), Hook-Swipe-File, Format-Glossar.
+  Lies /mnt/session/uploads/referenzen.json. Lade: Analyse-Framework (8 Schritte), Scoring-Rubrik (K1-K6), Hook-Swipe-File, Format-Glossar.
 
   ### Schritt 2 — Brand Knowledge laden
-  Lies /workspace/wissensbasis.json. Extrahiere:
+  Lies /mnt/session/uploads/wissensbasis.json. Extrahiere:
   - SNL USPs, Kern-Benefit, Produktpreise, Hero Product
   - Zielgruppe, Psychografie, Pain Points, Kaufmotive
   - Bekannte Konkurrenten und deren Positionierung (aus 08_brand_competitors)
@@ -93,7 +93,7 @@ system: |
   Diese Daten sind die Referenz für alle Wettbewerbs-Einordnungen und SNL-Empfehlungen.
 
   ### Schritt 3 — Breakdowns laden
-  Lies /workspace/breakdowns.json. Die Daten stammen aus der Tabelle ad_research (alle verfügbaren Felder).
+  Lies /mnt/session/uploads/breakdowns.json. Die Daten stammen aus der Tabelle ad_research (alle verfügbaren Felder).
   - status "keine" → informiere den User und stoppe.
   - status "alle_analysiert" → informiere den User, alle Breakdowns sind verarbeitet.
   - Sonst: liste die zu analysierenden Ads auf.

@@ -47,7 +47,7 @@ function fallback(produkt) {
   return [produkt]
 }
 
-const AUFTRAG = process.env.AUFTRAG_DATEI || '/workspace/auftrag.json'
+const AUFTRAG = process.env.AUFTRAG_DATEI || '/mnt/session/uploads/auftrag.json'
 const auftrag = JSON.parse(fs.readFileSync(AUFTRAG, 'utf8'))
 
 if (process.argv[2] === 'begriffe') {
@@ -63,7 +63,7 @@ function arg(name) { const i = process.argv.indexOf(name); return i > -1 ? proce
 
 const roh = JSON.parse(fs.readFileSync(arg('--ads'), 'utf8'))
 const out = arg('--out')
-const BEKANNT = process.env.BEKANNTE_DATEI || '/workspace/bekannte-ads.json'
+const BEKANNT = process.env.BEKANNTE_DATEI || '/mnt/session/uploads/bekannte-ads.json'
 const bekannt = new Set(
   fs.existsSync(BEKANNT) ? JSON.parse(fs.readFileSync(BEKANNT, 'utf8')).map(String) : []
 )

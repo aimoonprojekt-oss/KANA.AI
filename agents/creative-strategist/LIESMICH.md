@@ -11,9 +11,9 @@ anderem.
 
 | Alt | Neu |
 |---|---|
-| `read_strategist_refs` | `jq` auf `/workspace/referenzen.json` |
-| `read_brand_knowledge` | `jq` auf `/workspace/wissensbasis.json` |
-| `read_analyst_results` | `jq` auf `/workspace/analyst-ergebnisse.json` |
+| `read_strategist_refs` | `jq` auf `/mnt/session/uploads/referenzen.json` |
+| `read_brand_knowledge` | `jq` auf `/mnt/session/uploads/wissensbasis.json` |
+| `read_analyst_results` | `jq` auf `/mnt/session/uploads/analyst-ergebnisse.json` |
 | Ausgabe im Chat | Ausgabe im Chat **plus** `/mnt/session/outputs/strategy-guide.md` |
 | `buildStrategistSystemPrompt("20"\|"10"\|"2")` | `agent.yaml` + `modes/<N>.md` per `agent_with_overrides` |
 | Agentic Loop, `maxDuration = 300` | Managed-Agents-Session + Webhook |
@@ -22,9 +22,9 @@ anderem.
 
 | Pfad | Aus | Format |
 |---|---|---|
-| `/workspace/referenzen.json` | `strategist_knowledge`, nach `key` | `[{key,title,content}]` |
-| `/workspace/wissensbasis.json` | `tenant_knowledge` des Mandanten | `[{key,title,content,updated_at}]` |
-| `/workspace/analyst-ergebnisse.json` | `analyst_results`, `score` absteigend | `[{ad_id,advertiser,score,klasse,content,created_at}]` |
+| `/mnt/session/uploads/referenzen.json` | `strategist_knowledge`, nach `key` | `[{key,title,content}]` |
+| `/mnt/session/uploads/wissensbasis.json` | `tenant_knowledge` des Mandanten | `[{key,title,content,updated_at}]` |
+| `/mnt/session/uploads/analyst-ergebnisse.json` | `analyst_results`, `score` absteigend | `[{ad_id,advertiser,score,klasse,content,created_at}]` |
 
 Ergebnis: `/mnt/session/outputs/strategy-guide.md` → `run_artifacts`.
 **Es wird nichts in die Datenbank zurückgeschrieben** — der Altagent tut das auch nicht.

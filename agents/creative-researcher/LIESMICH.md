@@ -30,9 +30,9 @@ Varianten × 5` ungefähr richtig und bei jedem Lauf ein bisschen anders.
 
 | Pfad | Inhalt |
 |---|---|
-| `/workspace/auftrag.json` | `{targetProduct, adCount, adType, minImpressions, maxVideoDuration, startDateMin, startDateMax, country}` |
-| `/workspace/bekannte-ads.json` | `["123","456"]` — aus `SELECT ad_id FROM ad_research` |
-| `/workspace/werkzeuge/*` | die drei Skripte aus diesem Ordner |
+| `/mnt/session/uploads/auftrag.json` | `{targetProduct, adCount, adType, minImpressions, maxVideoDuration, startDateMin, startDateMax, country}` |
+| `/mnt/session/uploads/bekannte-ads.json` | `["123","456"]` — aus `SELECT ad_id FROM ad_research` |
+| `/mnt/session/uploads/*` | die drei Skripte aus diesem Ordner |
 
 Ergebnis: `/mnt/session/outputs/ads/<ad_id>.json` und `…/videos/<ad_id>.mp4`.
 

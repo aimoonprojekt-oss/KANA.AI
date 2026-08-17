@@ -9,7 +9,7 @@ BEGRIFF="$1"; FORMAT="$2"; MAX="$3"; OUT="$4"
 BASE="https://api.apify.com/v2"
 ACTOR="curious_coder~facebook-ads-library-scraper"
 
-AUFTRAG="${AUFTRAG_DATEI:-/workspace/auftrag.json}"
+AUFTRAG="${AUFTRAG_DATEI:-/mnt/session/uploads/auftrag.json}"
 LAND=$(jq -r '.country // "DE"' "$AUFTRAG")
 VON=$(jq -r '.startDateMin // empty' "$AUFTRAG")
 BIS=$(jq -r '.startDateMax // empty' "$AUFTRAG")

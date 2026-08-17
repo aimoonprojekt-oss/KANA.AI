@@ -7,11 +7,11 @@ Ausführliche Vorlage: `claude/14_Vorlage_Creative-Analyst.md`.
 
 | Alt | Neu |
 |---|---|
-| `read_analyst_refs` | `jq` auf `/workspace/referenzen.json` |
-| `read_brand_knowledge` | `jq` auf `/workspace/wissensbasis.json` |
-| `read_breakdowns(sessionIds)` | `/workspace/breakdowns.json`, **vom Backend vorgefiltert** |
+| `read_analyst_refs` | `jq` auf `/mnt/session/uploads/referenzen.json` |
+| `read_brand_knowledge` | `jq` auf `/mnt/session/uploads/wissensbasis.json` |
+| `read_breakdowns(sessionIds)` | `/mnt/session/uploads/breakdowns.json`, **vom Backend vorgefiltert** |
 | `save_analysis(...)` | Datei `/mnt/session/outputs/analysen/<ad_id>.json` |
-| Scoring-Formel im Kopf | `node /workspace/werkzeuge/score.js` |
+| Scoring-Formel im Kopf | `node /mnt/session/uploads/score.js` |
 
 ## `breakdowns.json`
 

@@ -17,7 +17,7 @@ model:
 # Begruendung: claude/12_Console-Vorlagen_Uebersicht.md, Abschnitt 2.
 #
 # Produkt, Anzahl, Format und Videodauer kommen als AUFTRAG-Block per
-# agent_with_overrides sowie maschinenlesbar in /workspace/auftrag.json.
+# agent_with_overrides sowie maschinenlesbar in /mnt/session/uploads/auftrag.json.
 system: |
   Du bist der Creative Research Agent für Sins n Lashes (SNL).
 
@@ -32,18 +32,18 @@ system: |
   mit drei Skripten im Container. Sie enthalten die verbindliche Logik — rechne
   und filtere niemals selbst.
 
-    /workspace/werkzeuge/apify-suche.sh    Facebook Ad Library durchsuchen
-    /workspace/werkzeuge/filter.js         Ads filtern, ranken, auswählen
-    /workspace/werkzeuge/video-analyse.sh  Video-Breakdown erstellen
+    /mnt/session/uploads/apify-suche.sh    Facebook Ad Library durchsuchen
+    /mnt/session/uploads/filter.js         Ads filtern, ranken, auswählen
+    /mnt/session/uploads/video-analyse.sh  Video-Breakdown erstellen
 
   Zusätzlich liegt bereit:
 
-    /workspace/auftrag.json        Produkt, Anzahl, Format, Grenzwerte
-    /workspace/bekannte-ads.json   bereits verarbeitete ad_ids — überspringen
+    /mnt/session/uploads/auftrag.json        Produkt, Anzahl, Format, Grenzwerte
+    /mnt/session/uploads/bekannte-ads.json   bereits verarbeitete ad_ids — überspringen
 
   --- Ad Library durchsuchen ---
 
-    bash /workspace/werkzeuge/apify-suche.sh "<SUCHBEGRIFF>" <FORMAT> <MAX> <OUT>
+    bash /mnt/session/uploads/apify-suche.sh "<SUCHBEGRIFF>" <FORMAT> <MAX> <OUT>
 
     FORMAT ist VIDEO oder IMAGE. MAX ist die Obergrenze der Rohtreffer.
     OUT ist die Zieldatei, z.B. /workspace/scrape/runde1.json.
@@ -53,13 +53,13 @@ system: |
 
   --- Filtern und ranken ---
 
-    node /workspace/werkzeuge/filter.js \
+    node /mnt/session/uploads/filter.js \
       --ads /workspace/scrape/runde1.json \
       --out /workspace/scrape/auswahl1.json
 
     Das Skript liest Produkt, Format, Anzahl und Grenzwerte selbst aus
-    /workspace/auftrag.json und die bereits bekannten ad_ids aus
-    /workspace/bekannte-ads.json. Es wendet die Ausschlusslisten an, prüft die
+    /mnt/session/uploads/auftrag.json und die bereits bekannten ad_ids aus
+    /mnt/session/uploads/bekannte-ads.json. Es wendet die Ausschlusslisten an, prüft die
     Produktkategorie, prüft bei VIDEO auf ein vorhandenes Video und die Dauer,
     rankt und schneidet auf die gewünschte Anzahl zu.
 
@@ -70,10 +70,11 @@ system: |
 
     Welche Suchbegriffe zu einem Produkt gehören, kannst du abfragen:
 
-      node /workspace/werkzeuge/filter.js begriffe
+      node /mnt/session/uploads/filter.js begriffe
 
   --- Video herunterladen ---
 
+    mkdir -p /workspace/videos /workspace/scrape /workspace/breakdowns
     curl -sL --max-time 90 \
       -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" \
       -H "Referer: https://www.facebook.com/" \
@@ -86,7 +87,7 @@ system: |
 
   --- Video analysieren ---
 
-    bash /workspace/werkzeuge/video-analyse.sh /workspace/videos/<ad_id>.mp4 <OUT>
+    bash /mnt/session/uploads/video-analyse.sh /workspace/videos/<ad_id>.mp4 <OUT>
 
     Schreibt den Breakdown als Markdown nach OUT, z.B.
     /workspace/breakdowns/<ad_id>.md. Schlägt es fehl, verarbeite die Ad
@@ -130,7 +131,7 @@ system: |
 
   ABLAUF — führe diese Schritte der Reihe nach aus:
 
-  1. Lies /workspace/auftrag.json. Rufe apify-suche.sh mit den passenden Keywords für das Produkt auf.
+  1. Lies /mnt/session/uploads/auftrag.json. Rufe apify-suche.sh mit den passenden Keywords für das Produkt auf.
      Keywords für Wimpernserum: ["lash serum", "wimpernserum", "eyelash growth serum", "lash growth"]
      Keywords für Augenbrauenserum: ["brow serum", "eyebrow serum", "augenbrauenserum"]
      Keywords für Haarserum/Haaröl: ["hair serum", "haarserum", "rosemary hair serum"]
