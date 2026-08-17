@@ -1,0 +1,17 @@
+# Fuer den Creative Researcher. Apify, Gemini, Facebook-CDN.
+# Zum Kopieren in das Console-Feld (kommagetrennt):
+#   api.apify.com, generativelanguage.googleapis.com, *.fbcdn.net, www.facebook.com
+#
+# Die Zielseiten der Apify-Scrapes muessen NICHT hier stehen — die ruft Apify
+# auf seinen eigenen Servern auf, nicht der Container.
+name: kana-agents-research
+config:
+  type: cloud
+  networking:
+    type: limited
+    allow_package_managers: false
+    allowed_hosts:
+      - api.apify.com
+      - generativelanguage.googleapis.com
+      - "*.fbcdn.net"
+      - www.facebook.com

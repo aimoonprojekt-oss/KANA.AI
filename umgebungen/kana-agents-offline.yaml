@@ -1,0 +1,9 @@
+# Kein Netzzugang. Fuer Creative Strategist und Creative Analyst.
+# Alle Quellen liegen als Kontextdatei bereit, es gibt nichts abzurufen.
+name: kana-agents-offline
+config:
+  type: cloud
+  networking:
+    type: limited
+    allow_package_managers: false
+    allowed_hosts: []

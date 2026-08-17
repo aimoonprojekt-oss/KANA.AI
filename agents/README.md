@@ -10,12 +10,43 @@ Ziel-Workspace: `wrkspc_019KKnEG6rCpwp7MKmbpg58C`
 
 ## Stand
 
-| Agent | Quelle | YAML | Angelegt |
-|---|---|---|---|
-| Brand Expert | `lib/agents/brandExpert.ts` + `api/brand-expert/run` | ✅ | ⬜ |
-| Creative Analyst | `lib/agents/creativeAnalyst.ts` + `api/creative-analyst/run` | ⬜ | ⬜ |
-| Creative Strategist | `lib/agents/creativeStrategist.ts` + `api/creative-strategist/run` | ⬜ | ⬜ |
-| Research Agent | `api/research/run/route.ts` (Logik in der Route) | ⬜ | ⬜ |
+| Welle | Agent | Quelle | YAML | Angelegt |
+|---|---|---|---|---|
+| 1 | Creative Strategist | `lib/agents/creativeStrategist.ts` + `api/creative-strategist/run` | ✅ `creative-strategist/` | ⬜ |
+| 2 | Brand Expert | `lib/agents/brandExpert.ts` + `api/brand-expert/run` | ✅ `brand-expert.agent.yaml` | ⬜ |
+| 3 | Creative Analyst | `lib/agents/creativeAnalyst.ts` + `api/creative-analyst/run` | ✅ `creative-analyst/` | ⬜ |
+| 4 | Creative Researcher | `api/research/run/route.ts` (Logik in der Route) | ✅ `creative-researcher/` | ⬜ |
+| 5 | Marketing-Abteilung | — (existiert noch nicht) | ⬜ | ⬜ |
+| — | Support Agent | `api/support-chat` — nur in der Console | ⬜ `console-ziehen.sh` | ✅ (unbestätigt) |
+| — | Widget Agent | `api/widget-chat` — nur in der Console | ⬜ `console-ziehen.sh` | ✅ (unbestätigt) |
+
+> **Support- und Widget-Agent sind bisher nirgends im Repo gesichert.** Ihre
+> Definitionen liegen ausschließlich in der Console — genau der ungeschützte
+> Bereich aus `claude/06_Console_vs_Plattform_und_Sicherung.md`, Abschnitt 5.
+> Mit `scripts/console-ziehen.sh` ins Repo holen.
+>
+> ⚠️ **`SUPPORT_AGENT_ID` steht nicht in `.env.local.example`** und kommt im
+> ganzen Repo nur in `app/api/support-chat/route.ts` vor. Ist die Variable
+> nirgends gesetzt, liefert die Route bei jedem Aufruf einen 500er. Ob der
+> Agent überhaupt existiert, zeigt `POST /api/admin/sync-agents` — es lädt die
+> Agenten aus allen konfigurierten Workspaces in die `agents`-Tabelle.
+
+## Ordnerstruktur
+
+```
+agents/<name>/
+├── agent.yaml        Definition — Quelle der Wahrheit
+├── modes/*.md        Modi, per agent_with_overrides angehaengt
+├── werkzeuge/*       deterministische Logik als Skript (NICHT im Prompt)
+└── LIESMICH.md       Abbildung alt -> neu, bewusste Abweichungen
+
+umgebungen/*.yaml     Environments je Sicherheitsstufe
+scripts/
+├── console-ausrollen.sh     Repo -> Console (einziger schreibender Weg)
+├── console-ziehen.sh        Console -> Repo (Sicherung, Drift-Erkennung)
+├── console-test-bindung.sh  Sind Agenten workspace-gebunden? (nicht dokumentiert)
+└── workspace-anlegen.sh     Kunden-Workspace per Admin-API
+```
 
 ---
 
