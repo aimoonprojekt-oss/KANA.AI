@@ -152,6 +152,10 @@ export async function getPublishedAgents(): Promise<DBAgent[]> {
   const { data } = await getSupabaseAdmin()
     .from("agents")
     .select("*")
+    // Modell A: Nur Master gehoeren in den Katalog. Kundenkopien haben
+    // published=false, aber verlassen wir uns nicht darauf — eine versehentlich
+    // veroeffentlichte Kopie waere im Shop ein fremder Agent zum Verkauf.
+    .is("organization_id", null)
     .eq("published", true)
     .eq("archived", false)
     .order("featured", { ascending: false })

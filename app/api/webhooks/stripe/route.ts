@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import Anthropic from "@anthropic-ai/sdk";
 import { grantAgentAccess, revokeAgentAccess, getDBAgentById } from "@/lib/platform/supabase";
-import { anthropicKana } from "@/lib/anthropic/mandant";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -13,12 +11,10 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
  *
  * Ablauf nach erfolgreicher Zahlung:
  * 1. Liest clerk_user_id + anthropic_agent_id aus den Session-Metadata
- * 2. Lädt den Master-Agent aus Anthropic Console
- * 3. Erstellt eine personalisierte Kopie des Agents für den Kunden
- * 4. Schaltet den Zugang in Supabase frei (agent_access1)
+ * 2. Schaltet den Zugang in Supabase frei (agent_access1)
  *
- * Jeder Kunde bekommt seine eigene Agent-ID → Kosten sind in der
- * Anthropic Console pro Agent-ID nachvollziehbar.
+ * Die Kundenkopie des Agenten entsteht NICHT hier, sondern beim ersten Chat
+ * im Workspace des Kunden — siehe lib/anthropic/kundenkopie.ts.
  */
 export async function POST(req: NextRequest) {
   const body      = await req.text();
@@ -56,37 +52,27 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ received: true });
       }
 
-      // ── Kundenkopie via Anthropic API erstellen ─────────────────────────
-      const anthropic = anthropicKana();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const beta = (anthropic as any).beta;
+      // ── Zugang freischalten. Mehr nicht. ────────────────────────────────
+      //
+      // Bis 18.08.2026 legte diese Stelle eine Kundenkopie des Agenten an —
+      // mit dem KANA-Schluessel, also im KANA-Workspace. In Modell A ist das
+      // der falsche Ort: Die Kopie gehoert in den Workspace des Kunden.
+      //
+      // Sie hier anzulegen ginge auch gar nicht zuverlaessig. Beim Kauf hat
+      // der Kunde womoeglich noch keinen Workspace — das Onboarding ist laut
+      // scripts/workspace-anlegen.sh teilweise Handarbeit und passiert nicht
+      // in den Sekunden, die Stripe auf eine Antwort wartet. Und schlaegt es
+      // fehl, ist der Kauf durch und der Zugang kaputt.
+      //
+      // Die Kopie entsteht deshalb beim ersten Chat, idempotent:
+      // lib/anthropic/kundenkopie.ts. Das deckt auch Bestandskunden ab, deren
+      // Kauf laengst zurueckliegt.
+      await grantAgentAccess(userId, masterAgentId);
 
-      // Master-Config laden
-      const masterConfig = await beta.agents.retrieve(masterAgentId);
-
-      // Eindeutiger Name für die Kundenkopie
-      const customerAgentName = `${masterDBAgent.name} — ${userId.slice(0, 12)}`;
-
-      // Kopie erstellen — identische Config, eigene ID
-      const customerAgent = await beta.agents.create({
-        name:        customerAgentName,
-        model:       masterConfig.model,
-        description: masterConfig.description ?? "",
-        system:      masterConfig.system ?? "",
-        tools:       masterConfig.tools ?? [],
-        skills:      masterConfig.skills ?? [],
-        mcp_servers: masterConfig.mcp_servers ?? [],
-      });
-
-      console.log(`✅ Kundenkopie erstellt: ${customerAgent.id} für User ${userId}`);
-
-      // ── Zugang in Supabase freischalten ────────────────────────────────
-      await grantAgentAccess(userId, masterAgentId, customerAgent.id);
-
-      console.log(`✅ Zugang freigeschaltet: ${userId} → ${customerAgent.id}`);
+      console.log(`Zugang freigeschaltet: ${userId} -> ${masterDBAgent.name}`);
 
     } catch (error) {
-      console.error("Fehler bei Agent-Kopie oder Zugangsvergabe:", error);
+      console.error("Fehler bei der Zugangsvergabe:", error);
       // Trotzdem 200 zurückgeben damit Stripe nicht erneut versucht
       // (Fehler manuell über Vercel Logs nachverfolgen)
     }
