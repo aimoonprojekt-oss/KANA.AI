@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { auth } from '@clerk/nextjs/server'
 import { isAdminUser } from '@/lib/platform/supabase'
 import { CREATIVE_ANALYST_TOOLS, executeAnalystTool, buildAnalystSystemPrompt } from '@/lib/agents/creativeAnalyst'
+import { anthropicKana } from "@/lib/anthropic/mandant";
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
@@ -15,7 +16,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}))
   const sessionIds: string[] = body.sessionIds ?? []
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const anthropic = anthropicKana()
   const encoder = new TextEncoder()
 
   const stream = new ReadableStream({

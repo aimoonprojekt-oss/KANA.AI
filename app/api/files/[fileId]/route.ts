@@ -1,12 +1,10 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { sessionGehoertNutzer } from "@/lib/platform/supabase";
+import { anthropicFuerNutzer } from "@/lib/anthropic/mandant";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
 export async function GET(
   req: NextRequest,
@@ -44,8 +42,12 @@ export async function GET(
   }
 
   try {
+    // Modell A: Die Datei liegt im Workspace des Kunden. Mit dem KANA-Schluessel
+    // waere sie schlicht nicht auffindbar — der Schluessel bestimmt, welchen
+    // Workspace man sieht.
+    const mandant = await anthropicFuerNutzer(userId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const beta = (anthropic as any).beta;
+    const beta = (mandant.client as any).beta;
 
     const inSession = await beta.files.list({ scope_id: sessionId });
     const gehoertDazu = (inSession?.data ?? inSession ?? []).some(

@@ -1,6 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import {
   checkAgentAccess,
   saveSession,
@@ -10,6 +9,7 @@ import {
   sessionGehoertNutzer,
 } from "@/lib/platform/supabase";
 import { sessionDateienAnhaengen } from "@/lib/agents/sessionRessourcen";
+import { anthropicFuerNutzer } from "@/lib/anthropic/mandant";
 
 // Managed Agents brauchen pro Request einen langen Lauf — Edge-Runtime
 // würde nach ~30s schließen. Daher Node-Runtime.
@@ -27,10 +27,9 @@ import { sessionDateienAnhaengen } from "@/lib/agents/sessionRessourcen";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-// Anthropic SDK — API Key NUR hier auf dem Server
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
-});
+// Modell A: KEIN Client auf Modulebene mehr. Der Schluessel haengt am Kunden,
+// nicht am Server — er wird pro Anfrage aus dessen Organisation geholt.
+// Siehe lib/anthropic/mandant.ts.
 
 export async function POST(req: NextRequest) {
   // ── 1. Authentifizierung prüfen ────────────────────────────────────────────
@@ -101,10 +100,25 @@ export async function POST(req: NextRequest) {
     : umgebungsListe("ANTHROPIC_MEMORY_STORE_IDS");
 
   // ── 5. Anthropic Managed Agents API aufrufen ───────────────────────────────
+  // Modell A: der Client gehoert dem Workspace DIESES Kunden. Wirft, wenn ein
+  // Workspace hinterlegt ist, der Schluessel dazu aber fehlt — ein stiller
+  // Rueckfall auf KANA waere genau das Datenteilen, das wir vermeiden wollen.
+  let mandant;
+  try {
+    mandant = await anthropicFuerNutzer(userId);
+  } catch (fehler) {
+    const text = fehler instanceof Error ? fehler.message : String(fehler);
+    console.error("[chat] Mandant nicht aufloesbar:", text);
+    return NextResponse.json(
+      { message: "Dein Arbeitsbereich ist nicht vollstaendig eingerichtet. Bitte an den Support wenden." },
+      { status: 503 }
+    );
+  }
+
   // Beta-Felder werden als `any` getypt, da die SDK-TS-Definitionen je nach
   // Version unterschiedlich sind und wir direkt gegen die Laufzeit-API gehen.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const beta = (anthropic as any).beta;
+  const beta = (mandant.client as any).beta;
 
   // M2: Die sessionId kommt vom Client. Ohne Pruefung koennte man mit einer
   // fremden Session-ID in eine fremde Konversation hineinschreiben und deren

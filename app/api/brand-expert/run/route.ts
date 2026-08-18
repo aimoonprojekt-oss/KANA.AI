@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { auth } from '@clerk/nextjs/server'
 import { isAdminUser } from '@/lib/platform/supabase'
 import { BRAND_EXPERT_TOOLS, executeBrandTool, buildBrandExpertSystemPrompt } from '@/lib/agents/brandExpert'
+import { anthropicKana } from "@/lib/anthropic/mandant";
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
     return new Response(JSON.stringify({ error: 'mode ist Pflichtfeld (weekly-scrape | brand-report | brand-check | brand-update)' }), { status: 400 })
   }
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const anthropic = anthropicKana()
   const encoder = new TextEncoder()
 
   const stream = new ReadableStream({
