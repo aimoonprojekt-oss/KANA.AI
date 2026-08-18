@@ -126,6 +126,56 @@ export async function getOrCreateOrganization(userId: string): Promise<string> {
   return created.id;
 }
 
+/** Firmendaten, wie sie beim Kauf über Stripe hereinkommen. */
+export type Kundendaten = {
+  firma?:              string | null;
+  ansprechpartner?:    string | null;
+  telefon?:            string | null;
+  website?:            string | null;
+  ust_id?:             string | null;
+  rechnungsanschrift?: Record<string, unknown> | null;
+  onboarding_notiz?:   string | null;
+};
+
+/**
+ * Schreibt die beim Kauf erhobenen Firmendaten an die Organisation und setzt
+ * das Onboarding auf "offen".
+ *
+ * Leere Felder überschreiben nichts. Beim zweiten Kauf desselben Kunden lässt
+ * Stripe die freiwilligen Felder womöglich leer — dann soll das, was beim
+ * ersten Kauf angekommen ist, stehen bleiben.
+ *
+ * Ein bereits abgeschlossenes Onboarding wird nicht zurückgesetzt: Wer seinen
+ * Workspace hat und einen zweiten Agenten kauft, muss nicht neu aufgesetzt
+ * werden.
+ */
+export async function kundendatenSpeichern(
+  userId: string,
+  daten: Kundendaten
+): Promise<void> {
+  const db = getSupabaseAdmin();
+  const organizationId = await getOrCreateOrganization(userId);
+
+  const { data: bestand } = await db
+    .from("organizations")
+    .select("onboarding_status, erstkauf_am")
+    .eq("id", organizationId)
+    .maybeSingle();
+
+  const patch: Record<string, unknown> = {};
+  for (const [feld, wert] of Object.entries(daten)) {
+    if (wert !== null && wert !== undefined && wert !== "") patch[feld] = wert;
+  }
+
+  if (!bestand?.erstkauf_am) patch.erstkauf_am = new Date().toISOString();
+  if (bestand?.onboarding_status !== "fertig") patch.onboarding_status = "offen";
+
+  if (Object.keys(patch).length === 0) return;
+
+  const { error } = await db.from("organizations").update(patch).eq("id", organizationId);
+  if (error) throw new Error(`Kundendaten konnten nicht gespeichert werden: ${error.message}`);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // ADMIN-HELPER — zentrale Prüfung, ob ein Clerk-User Admin ist
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -152,10 +202,6 @@ export async function getPublishedAgents(): Promise<DBAgent[]> {
   const { data } = await getSupabaseAdmin()
     .from("agents")
     .select("*")
-    // Modell A: Nur Master gehoeren in den Katalog. Kundenkopien haben
-    // published=false, aber verlassen wir uns nicht darauf — eine versehentlich
-    // veroeffentlichte Kopie waere im Shop ein fremder Agent zum Verkauf.
-    .is("organization_id", null)
     .eq("published", true)
     .eq("archived", false)
     .order("featured", { ascending: false })

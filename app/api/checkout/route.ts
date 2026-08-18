@@ -61,8 +61,62 @@ export async function POST(req: NextRequest) {
       // Nach erfolgreicher Zahlung → Dashboard mit Erfolgsmeldung
       success_url: `${baseUrl}/dashboard?purchased=${agent.slug}`,
       cancel_url:  `${baseUrl}/dashboard`,
-      // Optional: Kundendaten vorausfüllen wenn vorhanden
       allow_promotion_codes: true,
+
+      // ── Firmendaten erheben — hier und nirgends sonst ──────────────────────
+      //
+      // Entscheidung vom 18.08.2026: Die Anmeldung bleibt bei E-Mail und
+      // Passwort. Wer sich nur umsehen will, soll kein Formular ausfuellen.
+      // Erhoben wird beim KAUF, auf der Stripe-Seite, auf der der Kunde
+      // ohnehin gerade eine Rechnungsadresse eintippt.
+      //
+      // Kein eigenes Formular davor: Jede Seite zwischen "kaufen" und
+      // "bezahlt" kostet Abschluesse. Und Stripe kann das besser — die
+      // Umsatzsteuer-ID wird dort gleich geprueft, die Adressfelder passen
+      // sich dem Land an.
+      billing_address_collection: "required",
+      tax_id_collection: { enabled: true },
+      phone_number_collection: { enabled: true },
+
+      // Drei Felder sind das Maximum bei Stripe. Deshalb nur das, was Stripe
+      // NICHT ohnehin liefert:
+      //   - Firmenname: Der Rechnungsname ist bei Einzelunternehmern der
+      //     Personenname. Fuer die Anrede und den Workspace-Namen brauchen
+      //     wir die Firma.
+      //   - Website: Die Domain ist der Einstieg ins Firmenwissen und beim
+      //     Widget spaeter der Shop.
+      //   - Startpunkt: Gibt dem Onboarding eine Richtung, statt bei null
+      //     anzufangen. Freiwillig.
+      custom_fields: [
+        {
+          key: "firma",
+          label: { type: "custom", custom: "Firmenname" },
+          type: "text",
+          text: { maximum_length: 100 },
+        },
+        {
+          key: "website",
+          label: { type: "custom", custom: "Website oder Shop-Adresse" },
+          type: "text",
+          optional: true,
+          text: { maximum_length: 200 },
+        },
+        {
+          key: "startpunkt",
+          label: { type: "custom", custom: "Womit sollen wir starten?" },
+          type: "text",
+          optional: true,
+          text: { maximum_length: 255 },
+        },
+      ],
+
+      custom_text: {
+        submit: {
+          message:
+            "Nach dem Kauf richten wir Ihren eigenen Arbeitsbereich ein. " +
+            "Wir melden uns innerhalb eines Werktags bei Ihnen.",
+        },
+      },
     });
 
     return NextResponse.json({ url: session.url });
