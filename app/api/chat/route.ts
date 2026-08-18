@@ -10,6 +10,7 @@ import {
 } from "@/lib/platform/supabase";
 import { sessionDateienAnhaengen } from "@/lib/agents/sessionRessourcen";
 import { anthropicFuerNutzer } from "@/lib/anthropic/mandant";
+import { laufzielFuerKunden } from "@/lib/anthropic/kundenkopie";
 
 // Managed Agents brauchen pro Request einen langen Lauf — Edge-Runtime
 // würde nach ~30s schließen. Daher Node-Runtime.
@@ -61,17 +62,18 @@ export async function POST(req: NextRequest) {
   const agentDef = await getDBAgentById(agentId);
   const agentName = agentDef?.name ?? "Agent";
 
-  // Ein Master-Agent je Produkt, keine Kundenkopien mehr.
-  // Entscheidung vom 16.08.2026: Kopien erreichen Verbesserungen am Master
-  // nie, und bei 50 Kunden × 6 Agenten wären es 300 Definitionen.
-  // Unterschieden wird zur Laufzeit — über Kontext, Vaults und Metadaten.
-  const activeAgentId = agentId;
-
-  const environmentId = agentDef?.environment_id ?? process.env.ANTHROPIC_ENVIRONMENT_ID;
-  if (!environmentId) {
+  // Modell A (18.08.2026): Der Kunde arbeitet in SEINEM Workspace, und Agenten
+  // sind workspace-gebunden. Gestartet wird deshalb nicht der Master aus dem
+  // KANA-Katalog, sondern die Kopie im Workspace des Kunden. Existiert sie noch
+  // nicht, wird sie hier angelegt — idempotent, siehe lib/anthropic/kundenkopie.ts.
+  //
+  // Der frühere Kommentar an dieser Stelle ("keine Kundenkopien mehr",
+  // Entscheidung vom 16.08.) galt für Modell B und ist überholt. Er stimmte
+  // ohnehin nie mit dem Stripe-Webhook überein, der seit jeher Kopien anlegte.
+  if (!agentDef) {
     return NextResponse.json(
-      { message: "ANTHROPIC_ENVIRONMENT_ID nicht gesetzt." },
-      { status: 500 }
+      { message: "Agent nicht im Katalog gefunden." },
+      { status: 404 }
     );
   }
 
@@ -114,6 +116,25 @@ export async function POST(req: NextRequest) {
       { status: 503 }
     );
   }
+
+  // Welcher Agent wird tatsächlich gestartet — Kopie oder (übergangsweise)
+  // Master? Und in welcher Umgebung? Beides gehört zusammen: Eine Kopie im
+  // Kundenworkspace lässt sich nicht mit der Environment-ID aus dem
+  // KANA-Workspace starten.
+  let laufziel;
+  try {
+    laufziel = await laufzielFuerKunden(mandant.organizationId, agentDef);
+  } catch (fehler) {
+    const text = fehler instanceof Error ? fehler.message : String(fehler);
+    console.error("[chat] Kundenkopie nicht bereitstellbar:", text);
+    return NextResponse.json(
+      { message: "Der Agent konnte in deinem Arbeitsbereich nicht bereitgestellt werden." },
+      { status: 503 }
+    );
+  }
+
+  const activeAgentId = laufziel.agentId;
+  const environmentId = laufziel.environmentId;
 
   // Beta-Felder werden als `any` getypt, da die SDK-TS-Definitionen je nach
   // Version unterschiedlich sind und wir direkt gegen die Laufzeit-API gehen.
