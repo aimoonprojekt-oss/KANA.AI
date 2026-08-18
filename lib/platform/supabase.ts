@@ -46,6 +46,21 @@ export type DBAgent = {
   workspace:          string | null;  // Console-Workspace, z.B. "KANA AI". NULL = unbekannt
   last_seen_at:       string | null;  // zuletzt beim Sync in der Console gefunden
   archived:           boolean;        // true = in der Console nicht mehr vorhanden
+
+  // Beides wird beim Anlegen einer Session an die Managed-Agents-API gereicht.
+  // Bis 18.08.2026 fehlten beide Felder hier und waren nur ueber `as`-Casts in
+  // app/api/chat/route.ts erreichbar. Der Cast auf memory_store_ids hat verdeckt,
+  // dass es die SPALTE gar nicht gab — der Wert war immer undefined und der Code
+  // fiel stillschweigend auf eine globale Umgebungsvariable zurueck. Typisiert
+  // faellt so etwas beim naechsten Mal im Compiler auf.
+  vault_ids:          string[] | null;  // Zugangsdaten, z.B. APIFY_API_TOKEN fuer den Researcher
+  memory_store_ids:   string[] | null;  // Kundenwissen, wird unter /mnt/memory/<name>/ eingehaengt
+
+  // Ordner unter agents/ im Repo. Bestimmt, welche Werkzeugskripte in die
+  // Session gemountet werden. Bewusst NICHT aus dem Slug abgeleitet: Der Slug
+  // entsteht aus dem Console-Anzeigenamen ("Creative Strategist (Test Modus 20)")
+  // und aendert sich beim Umbenennen. Gesetzt beim Ausrollen.
+  repo_ordner:        string | null;
 };
 
 /** Organisation — ein User hat genau eine Organisation */
