@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { getSupabaseAdmin } from '@/lib/platform/supabase'
+import { auth } from '@clerk/nextjs/server'
+import { getSupabaseAdmin, isAdminUser } from '@/lib/platform/supabase'
 import { searchFacebookAds } from '@/lib/agents/apify'
 import { analyzeVideoUrl } from '@/lib/agents/gemini'
 import { downloadAndStoreVideo } from '@/lib/agents/videoStorage'
@@ -354,6 +355,13 @@ QUALITÄTSREGELN:
 // ─── API Route ────────────────────────────────────────────────────────────────
 
 export async function POST(req: Request) {
+  // K2: Diese Route war ueber middleware.ts oeffentlich ("Auth im Frontend").
+  // Sie startet Apify-Scraping, Gemini-Videoanalyse und Anthropic-Aufrufe —
+  // jeder Aufruf kostet Geld. Ohne Login war das ein offenes Portemonnaie.
+  const { userId } = await auth()
+  if (!userId) return Response.json({ error: 'Nicht angemeldet' }, { status: 401 })
+  if (!isAdminUser(userId)) return Response.json({ error: 'Kein Zugriff' }, { status: 403 })
+
   const { targetProduct, adCount, adType, searchKeywords, minImpressions = 0, maxVideoDuration = 0, startDateMin, startDateMax } = await req.json()
 
   if (!targetProduct || !adCount || !adType) {

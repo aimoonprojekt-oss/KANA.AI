@@ -1,8 +1,14 @@
-import { getSupabaseAdmin } from '@/lib/platform/supabase'
+import { auth } from '@clerk/nextjs/server'
+import { getSupabaseAdmin, isAdminUser } from '@/lib/platform/supabase'
 import { analyzeVideoUrl } from '@/lib/agents/gemini'
 
 // Läuft nur die Gemini-Analyse für bereits gespeicherte Ads nochmal
 export async function POST(req: Request) {
+  // K2: War ohne Login erreichbar und loest kostenpflichtige Gemini-Aufrufe aus.
+  const { userId } = await auth()
+  if (!userId) return Response.json({ error: 'Nicht angemeldet' }, { status: 401 })
+  if (!isAdminUser(userId)) return Response.json({ error: 'Kein Zugriff' }, { status: 403 })
+
   const { adId } = await req.json()
 
   if (!adId) {

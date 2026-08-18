@@ -1,12 +1,13 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 // Diese Routen sind ÖFFENTLICH (kein Login nötig)
+// ACHTUNG: Was hier steht, ist ohne Login aus dem Internet erreichbar.
+// Routen, die Geld ausgeben (Anthropic, Apify, Gemini), gehoeren NICHT hierher.
 const isPublicRoute = createRouteMatcher([
   "/",              // Landing Page
   "/sign-in(.*)",   // Login
   "/sign-up(.*)",   // Registrierung
   "/api/webhooks/stripe", // Stripe Webhook (muss ohne Auth erreichbar sein)
-  "/api/research/(.*)",  // Research Agent (intern, Auth im Frontend)
 ]);
 
 // Alle anderen Routen sind GESCHÜTZT

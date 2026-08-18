@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { sessionGehoertNutzer } from "@/lib/platform/supabase";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -21,9 +22,38 @@ export async function GET(
     return NextResponse.json({ message: "Keine File-ID" }, { status: 400 });
   }
 
+  // ── H2: Besitznachweis ────────────────────────────────────────────────────
+  // Vorher genuegte irgendein Login, um JEDE Datei herunterzuladen, deren ID
+  // man kannte — auch die eines anderen Kunden. Jetzt gilt: Die Datei muss zu
+  // einer Session gehoeren, die diesem Nutzer gehoert.
+  //
+  // Zwei Pruefungen, weil beide noetig sind:
+  //   1. Gehoert die Session dem Nutzer?          -> Tabelle sessions
+  //   2. Liegt die Datei wirklich in dieser Session? -> files.list(scope_id)
+  // Ohne (2) koennte man eine eigene Session als Eintrittskarte fuer eine
+  // fremde Datei benutzen.
+  const sessionId = req.nextUrl.searchParams.get("session");
+  if (!sessionId) {
+    return NextResponse.json(
+      { message: "Session-ID fehlt (?session=...)" },
+      { status: 400 }
+    );
+  }
+  if (!(await sessionGehoertNutzer(userId, sessionId))) {
+    return NextResponse.json({ message: "Kein Zugriff" }, { status: 403 });
+  }
+
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const beta = (anthropic as any).beta;
+
+    const inSession = await beta.files.list({ scope_id: sessionId });
+    const gehoertDazu = (inSession?.data ?? inSession ?? []).some(
+      (f: { id?: string }) => f?.id === fileId
+    );
+    if (!gehoertDazu) {
+      return NextResponse.json({ message: "Kein Zugriff" }, { status: 403 });
+    }
 
     // Datei-Metadaten abrufen (für Filename + MIME-Type)
     const fileMeta = await beta.files.retrieve(fileId);

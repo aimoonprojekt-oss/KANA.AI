@@ -7,6 +7,7 @@ import {
   getDBAgentById,
   createRun,
   completeRun,
+  sessionGehoertNutzer,
 } from "@/lib/platform/supabase";
 
 // Managed Agents brauchen pro Request einen langen Lauf — Edge-Runtime
@@ -97,6 +98,18 @@ export async function POST(req: NextRequest) {
   // Version unterschiedlich sind und wir direkt gegen die Laufzeit-API gehen.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const beta = (anthropic as any).beta;
+
+  // M2: Die sessionId kommt vom Client. Ohne Pruefung koennte man mit einer
+  // fremden Session-ID in eine fremde Konversation hineinschreiben und deren
+  // Antworten mitlesen. Eine unbekannte oder fremde ID wird abgewiesen statt
+  // stillschweigend als "neue Session" behandelt — sonst waere der Fehler
+  // fuer den Nutzer unsichtbar.
+  if (sessionId && !(await sessionGehoertNutzer(userId, sessionId))) {
+    return NextResponse.json(
+      { message: "Diese Sitzung gehoert nicht zu deinem Konto." },
+      { status: 403 }
+    );
+  }
 
   try {
     let activeSessionId: string = sessionId;

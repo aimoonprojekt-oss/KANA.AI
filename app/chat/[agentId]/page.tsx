@@ -430,7 +430,7 @@ function ChatPageInner() {
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {outputFiles.map(f => (
                   <a key={f.id}
-                    href={`/api/files/${f.id}`}
+                    href={`/api/files/${f.id}?session=${encodeURIComponent(sessionId ?? "")}`}
                     download={f.filename}
                     style={{
                       display: "flex", alignItems: "center", gap: 10,

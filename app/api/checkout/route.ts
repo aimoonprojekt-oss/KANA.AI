@@ -48,6 +48,16 @@ export async function POST(req: NextRequest) {
         anthropic_agent_id:  anthropicAgentId,
         agent_name:          agent.name,
       },
+      // Die Metadaten oben haengen NUR an der Checkout-Session. Das Ereignis
+      // customer.subscription.deleted liefert aber das Abo-Objekt, nicht die
+      // Session — ohne die Wiederholung hier kaeme die Kuendigung ohne jeden
+      // Bezug zu Nutzer und Agent an, und der Zugang liesse sich nicht entziehen.
+      subscription_data: {
+        metadata: {
+          clerk_user_id:      userId,
+          anthropic_agent_id: anthropicAgentId,
+        },
+      },
       // Nach erfolgreicher Zahlung → Dashboard mit Erfolgsmeldung
       success_url: `${baseUrl}/dashboard?purchased=${agent.slug}`,
       cancel_url:  `${baseUrl}/dashboard`,

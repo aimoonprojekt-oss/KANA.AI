@@ -442,6 +442,39 @@ export async function grantAgentAccess(
 }
 
 /**
+ * Entzieht einen Zugang (M1 — Abo-Kuendigung).
+ *
+ * Ohne masterAnthropicAgentId werden ALLE Zugaenge der Organisation
+ * deaktiviert — das ist der Fall, wenn Stripe uns nicht mitteilt, welches
+ * Produkt gekuendigt wurde.
+ *
+ * Es wird deaktiviert, nicht geloescht: Die Kaufhistorie bleibt erhalten,
+ * und eine Reaktivierung ist ein einzelnes UPDATE statt einer Neuanlage.
+ */
+export async function revokeAgentAccess(
+  userId: string,
+  masterAnthropicAgentId?: string
+): Promise<void> {
+  const db = getSupabaseAdmin();
+  const orgId = await getOrCreateOrganization(userId);
+
+  let query = db.from("agent_access1").update({ active: false }).eq("organization_id", orgId);
+
+  if (masterAnthropicAgentId) {
+    const { data: agent } = await db
+      .from("agents")
+      .select("id")
+      .eq("anthropic_agent_id", masterAnthropicAgentId)
+      .maybeSingle();
+    if (!agent) throw new Error(`Agent nicht in DB gefunden: ${masterAnthropicAgentId}`);
+    query = query.eq("agent_id", agent.id);
+  }
+
+  const { error } = await query;
+  if (error) throw new Error(`Zugang konnte nicht entzogen werden: ${error.message}`);
+}
+
+/**
  * Gibt die Kunden-spezifische Anthropic Agent-ID zurück.
  * Wird im Chat genutzt damit jeder Kunde seinen eigenen Agent verwendet.
  */
@@ -497,6 +530,29 @@ export async function saveSession(
     .select("id")
     .single();
   return data?.id ?? "";
+}
+
+/**
+ * Prueft, ob eine Anthropic-Session dem angegebenen Nutzer gehoert.
+ *
+ * Behebt H2/M2: Bisher wurde die vom Client geschickte sessionId ungeprueft
+ * uebernommen. Wer eine fremde Session-ID kennt, konnte sie weiterfuehren
+ * und die darin erzeugten Dateien herunterladen. Admins sind bewusst NICHT
+ * ausgenommen — fuer den Support gibt es die Laufakte, nicht den Direktzugriff
+ * auf fremde Kundendateien.
+ */
+export async function sessionGehoertNutzer(
+  userId:             string,
+  anthropicSessionId: string
+): Promise<boolean> {
+  if (!userId || !anthropicSessionId) return false;
+  const { data } = await getSupabaseAdmin()
+    .from("sessions")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("anthropic_session_id", anthropicSessionId)
+    .maybeSingle();
+  return Boolean(data?.id);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
