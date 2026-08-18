@@ -1,11 +1,10 @@
-import Anthropic from "@anthropic-ai/sdk";
+
 import { NextRequest } from "next/server";
 import { getWidgetConfig, logEscalation, WidgetConfig } from "@/lib/platform/supabase";
+import { anthropicFuerOrganisation } from "@/lib/anthropic/mandant";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
 // ─── CORS — Widget wird von fremden Domains eingebettet ───────────────────────
 const CORS_HEADERS = {
@@ -51,8 +50,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Modell A: Das Widget arbeitet im Workspace SEINES Kunden. Die Organisation
+  // steht in der widget_configs-Zeile, zu der der X-Widget-Token gehoert.
+  const mandant = await anthropicFuerOrganisation(config.organization_id);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const beta = (anthropic as any).beta;
+  const beta = (mandant.client as any).beta;
   const envId = process.env.ANTHROPIC_ENVIRONMENT_ID!;
 
   if (!envId) {

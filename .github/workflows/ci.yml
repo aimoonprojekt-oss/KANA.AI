@@ -105,3 +105,42 @@ jobs:
             exit 1
           fi
           echo "Keine versionierten .env-Dateien."
+
+  mandantentrennung:
+    name: Mandantentrennung
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Kein direkter Griff zum KANA-Schlüssel
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          # Modell A (Entscheidung vom 18.08.2026): ein Anthropic-Workspace je
+          # Kunde. Ein Schlüssel gehört zu genau einem Workspace. Wer irgendwo
+          # direkt process.env.ANTHROPIC_API_KEY greift, arbeitet im
+          # KANA-Workspace — bei einem kundenbezogenen Aufruf ist das der
+          # falsche, und die API sagt dazu nichts.
+          #
+          # Erlaubt ist der Zugriff nur in lib/anthropic/. Dort steht die eine
+          # Stelle, die entscheidet, wessen Schlüssel gilt.
+          treffer=$(grep -rIn 'process\.env\.ANTHROPIC_API_KEY' app lib \
+            --include='*.ts' --include='*.tsx' \
+            | grep -v '^lib/anthropic/' || true)
+
+          if [ -n "$treffer" ]; then
+            echo "::error::Direkter Zugriff auf ANTHROPIC_API_KEY außerhalb von lib/anthropic/."
+            echo "$treffer"
+            echo ""
+            echo "Für Kundenaufrufe: anthropicFuerNutzer(userId) bzw."
+            echo "anthropicFuerOrganisation(organizationId)."
+            echo "Für betriebliche Aufrufe (Sync, Admin, Stripe): anthropicKana()."
+            echo "Siehe lib/anthropic/mandant.ts."
+            exit 1
+          fi
+
+          echo "Kein direkter Zugriff gefunden."

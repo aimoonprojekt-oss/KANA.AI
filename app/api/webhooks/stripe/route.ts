@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import Anthropic from "@anthropic-ai/sdk";
 import { grantAgentAccess, revokeAgentAccess, getDBAgentById } from "@/lib/platform/supabase";
+import { anthropicKana } from "@/lib/anthropic/mandant";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
       }
 
       // ── Kundenkopie via Anthropic API erstellen ─────────────────────────
-      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+      const anthropic = anthropicKana();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const beta = (anthropic as any).beta;
 

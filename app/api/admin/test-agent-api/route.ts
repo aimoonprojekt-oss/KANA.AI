@@ -1,7 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+
 import { isAdminUser } from "@/lib/platform/supabase";
+import { anthropicKana } from "@/lib/anthropic/mandant";
 
 export const runtime = "nodejs";
 
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
   const masterId = req.nextUrl.searchParams.get("masterId");
   if (!masterId) return NextResponse.json({ error: "?masterId=agent_xxx fehlt" }, { status: 400 });
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+  const anthropic = anthropicKana();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const beta = (anthropic as any).beta;
 

@@ -4,6 +4,7 @@ import { getSupabaseAdmin, isAdminUser } from '@/lib/platform/supabase'
 import { searchFacebookAds } from '@/lib/agents/apify'
 import { analyzeVideoUrl } from '@/lib/agents/gemini'
 import { downloadAndStoreVideo } from '@/lib/agents/videoStorage'
+import { anthropicKana } from "@/lib/anthropic/mandant";
 
 export const runtime = 'nodejs'
 // 300 ist das Maximum des Vercel-Hobby-Tarifs. Hoehere Werte lassen den
@@ -371,7 +372,7 @@ export async function POST(req: Request) {
   // Session-ID für diesen Run generieren
   const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const anthropic = anthropicKana()
 
   // SSE Stream aufbauen — damit das Frontend live Updates sieht
   const encoder = new TextEncoder()

@@ -1,11 +1,12 @@
-import Anthropic from "@anthropic-ai/sdk";
+
 import { NextRequest } from "next/server";
+import { anthropicKana } from "@/lib/anthropic/mandant";
 
 // Node-Runtime — Edge würde nach 30s schließen, Managed Agent braucht länger
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+const anthropic = anthropicKana();
 
 export async function POST(req: NextRequest) {
   const { message, sessionId } = await req.json();

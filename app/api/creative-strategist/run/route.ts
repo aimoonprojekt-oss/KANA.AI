@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { auth } from '@clerk/nextjs/server'
 import { isAdminUser } from '@/lib/platform/supabase'
 import { CREATIVE_STRATEGIST_TOOLS, executeStrategistTool, buildStrategistSystemPrompt } from '@/lib/agents/creativeStrategist'
+import { anthropicKana } from "@/lib/anthropic/mandant";
 
 export const runtime = 'nodejs'
 // 300 ist das Maximum des Vercel-Hobby-Tarifs. Hoehere Werte lassen den
@@ -21,7 +22,7 @@ export async function POST(req: Request) {
 
   const briefLabel = mode === "20" ? "20 Creative Briefs" : mode === "10" ? "10 Creative Briefs (5 Image + 5 Video)" : "2 Creative Briefs (1 Image + 1 Video)"
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const anthropic = anthropicKana()
   const encoder = new TextEncoder()
 
   const stream = new ReadableStream({
