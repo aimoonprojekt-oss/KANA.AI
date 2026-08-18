@@ -7,6 +7,7 @@ import {
   isAdminUser,
 } from "@/lib/platform/supabase";
 import PortalDashboard from "@/app/components/dashboard/PortalDashboard";
+import SupportChatWidget from "@/app/components/ui/SupportChatWidget";
 
 interface PageProps {
   searchParams: Promise<{ purchased?: string }>;
@@ -38,7 +39,12 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   // Admin-Check über zentrale Funktion aus lib/supabase.ts
   const isAdmin = isAdminUser(userId);
 
+  /* Die Support-Blase hing bisher im Wurzel-Layout und erschien deshalb auch
+     auf der oeffentlichen Landingpage — dort ohne Funktion, weil
+     /api/support-chat nicht als oeffentliche Route eingetragen ist. Sie sitzt
+     jetzt im Kundenbereich, wo sie hingehoert. */
   return (
+    <>
     <PortalDashboard
       userAgents={userAgents}
       lockedAgents={lockedAgents}
@@ -49,5 +55,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       purchasedSlug={params.purchased}
       isAdmin={isAdmin}
     />
+    <SupportChatWidget />
+    </>
   );
 }

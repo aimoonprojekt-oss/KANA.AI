@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- KANA-Signet. Offener Bogen von unten ueber links nach oben — die Oeffnung
+       liegt rechts, der sichtbare Bogen also links neben dem Kern. Das entspricht
+       der CSS-Fassung (border-top/right transparent, rotate(45deg)).
+       Kein Innenring: bei Faviconsgroesse wuerde er zulaufen. -->
+  <path d="M 16 29.2 A 13.2 13.2 0 0 1 16 2.8"
+        fill="none" stroke="#1F4B45" stroke-width="2.6"/>
+  <circle cx="16" cy="16" r="4.5" fill="#1F4B45"/>
+</svg>
