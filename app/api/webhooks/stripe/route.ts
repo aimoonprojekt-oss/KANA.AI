@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import Anthropic from "@anthropic-ai/sdk";
-import { grantAgentAccess, getDBAgentById } from "@/lib/platform/supabase";
+import { grantAgentAccess, revokeAgentAccess, getDBAgentById } from "@/lib/platform/supabase";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -92,9 +92,26 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Abo-Kündigung ─────────────────────────────────────────────────────────
+  // M1: Hier stand ein TODO. Folge: Wer kuendigte, behielt den Zugang dauerhaft
+  // und nutzte weiter Anthropic-Kontingent auf unsere Rechnung.
   if (event.type === "customer.subscription.deleted") {
-    // TODO: Zugang widerrufen (active = false in agent_access1)
-    console.log("Abo gekündigt — Zugang manuell prüfen");
+    const abo = event.data.object as { id?: string; metadata?: Record<string, string> };
+    const userId        = abo.metadata?.clerk_user_id;
+    const masterAgentId = abo.metadata?.anthropic_agent_id;
+
+    if (!userId) {
+      // Kein Metadaten-Bezug: nicht raten, sondern laut scheitern lassen und
+      // von Hand nacharbeiten. Ein falsch entzogener Zugang ist schlimmer
+      // als ein zu spaet entzogener.
+      console.error("Abo gekuendigt, aber keine userId in den Metadaten:", abo.id);
+    } else {
+      try {
+        await revokeAgentAccess(userId, masterAgentId);
+        console.log(`Zugang entzogen: ${userId} → ${masterAgentId ?? "alle Agenten"}`);
+      } catch (error) {
+        console.error("Zugang konnte nicht entzogen werden:", error);
+      }
+    }
   }
 
   return NextResponse.json({ received: true });

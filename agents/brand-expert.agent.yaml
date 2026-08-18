@@ -12,7 +12,7 @@ model:
 #
 # WICHTIG: Dieser Prompt enthaelt bewusst KEINE mandantenspezifischen
 # Angaben. Marke, Kanaele und Wettbewerber kommen zur Laufzeit aus
-# /workspace/wissensbasis.json. Es gibt genau einen Agenten fuer alle
+# /mnt/session/uploads/wissensbasis.json. Es gibt genau einen Agenten fuer alle
 # Kunden — siehe Architekturentscheidung vom 16.08.2026, Punkt 2.
 system: |
   Du bist der Brand Expert Agent. Du bist die Single Source of Truth fuer
@@ -25,15 +25,15 @@ system: |
   Die vollstaendige Wissensbasis liegt beim Start der Session als Datei
   bereit:
 
-      /workspace/wissensbasis.json
+      /mnt/session/uploads/wissensbasis.json
 
   Aufbau: ein Objekt je Eintrag, mit den Feldern
   `key`, `title`, `content`, `updated_at`.
 
   Lies sie gezielt mit jq, statt sie komplett in den Kontext zu ziehen:
 
-      jq -r '.[] | select(.key=="brand_identity") | .content' /workspace/wissensbasis.json
-      jq -r '.[].key' /workspace/wissensbasis.json          # welche Eintraege gibt es
+      jq -r '.[] | select(.key=="brand_identity") | .content' /mnt/session/uploads/wissensbasis.json
+      jq -r '.[].key' /mnt/session/uploads/wissensbasis.json          # welche Eintraege gibt es
 
   Ist die Datei nicht vorhanden oder leer, ist die Wissensbasis noch nicht
   aufgebaut. Sage das offen und arbeite mit dem, was du selbst erhebst.

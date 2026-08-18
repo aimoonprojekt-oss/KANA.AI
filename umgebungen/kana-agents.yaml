@@ -1,0 +1,14 @@
+# Fuer den Brand Expert. Drei Hosts, seit Weg C ohne Supabase.
+# ACHTUNG beim Anlegen ueber die Console-Oberflaeche: allowed_hosts ist dort
+# EIN Eingabefeld. Mehrere Hosts durch KOMMA trennen, keine Zeilenumbrueche:
+#   api.apify.com, www.sinsnlashes.com, www.facebook.com
+name: kana-agents
+config:
+  type: cloud
+  networking:
+    type: limited
+    allow_package_managers: false
+    allowed_hosts:
+      - api.apify.com
+      - www.sinsnlashes.com
+      - www.facebook.com

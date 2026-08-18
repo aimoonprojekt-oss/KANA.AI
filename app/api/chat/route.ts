@@ -5,13 +5,24 @@ import {
   checkAgentAccess,
   saveSession,
   getDBAgentById,
-  getCustomerAgentId,
   createRun,
   completeRun,
+  sessionGehoertNutzer,
 } from "@/lib/platform/supabase";
 
 // Managed Agents brauchen pro Request einen langen Lauf — Edge-Runtime
-// würde nach ~30s schließen. Daher Node-Runtime + max. Laufzeit hochsetzen.
+// würde nach ~30s schließen. Daher Node-Runtime.
+//
+// 300 s ist das HARTE Maximum des Vercel-Hobby-Tarifs und nicht erhöhbar.
+// Pro erlaubt 800 s, erweitert bis 1800 s.
+// Gemessen am 17.08.2026: Strategy Guide mit 20 Briefs + PDF = 536 s.
+// Auf Hobby passt deshalb nur ein kleiner Lauf (Modus 2) in eine Anfrage.
+//
+// Die eigentliche Lösung ist unabhängig vom Tarif: Starten und Zuhören
+// trennen — Lauf starten, sofort antworten, Ende per Webhook. Solange die
+// Abholung der Dateien unten im Stream-Handler steht, geht bei einem
+// Verbindungsabbruch das Ergebnis verloren, obwohl die Session bei
+// Anthropic weiterläuft. Siehe claude/18_Laufakte_und_Kundenansicht.md.
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
@@ -43,19 +54,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── 4. Agent-Definition + Kundenkopie laden ────────────────────────────────
+  // ── 4. Agent-Definition laden ──────────────────────────────────────────────
   const agentDef = await getDBAgentById(agentId);
   const agentName = agentDef?.name ?? "Agent";
 
-  // Kundenkopie verwenden falls vorhanden, sonst Master als Fallback
-  // Jeder Kunde hat nach dem Kauf seinen eigenen anthropic_agent_id
-  const customerAgentId = await getCustomerAgentId(userId, agentId);
-  const activeAgentId   = customerAgentId ?? agentId;
-
-  if (activeAgentId === agentId) {
-    // Kein Kunden-Agent → entweder Admin-Zugang oder noch keine Kopie
-    console.warn(`User ${userId} nutzt Master-Agent ${agentId} (keine Kundenkopie)`);
-  }
+  // Ein Master-Agent je Produkt, keine Kundenkopien mehr.
+  // Entscheidung vom 16.08.2026: Kopien erreichen Verbesserungen am Master
+  // nie, und bei 50 Kunden × 6 Agenten wären es 300 Definitionen.
+  // Unterschieden wird zur Laufzeit — über Kontext, Vaults und Metadaten.
+  const activeAgentId = agentId;
 
   const environmentId = agentDef?.environment_id ?? process.env.ANTHROPIC_ENVIRONMENT_ID;
   if (!environmentId) {
@@ -74,11 +81,35 @@ export async function POST(req: NextRequest) {
     process.env.ANTHROPIC_VAULT_IDS?.split(",").map((s) => s.trim()).filter(Boolean) ??
     [];
 
+  // Memory-Stores tragen das Kundenwissen. Sie werden als Verzeichnis unter
+  // /mnt/memory/<name>/ eingehängt und lassen sich — wie Vaults — NUR beim
+  // Anlegen der Session anhängen, nicht nachträglich.
+  //
+  // read_only ist Absicht: Nur der Datenpfleger schreibt hinein, und zwar
+  // über das Backend mit Validierung. Ein Agent, der die Wissensbasis eines
+  // Mandanten überschreiben kann, ist ein Agent zu viel.
+  const memoryStoreIds =
+    (agentDef as { memory_store_ids?: string[] } | null)?.memory_store_ids ??
+    process.env.ANTHROPIC_MEMORY_STORE_IDS?.split(",").map((s) => s.trim()).filter(Boolean) ??
+    [];
+
   // ── 5. Anthropic Managed Agents API aufrufen ───────────────────────────────
   // Beta-Felder werden als `any` getypt, da die SDK-TS-Definitionen je nach
   // Version unterschiedlich sind und wir direkt gegen die Laufzeit-API gehen.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const beta = (anthropic as any).beta;
+
+  // M2: Die sessionId kommt vom Client. Ohne Pruefung koennte man mit einer
+  // fremden Session-ID in eine fremde Konversation hineinschreiben und deren
+  // Antworten mitlesen. Eine unbekannte oder fremde ID wird abgewiesen statt
+  // stillschweigend als "neue Session" behandelt — sonst waere der Fehler
+  // fuer den Nutzer unsichtbar.
+  if (sessionId && !(await sessionGehoertNutzer(userId, sessionId))) {
+    return NextResponse.json(
+      { message: "Diese Sitzung gehoert nicht zu deinem Konto." },
+      { status: 403 }
+    );
+  }
 
   try {
     let activeSessionId: string = sessionId;
@@ -87,9 +118,30 @@ export async function POST(req: NextRequest) {
     // Neue Session starten wenn noch keine vorhanden
     if (!activeSessionId) {
       const session = await beta.sessions.create({
-        agent: activeAgentId,   // Kundenkopie statt Master
+        agent: activeAgentId,
         environment_id: environmentId,
         ...(vaultIds.length ? { vault_ids: vaultIds } : {}),
+        ...(memoryStoreIds.length
+          ? {
+              resources: memoryStoreIds.map((id) => ({
+                type: "memory_store",
+                memory_store_id: id,
+                access: "read_only",
+              })),
+            }
+          : {}),
+        // Harter Kostendeckel je Lauf, in ganzen CENT als String.
+        // Ohne ihn ist eine Endlosschleife im Agenten ein unbegrenztes
+        // Kostenrisiko. Gemessen: ein Strategy Guide mit 20 Briefs = 40 Cent.
+        budget: {
+          type: "limit",
+          max_list_cost: {
+            amount: process.env.ANTHROPIC_MAX_LIST_COST_CENT ?? "300",
+            currency: "USD",
+          },
+        },
+        // Für die spätere Zuordnung in der Laufakte.
+        metadata: { tenant: userId, agent_key: agentId },
         title: `${agentName} — ${userId}`,
       });
       activeSessionId = session.id;
@@ -120,69 +172,199 @@ export async function POST(req: NextRequest) {
     const encoder = new TextEncoder();
     let fullResponse = "";
 
+    // Vercel kappt eine Anfrage hart bei maxDuration. Wird sie gekappt, laeuft
+    // KEINE Zeile mehr, die hinter der Schleife steht — die Dateien werden nie
+    // abgeholt, der Lauf nie abgeschlossen.
+    //
+    // Genau das ist am 17.08.2026 passiert: Der Lauf dauerte rund sieben
+    // Minuten, beide Dateien lagen fertig bei Anthropic, im Chatfenster kam
+    // nichts an. Deshalb hoeren wir 20 s vor dem Limit von SELBST auf, holen
+    // was da ist und schliessen sauber. Die Session laeuft bei Anthropic
+    // weiter — verloren geht nichts, es wird nur nicht mehr zugeschaut.
+    const ZEITGRENZE_MS = (maxDuration - 20) * 1000;
+    const beginn = Date.now();
+
     const stream = new ReadableStream({
       async start(controller) {
-        try {
-          for await (const event of eventStream) {
-            // Agent-Text streamen (kommt als agent.message.delta oder agent.message)
-            if (event.type === "agent.message.delta" && event.delta?.text) {
-              fullResponse += event.delta.text;
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`)
-              );
-            } else if (event.type === "agent.message" && Array.isArray(event.content)) {
-              // Volltext-Variante (kein Delta-Stream): Blöcke einzeln rausgeben
-              for (const block of event.content) {
-                if (block?.type === "text" && typeof block.text === "string") {
-                  fullResponse += block.text;
-                  controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify({ text: block.text })}\n\n`)
-                  );
-                }
-              }
-            } else if (event.type === "agent.tool_use") {
-              // Tool-Name als separates Event senden (kein Text — wird im UI als Status angezeigt)
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ tool: event.name ?? "tool" })}\n\n`)
-              );
-            } else if (event.type === "session.status_idle") {
-              // Agent ist fertig
-              break;
-            }
-          }
-
-          // ── 6. Output-Dateien via Files API abholen ────────────────────
-          // Agent schreibt Dateien nach /mnt/session/outputs/ im Container.
-          // Nach session.status_idle sind sie über die Files API abrufbar.
+        let offen = true;
+        const sende = (nutzlast: Record<string, unknown>) => {
+          if (!offen) return;
           try {
-            const fileList = await beta.files.list({ scope_id: activeSessionId });
-            if (fileList?.data?.length > 0) {
-              const files = fileList.data.map((f: { id: string; filename?: string }) => ({
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(nutzlast)}\n\n`));
+          } catch {
+            // Browser hat den Tab geschlossen. Kein Fehler — nur niemand mehr da.
+            // Ohne dieses Fangen wuerde der Herzschlag die Funktion abstuerzen
+            // lassen und die Dateiabholung mitreissen.
+            offen = false;
+          }
+        };
+
+        // Statuszeile des Chatfensters. Der Herzschlag wiederholt sie mit der
+        // verstrichenen Zeit, damit ein langer Modellaufruf nicht wie ein
+        // Absturz aussieht. Am 17.08. stand die Anzeige drei Minuten still.
+        let status = "startet";
+        const verstrichen = () => {
+          const s = Math.floor((Date.now() - beginn) / 1000);
+          return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+        };
+        const herzschlag = setInterval(() => {
+          sende({ tool: `${status} · ${verstrichen()}` });
+        }, 10_000);
+
+        // Dateiabholung. Wird an mehreren Stellen aufgerufen und darf deshalb
+        // unter keinen Umstaenden werfen.
+        const dateienSenden = async () => {
+          try {
+            const liste = await beta.files.list({ scope_id: activeSessionId });
+            const dateien = (liste?.data ?? []).map(
+              (f: { id: string; filename?: string }) => ({
                 id: f.id,
                 filename: f.filename ?? f.id,
-              }));
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ files })}\n\n`)
-              );
+              })
+            );
+            if (dateien.length) sende({ files: dateien });
+          } catch (fehler) {
+            console.warn("Files API:", fehler);
+          }
+        };
+
+        let abgelaufen = false;
+
+        try {
+          const ereignisse = eventStream[Symbol.asyncIterator]();
+
+          while (true) {
+            const rest = ZEITGRENZE_MS - (Date.now() - beginn);
+            if (rest <= 0) {
+              abgelaufen = true;
+              break;
             }
-          } catch (filesError) {
-            // Files API nicht verfügbar oder keine Dateien — kein fataler Fehler
-            console.warn("Files API:", filesError);
+
+            // Auf das naechste Ereignis warten, aber hoechstens bis zur
+            // Zeitgrenze — sonst haengt die Schleife im Modellaufruf fest und
+            // die Plattform kappt uns mitten darin.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const naechstes: any = await Promise.race([
+              ereignisse.next(),
+              new Promise((r) => setTimeout(() => r({ __frist: true }), rest)),
+            ]);
+
+            if (naechstes?.__frist) {
+              abgelaufen = true;
+              break;
+            }
+            if (naechstes?.done) break;
+
+            const event = naechstes.value;
+
+            switch (event.type) {
+              // ── Text des Agenten ─────────────────────────────────────────
+              case "agent.message.delta":
+                if (event.delta?.text) {
+                  fullResponse += event.delta.text;
+                  sende({ text: event.delta.text });
+                }
+                break;
+
+              case "agent.message":
+                if (Array.isArray(event.content)) {
+                  for (const block of event.content) {
+                    if (block?.type === "text" && typeof block.text === "string") {
+                      fullResponse += block.text;
+                      sende({ text: block.text });
+                    }
+                  }
+                }
+                break;
+
+              // ── Denkschritte: NUR als Status, niemals im Wortlaut ────────
+              // Der Gedankengang des Agenten ist Betriebsgeheimnis.
+              // Siehe claude/18_Laufakte_und_Kundenansicht.md, Abschnitt 3.
+              case "agent.thinking":
+                status = "denkt nach";
+                sende({ tool: status });
+                break;
+
+              // ── Werkzeuge ────────────────────────────────────────────────
+              case "agent.tool_use": {
+                const pfad =
+                  typeof event.input?.file_path === "string" ? event.input.file_path : "";
+                status =
+                  event.name === "write" && pfad.startsWith("/mnt/session/outputs/")
+                    ? `schreibt ${pfad.split("/").pop()}`
+                    : (event.name ?? "arbeitet");
+                sende({ tool: status });
+                break;
+              }
+
+              // ── Unteragenten ─────────────────────────────────────────────
+              // Ohne diese vier Faelle ist die gesamte Uebergabe an einen
+              // Unteragenten im Chatfenster unsichtbar. Beim Lauf vom 17.08.
+              // waren das vier von sieben Minuten Funkstille.
+              case "session.thread_status_running":
+                status = `${event.agent_name ?? "Unteragent"} uebernimmt`;
+                sende({ tool: status });
+                break;
+
+              case "agent.thread_message_received":
+                status = `${event.agent_name ?? "Unteragent"} hat den Auftrag`;
+                sende({ tool: status });
+                break;
+
+              case "agent.thread_message_sent":
+                status = "Unteragent meldet zurueck";
+                sende({ tool: status });
+                break;
+
+              case "session.thread_status_idle":
+                status = `${event.agent_name ?? "Unteragent"} fertig`;
+                sende({ tool: status });
+                break;
+
+              default:
+                break;
+            }
+
+            // Hauptagent fertig — hier und nur hier endet die Schleife regulaer.
+            // NICHT bei session.thread_status_idle: das ist ein Unteragent.
+            if (event.type === "session.status_idle") break;
           }
 
-          // Run als completed markieren
+          clearInterval(herzschlag);
+
+          // Dateien IMMER holen — auch nach Zeitueberschreitung.
+          await dateienSenden();
+
+          if (abgelaufen) {
+            sende({
+              text:
+                `\n\n⏱ Nach ${verstrichen()} wurde die Verbindung geschlossen — ` +
+                `das Zeitlimit des Hostings. Der Agent arbeitet bei Anthropic ` +
+                `weiter. Alles, was bis hierhin fertig war, steht oben zum ` +
+                `Herunterladen bereit.`,
+            });
+          }
+
           if (runId) {
-            const summary = fullResponse.slice(0, 500) || undefined;
-            await completeRun(runId, summary);
+            const zusammenfassung = fullResponse.slice(0, 500) || undefined;
+            await completeRun(
+              runId,
+              abgelaufen ? (zusammenfassung ?? "ABGEBROCHEN: Zeitlimit") : zusammenfassung
+            );
           }
 
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          offen = false;
           controller.close();
         } catch (streamError) {
-          // Run als failed markieren wenn möglich
+          clearInterval(herzschlag);
+          // Auch im Fehlerfall zuerst die Dateien retten — sie sind das
+          // Ergebnis, der Fehler ist nur der Transportweg.
+          await dateienSenden();
           if (runId) await completeRun(runId, "ERROR").catch(() => {});
           const msg = streamError instanceof Error ? streamError.message : "Stream-Fehler";
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: msg })}\n\n`));
+          sende({ error: msg });
+          offen = false;
           controller.close();
         }
       },

@@ -1,0 +1,325 @@
+/* ═══════════════════════════════════════════════════════════════
+   KANA AI — Corporate Design für PDF-Dokumente
+   ───────────────────────────────────────────────────────────────
+   Abgeleitet aus app/globals.css der Plattform, Commit acc7607.
+   Farbwerte, Schrift und Wortmarke sind unverändert übernommen.
+
+   BEWUSSTE ABWEICHUNG VON DER WEBSITE:
+   Die Website ist dunkel. Ein dunkles PDF ist für ein 30-seitiges
+   Dokument die falsche Wahl — es ist am Bildschirm ermüdend, beim
+   Ausdrucken unbrauchbar und verbraucht Toner ohne Nutzen.
+   Deshalb: Deckblatt dunkel wie die Website, Inhalt hell.
+   Die Wiedererkennung trägt das Deckblatt, die Lesbarkeit den Rest.
+
+   Änderungen am Erscheinungsbild passieren HIER, nicht im Prompt
+   eines Agenten.
+   ═══════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+:root {
+  --accent:        #6366F1;   /* Indigo, Primärakzent */
+  --accent-light:  #818CF8;
+  --accent-bright: #A5B4FC;
+  --dark:          #060A13;   /* Deckblatt-Hintergrund */
+  --dark-2:        #0C1220;
+  --ink:           #16202F;   /* Fließtext, nicht reines Schwarz */
+  --ink-soft:      #4A5A6E;
+  --ink-mute:      #7A8FA6;
+  --line:          #E2E8F0;
+  --tint:          #F4F5FF;   /* Indigo, stark aufgehellt */
+  --success:       #34D399;
+}
+
+/* ── Seite ────────────────────────────────────────────────────── */
+
+@page {
+  size: A4;
+  margin: 22mm 20mm 20mm 20mm;
+
+  @bottom-right {
+    content: counter(page);
+    font-family: 'Inter', sans-serif;
+    font-size: 8.5pt;
+    color: #7A8FA6;
+  }
+  @bottom-left {
+    content: "KANA AI";
+    font-family: 'Inter', sans-serif;
+    font-size: 8.5pt;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    color: #7A8FA6;
+  }
+}
+
+@page :first { margin: 0; }          /* Deckblatt randlos */
+
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.62;
+  color: var(--ink);
+  background: #FFFFFF;
+  hyphens: auto;
+}
+
+/* ── Deckblatt ────────────────────────────────────────────────── */
+
+.deckblatt {
+  page: first;
+  page-break-after: always;
+  background: var(--dark);
+  color: #F1F5F9;
+  height: 297mm;
+  padding: 45mm 24mm 24mm 24mm;
+  position: relative;
+}
+
+/* Wortmarke: Punkt + Schriftzug, wie in der Navigation der Website */
+.wortmarke {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 900;
+  font-size: 15pt;
+  letter-spacing: -0.5px;
+  color: #F1F5F9;
+}
+.wortmarke::before {
+  content: "";
+  width: 9px; height: 9px;
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 16px var(--accent);
+}
+
+.deckblatt .titel {
+  margin-top: 62mm;
+  font-size: 30pt;
+  font-weight: 800;
+  line-height: 1.18;
+  letter-spacing: -0.8px;
+}
+.deckblatt .untertitel {
+  margin-top: 7mm;
+  font-size: 12.5pt;
+  font-weight: 400;
+  color: #B8C5D6;
+}
+.deckblatt .streifen {
+  margin-top: 14mm;
+  width: 54mm; height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(135deg, #6366F1, #818CF8);
+}
+.deckblatt .fuss {
+  position: absolute;
+  bottom: 24mm; left: 24mm; right: 24mm;
+  font-size: 9pt;
+  color: #7A8FA6;
+  border-top: 1px solid rgba(255,255,255,0.10);
+  padding-top: 5mm;
+}
+
+/* ── Überschriften ────────────────────────────────────────────── */
+
+h1 {
+  font-size: 19pt; font-weight: 800; letter-spacing: -0.5px;
+  color: var(--ink);
+  margin: 0 0 6mm 0; padding-bottom: 3mm;
+  border-bottom: 2px solid var(--accent);
+  page-break-before: always;   /* jedes Hauptkapitel auf neuer Seite */
+  page-break-after: avoid;
+}
+h1:first-of-type { page-break-before: avoid; }
+
+h2 {
+  font-size: 13.5pt; font-weight: 700; letter-spacing: -0.3px;
+  color: var(--ink);
+  margin: 9mm 0 3mm 0;
+  page-break-after: avoid;
+}
+h2::before {                    /* schmaler Akzentstrich links */
+  content: ""; display: inline-block;
+  width: 3px; height: 0.92em;
+  background: var(--accent);
+  margin-right: 3.5mm;
+  vertical-align: -0.1em;
+  border-radius: 2px;
+}
+
+h3 {
+  font-size: 11pt; font-weight: 700;
+  color: var(--accent);
+  margin: 6mm 0 2mm 0;
+  page-break-after: avoid;
+}
+
+h4 { font-size: 10.5pt; font-weight: 600; color: var(--ink-soft); margin: 4mm 0 1.5mm 0; }
+
+/* ── Fließtext ────────────────────────────────────────────────── */
+
+p { margin: 0 0 3.2mm 0; orphans: 3; widows: 3; }
+strong { font-weight: 700; color: var(--ink); }
+em { font-style: italic; color: var(--ink-soft); }
+
+ul, ol { margin: 0 0 3.5mm 0; padding-left: 6mm; }
+li { margin-bottom: 1.3mm; }
+li::marker { color: var(--accent); }
+
+hr {
+  border: none; height: 1px;
+  background: var(--line);
+  margin: 7mm 0;
+}
+
+a { color: var(--accent); text-decoration: none; }
+
+/* ── Titelflächen (ersetzen die ASCII-Kästen der Quelle) ──────── */
+
+.titelflaeche {
+  background: var(--tint);
+  border-left: 4px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 6mm 7mm;
+  margin: 6mm 0 8mm 0;
+  page-break-inside: avoid;
+}
+.titelflaeche .zeile-1 {
+  font-size: 15pt; font-weight: 800; letter-spacing: -0.4px;
+  color: var(--ink);
+}
+.titelflaeche .zeile-2 {
+  margin-top: 1.5mm;
+  font-size: 10pt; font-weight: 500;
+  color: var(--accent);
+}
+
+/* Abschnittstrenner (ersetzt ─── STAGE N ─── der Quelle) */
+.abschnitt {
+  display: flex; align-items: center; gap: 4mm;
+  margin: 9mm 0 4mm 0;
+  font-size: 12pt; font-weight: 700; letter-spacing: -0.2px;
+  color: var(--ink);
+  page-break-after: avoid;
+}
+.abschnitt::after {
+  content: ""; flex: 1; height: 1px; background: var(--line);
+}
+
+/* ── Tabellen ─────────────────────────────────────────────────── */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 4mm 0 6mm 0;
+  font-size: 9.5pt;
+  page-break-inside: avoid;
+}
+thead th {
+  background: var(--tint);
+  color: var(--ink);
+  font-weight: 700;
+  text-align: left;
+  padding: 2.6mm 3mm;
+  border-bottom: 2px solid var(--accent);
+}
+tbody td {
+  padding: 2.4mm 3mm;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+tbody tr:last-child td { border-bottom: none; }
+
+/* ── Belegkette: [ANALYST: ...] und [ABGELEITET] ──────────────── */
+/* Diese Markierungen sind kein Arbeitsrest, sondern zeigen dem
+   Kunden, was belegt und was abgeleitet ist. Sie werden sichtbar
+   ausgezeichnet, nicht versteckt.                                */
+
+.beleg {
+  display: inline-block;
+  font-size: 8.2pt; font-weight: 600;
+  padding: 0.4mm 1.8mm;
+  border-radius: 4px;
+  background: var(--tint);
+  color: var(--accent);
+  border: 1px solid rgba(99,102,241,0.28);
+  white-space: nowrap;
+}
+.beleg-abgeleitet {
+  background: #F8FAFC;
+  color: var(--ink-mute);
+  border-color: var(--line);
+}
+.hinweis-entwurf {
+  font-size: 8.8pt; font-style: italic; color: var(--ink-mute);
+}
+
+/* ── Codeblöcke und Monospace ─────────────────────────────────── */
+
+code {
+  font-family: 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+  font-size: 9pt;
+  background: #F4F6F9;
+  padding: 0.3mm 1.2mm;
+  border-radius: 3px;
+  color: var(--ink);
+}
+pre {
+  font-family: 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+  font-size: 8.8pt; line-height: 1.5;
+  background: #F7F9FC;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4mm 5mm;
+  margin: 3mm 0 5mm 0;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  page-break-inside: avoid;
+}
+pre code { background: none; padding: 0; }
+
+blockquote {
+  margin: 4mm 0;
+  padding: 1mm 0 1mm 5mm;
+  border-left: 3px solid var(--accent-bright);
+  color: var(--ink-soft);
+}
+
+/* ── Inhaltsverzeichnis ───────────────────────────────────────── */
+
+.inhalt { page-break-after: always; }
+.inhalt h1 { page-break-before: avoid; }
+.inhalt ol { list-style: none; padding-left: 0; }
+.inhalt li {
+  display: flex; align-items: baseline; gap: 2mm;
+  padding: 1.6mm 0;
+  border-bottom: 1px dotted var(--line);
+  font-size: 10pt;
+}
+.inhalt li .nr { color: var(--accent); font-weight: 700; min-width: 8mm; }
+.inhalt li .seite { margin-left: auto; color: var(--ink-mute); font-size: 9pt; }
+
+/* ── Checklisten ──────────────────────────────────────────────── */
+
+.checkliste { list-style: none; padding-left: 0; }
+.checkliste li {
+  position: relative;
+  padding-left: 7mm;
+  margin-bottom: 2.2mm;
+}
+.checkliste li::before {
+  content: "";
+  position: absolute; left: 0; top: 0.35em;
+  width: 3.6mm; height: 3.6mm;
+  border: 1.5px solid var(--accent);
+  border-radius: 3px;
+}
+
+/* ── Umbruchsteuerung ─────────────────────────────────────────── */
+
+.zusammenhalten { page-break-inside: avoid; }
+.neue-seite     { page-break-before: always; }
