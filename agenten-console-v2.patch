@@ -1,0 +1,3070 @@
+From 40885821390b8b23ed1d032dbcd9b349bb080692 Mon Sep 17 00:00:00 2001
+From: "Claude (KANA Beratung)" <noreply@anthropic.com>
+Date: Mon, 17 Aug 2026 13:30:14 +0000
+Subject: [PATCH 1/2] feat(agents): Strategist, Analyst und Researcher als
+ Console-Definitionen
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Überführt die drei verbleibenden hartcodierten Agenten in Managed-Agents-
+Definitionen. Der alte Pfad bleibt unangetastet — dieses Verzeichnis ist
+additiv, wie beim Brand Expert.
+
+Fachlichkeit ist Wort für Wort übernommen. Geändert wurde ausschließlich der
+Transportweg: Tools werden zu Kontextdateien, Chatausgabe wird zu
+Ergebnisdateien. Bewusste Abweichungen stehen je Agent in LIESMICH.md und
+gehören ins Vergleichsprotokoll der Gegenprobe.
+
+Kernpunkt beim Researcher: Die deterministische Logik des Altcodes —
+Ausschlusslisten, Produktfilter, Videoprüfung, Rangformel — bleibt Code
+(werkzeuge/filter.js) und wandert NICHT in den Prompt. Ein Sprachmodell
+rechnet eine Rangformel ungefähr richtig und bei jedem Lauf anders. Gleiches
+gilt für die K1-K6-Gewichtung des Analysten (werkzeuge/score.js).
+
+Neu:
+- agents/creative-strategist/  agent.yaml, modes/{20,10,2}.md, LIESMICH.md
+- agents/creative-analyst/     agent.yaml, werkzeuge/score.js, LIESMICH.md
+- agents/creative-researcher/  agent.yaml, werkzeuge/{apify-suche.sh,
+                               filter.js,video-analyse.sh}, LIESMICH.md
+- umgebungen/                  drei Environments je Sicherheitsstufe
+- scripts/console-ausrollen.sh Repo -> Console, einziger schreibender Weg
+- scripts/console-ziehen.sh    Console -> Repo, Sicherung und Drift-Erkennung
+- scripts/console-test-bindung.sh  misst die nicht dokumentierte
+                               Workspace-Bindung von Agenten
+- scripts/workspace-anlegen.sh Kunden-Workspace per Admin-API
+
+Beim Lesen des Altcodes aufgefallen, nicht in diesem PR behoben:
+- Strategist und Analyst suchen 08_brand_competitors / 10_brand_claims,
+  der Brand Expert schreibt aber brand_competitors / brand_claims ohne
+  Zahlenpräfix. Möglicherweise finden beide die Einträge gar nicht.
+- getVideoUrls() in lib/agents/apify.ts wird nirgends aufgerufen.
+- SUPPORT_AGENT_ID fehlt in .env.local.example und kommt nur in
+  app/api/support-chat/route.ts vor. Ohne gesetzte Variable liefert die
+  Route einen 500er.
+- Support- und Widget-Agent sind nirgends im Repo gesichert.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_011hEuYxmXxTcLPski3KKYQr
+---
+ agents/README.md                              |  43 +++-
+ agents/creative-analyst/LIESMICH.md           |  64 ++++++
+ agents/creative-analyst/agent.yaml            | 171 ++++++++++++++++
+ agents/creative-analyst/werkzeuge/score.js    |  31 +++
+ agents/creative-researcher/LIESMICH.md        |  71 +++++++
+ agents/creative-researcher/agent.yaml         | 186 ++++++++++++++++++
+ .../werkzeuge/apify-suche.sh                  |  57 ++++++
+ .../creative-researcher/werkzeuge/filter.js   | 128 ++++++++++++
+ .../werkzeuge/video-analyse.sh                |  95 +++++++++
+ agents/creative-strategist/LIESMICH.md        |  61 ++++++
+ agents/creative-strategist/agent.yaml         | 160 +++++++++++++++
+ agents/creative-strategist/modes/10.md        |  19 ++
+ agents/creative-strategist/modes/2.md         |  16 ++
+ agents/creative-strategist/modes/20.md        |  21 ++
+ scripts/console-ausrollen.sh                  |  47 +++++
+ scripts/console-test-bindung.sh               |  54 +++++
+ scripts/console-ziehen.sh                     |  38 ++++
+ scripts/workspace-anlegen.sh                  |  34 ++++
+ umgebungen/kana-agents-offline.yaml           |   9 +
+ umgebungen/kana-agents-research.yaml          |  17 ++
+ umgebungen/kana-agents.yaml                   |  14 ++
+ 21 files changed, 1330 insertions(+), 6 deletions(-)
+ create mode 100644 agents/creative-analyst/LIESMICH.md
+ create mode 100644 agents/creative-analyst/agent.yaml
+ create mode 100755 agents/creative-analyst/werkzeuge/score.js
+ create mode 100644 agents/creative-researcher/LIESMICH.md
+ create mode 100644 agents/creative-researcher/agent.yaml
+ create mode 100755 agents/creative-researcher/werkzeuge/apify-suche.sh
+ create mode 100755 agents/creative-researcher/werkzeuge/filter.js
+ create mode 100755 agents/creative-researcher/werkzeuge/video-analyse.sh
+ create mode 100644 agents/creative-strategist/LIESMICH.md
+ create mode 100644 agents/creative-strategist/agent.yaml
+ create mode 100644 agents/creative-strategist/modes/10.md
+ create mode 100644 agents/creative-strategist/modes/2.md
+ create mode 100644 agents/creative-strategist/modes/20.md
+ create mode 100755 scripts/console-ausrollen.sh
+ create mode 100755 scripts/console-test-bindung.sh
+ create mode 100755 scripts/console-ziehen.sh
+ create mode 100755 scripts/workspace-anlegen.sh
+ create mode 100644 umgebungen/kana-agents-offline.yaml
+ create mode 100644 umgebungen/kana-agents-research.yaml
+ create mode 100644 umgebungen/kana-agents.yaml
+
+diff --git a/agents/README.md b/agents/README.md
+index f9e4609..ba19e06 100644
+--- a/agents/README.md
++++ b/agents/README.md
+@@ -10,12 +10,43 @@ Ziel-Workspace: `wrkspc_019KKnEG6rCpwp7MKmbpg58C`
+ 
+ ## Stand
+ 
+-| Agent | Quelle | YAML | Angelegt |
+-|---|---|---|---|
+-| Brand Expert | `lib/agents/brandExpert.ts` + `api/brand-expert/run` | ✅ | ⬜ |
+-| Creative Analyst | `lib/agents/creativeAnalyst.ts` + `api/creative-analyst/run` | ⬜ | ⬜ |
+-| Creative Strategist | `lib/agents/creativeStrategist.ts` + `api/creative-strategist/run` | ⬜ | ⬜ |
+-| Research Agent | `api/research/run/route.ts` (Logik in der Route) | ⬜ | ⬜ |
++| Welle | Agent | Quelle | YAML | Angelegt |
++|---|---|---|---|---|
++| 1 | Creative Strategist | `lib/agents/creativeStrategist.ts` + `api/creative-strategist/run` | ✅ `creative-strategist/` | ⬜ |
++| 2 | Brand Expert | `lib/agents/brandExpert.ts` + `api/brand-expert/run` | ✅ `brand-expert.agent.yaml` | ⬜ |
++| 3 | Creative Analyst | `lib/agents/creativeAnalyst.ts` + `api/creative-analyst/run` | ✅ `creative-analyst/` | ⬜ |
++| 4 | Creative Researcher | `api/research/run/route.ts` (Logik in der Route) | ✅ `creative-researcher/` | ⬜ |
++| 5 | Marketing-Abteilung | — (existiert noch nicht) | ⬜ | ⬜ |
++| — | Support Agent | `api/support-chat` — nur in der Console | ⬜ `console-ziehen.sh` | ✅ (unbestätigt) |
++| — | Widget Agent | `api/widget-chat` — nur in der Console | ⬜ `console-ziehen.sh` | ✅ (unbestätigt) |
++
++> **Support- und Widget-Agent sind bisher nirgends im Repo gesichert.** Ihre
++> Definitionen liegen ausschließlich in der Console — genau der ungeschützte
++> Bereich aus `claude/06_Console_vs_Plattform_und_Sicherung.md`, Abschnitt 5.
++> Mit `scripts/console-ziehen.sh` ins Repo holen.
++>
++> ⚠️ **`SUPPORT_AGENT_ID` steht nicht in `.env.local.example`** und kommt im
++> ganzen Repo nur in `app/api/support-chat/route.ts` vor. Ist die Variable
++> nirgends gesetzt, liefert die Route bei jedem Aufruf einen 500er. Ob der
++> Agent überhaupt existiert, zeigt `POST /api/admin/sync-agents` — es lädt die
++> Agenten aus allen konfigurierten Workspaces in die `agents`-Tabelle.
++
++## Ordnerstruktur
++
++```
++agents/<name>/
++├── agent.yaml        Definition — Quelle der Wahrheit
++├── modes/*.md        Modi, per agent_with_overrides angehaengt
++├── werkzeuge/*       deterministische Logik als Skript (NICHT im Prompt)
++└── LIESMICH.md       Abbildung alt -> neu, bewusste Abweichungen
++
++umgebungen/*.yaml     Environments je Sicherheitsstufe
++scripts/
++├── console-ausrollen.sh     Repo -> Console (einziger schreibender Weg)
++├── console-ziehen.sh        Console -> Repo (Sicherung, Drift-Erkennung)
++├── console-test-bindung.sh  Sind Agenten workspace-gebunden? (nicht dokumentiert)
++└── workspace-anlegen.sh     Kunden-Workspace per Admin-API
++```
+ 
+ ---
+ 
+diff --git a/agents/creative-analyst/LIESMICH.md b/agents/creative-analyst/LIESMICH.md
+new file mode 100644
+index 0000000..585e171
+--- /dev/null
++++ b/agents/creative-analyst/LIESMICH.md
+@@ -0,0 +1,64 @@
++# Creative Analyst — Console-Fassung
++
++**Welle 3.** Quelle: `lib/agents/creativeAnalyst.ts` + `app/api/creative-analyst/run/route.ts`, Commit `acc7607`.
++Ausführliche Vorlage: `claude/14_Vorlage_Creative-Analyst.md`.
++
++## Abbildung alt → neu
++
++| Alt | Neu |
++|---|---|
++| `read_analyst_refs` | `jq` auf `/workspace/referenzen.json` |
++| `read_brand_knowledge` | `jq` auf `/workspace/wissensbasis.json` |
++| `read_breakdowns(sessionIds)` | `/workspace/breakdowns.json`, **vom Backend vorgefiltert** |
++| `save_analysis(...)` | Datei `/mnt/session/outputs/analysen/<ad_id>.json` |
++| Scoring-Formel im Kopf | `node /workspace/werkzeuge/score.js` |
++
++## `breakdowns.json`
++
++```json
++{ "status": "offen", "hinweis": "", "ads": [ { "ad_id": "…", "advertiser": "…",
++  "ad_format": "…", "laufzeit_tage": 0, "impressionen": "…", "varianten": 1,
++  "plattformen": "…", "headline": "…", "ad_text": "…", "cta_button": "…",
++  "landing_page": "…", "video_url": "…", "video_breakdown": "…" } ] }
++```
++
++`status`: `offen` · `keine` (= `KEINE_BREAKDOWNS_VORHANDEN`) · `alle_analysiert`.
++
++Welche Ads offen sind, entscheidet **das Backend** — wie heute in
++`readBreakdowns()`. Diese Logik gehört nicht in den Prompt.
++Ist `video_breakdown` leer, trägt das Backend den Satz
++`(Kein Video-Breakdown — analysiere anhand der Library-Daten)` ein, damit sich
++das Verhalten nicht ändert.
++
++## Validierung beim Zurückschreiben (Backend)
++
++1. gültiges JSON, `ad_id` und `content` vorhanden
++2. **`ad_id` steht in der Liste der dieser Session mitgegebenen Ads** — sonst verwerfen
++3. `score` ist Zahl zwischen 1,0 und 5,0
++4. `klasse` ist einer der fünf erlaubten Werte
++5. Längenbegrenzung für `content`
++6. `tenant_id` **aus dem Laufdatensatz**, nie aus der Datei
++7. protokollieren, was übernommen und was verworfen wurde
++
++Punkt 2 ist neu: Der Altagent konnte über `save_analysis` jede beliebige `ad_id`
++überschreiben.
++
++## Bewusste Abweichungen
++
++1. **Gewichtung wird gerechnet statt geschätzt** (`werkzeuge/score.js`). Die Formel
++   steht zusätzlich wortgleich im Prompt. Weichen die Scores vom Referenzlauf ab,
++   ist das **kein** Migrationsfehler — es zeigt, dass der Altagent falsch
++   gerechnet hat. Dokumentieren, nicht zurückdrehen.
++2. **Statuswerte statt Signaltexte** (`KEINE_BREAKDOWNS_VORHANDEN` → `status`).
++3. **Eine Datei je Ad statt eines Tool-Aufrufs je Ad** — sofort schreiben, nicht
++   sammeln. Sonst geht bei einem Abbruch alles verloren statt nur der letzten Ad.
++
++## Nach der Migration zu prüfen
++
++1. **Schlüsselnamen** `08_brand_competitors` / `10_brand_claims` gegen die
++   präfixlosen Schlüssel des Brand Expert — derselbe mögliche Fehler wie beim
++   Strategisten.
++2. Lücke in den Score-Klassen zwischen 4,4/4,5 und 3,4/3,5 (`score.js` gibt dort
++   „Unbekannt" zurück).
++3. K1–K6-Rubrik als gemeinsamer Skill für Analyst und Strategist.
++4. `analyst_breakdowns` wurde nie benutzt — beim Aufräumen entfernen.
+diff --git a/agents/creative-analyst/agent.yaml b/agents/creative-analyst/agent.yaml
+new file mode 100644
+index 0000000..c900413
+--- /dev/null
++++ b/agents/creative-analyst/agent.yaml
+@@ -0,0 +1,171 @@
++name: Creative Analyst
++description: >-
++  Analysiert Competitor-Ads nach der K1–K6-Rubrik, arbeitet Stärken und Schwächen
++  heraus und leitet konkrete Empfehlungen für die Marke ab. Schreibt je Ad eine
++  Analysedatei zurück.
++
++# Identisch zum Altcode (lib/agents/creativeAnalyst.ts).
++model:
++  id: claude-sonnet-4-6
++
++# Fachlichkeit Wort fuer Wort aus buildAnalystSystemPrompt() uebernommen.
++# Geaendert wurde ausschliesslich der Transportweg. Zwei bewusste Abweichungen
++# sind in LIESMICH.md dokumentiert.
++system: |
++  Du bist der SNL Creative Analyst Agent auf der KANA.AI Plattform.
++
++  Deine Aufgabe: Competitor-Ads analysieren — K1-K6 Scoring durchführen, Stärken/Schwächen herausarbeiten und konkrete Empfehlungen für Sins 'n Lashes ableiten.
++
++  **ABSOLUTES AUSSCHLUSS-PRINZIP: Ads von Sins 'n Lashes (sinsnlashes.com, @sinsnlashes, "Sins n Lashes") werden NIEMALS analysiert. Sofort überspringen.**
++
++  **ANTI-HALLUZINATION: Nur analysieren was tatsächlich in der Breakdown-Datei steht. Kein Raten, kein Ergänzen.**
++
++  ═══ DEINE DATEN ═══
++
++  Du hast KEINEN Datenbankzugang. Alles, was du brauchst, liegt beim Start der
++  Session als Datei bereit. Lies die Dateien gezielt mit jq, statt sie komplett
++  in den Kontext zu ziehen.
++
++    /workspace/referenzen.json    REF-Dateien (key, title, content)
++    /workspace/wissensbasis.json  Brand Knowledge (key, title, content)
++    /workspace/breakdowns.json    Die zu analysierenden Ads
++
++  Nützliche Aufrufe:
++
++    jq -r '.[].key' /workspace/referenzen.json
++    jq -r '.[] | select(.key=="scoring") | .content' /workspace/referenzen.json
++    jq -r '.status, .hinweis' /workspace/breakdowns.json
++    jq -r '.ads[].ad_id' /workspace/breakdowns.json
++    jq -r '.ads[] | select(.ad_id=="<ID>")' /workspace/breakdowns.json
++
++  ═══ ERGEBNISSE SCHREIBEN ═══
++
++  Du schreibst KEINE Datenbankeinträge. Je fertiger Analyse eine Datei:
++
++    /mnt/session/outputs/analysen/<ad_id>.json
++
++  Inhalt, genau diese fünf Felder:
++
++    {
++      "ad_id": "<Ad-ID aus der Breakdown-Datei>",
++      "advertiser": "<Name des Advertisers/Brand>",
++      "score": <gewichteter Gesamt-Score als Zahl, 1.0–5.0>,
++      "klasse": "<Ausnahme-Ad | Starke Ad | Durchschnittliche Ad | Schwache Ad | Keine Relevanz>",
++      "content": "<vollständige Analyse als Markdown-Text>"
++    }
++
++  Regeln dazu:
++  - `ad_id` und `content` sind Pflichtfelder. Fehlt eines, wird die Datei verworfen.
++  - Fehlt `advertiser`, trage "Unbekannt" ein. Fehlt `score`, trage 0 ein. Fehlt
++    `klasse`, trage "Unbekannt" ein.
++  - Schreibe die Datei mit einem Editor oder per Heredoc — niemals langen
++    Markdown-Text über die Kommandozeile inlinen.
++  - Prüfe jede Datei nach dem Schreiben mit `jq . <datei>`. Ungültiges JSON wird
++    von der Plattform verworfen, und du erfährst es nicht mehr.
++  - Eine Datei je Ad. Nicht sammeln, nicht am Ende auf einmal schreiben.
++
++  ═══ SCORING ═══
++
++  Die Gewichtung ist Rechnung, keine Einschätzung. Rechne sie nicht im Kopf,
++  sondern rufe das Skript auf:
++
++    node /workspace/werkzeuge/score.js <K1> <K2> <K3> <K4> <K5> <K6>
++
++  Es gibt den gewichteten Gesamt-Score und die Score-Klasse zurück. Übernimm
++  beide Werte unverändert in die Analysedatei. Die zugrunde liegende Formel und
++  die Klassengrenzen stehen unten in Schritt 4 — sie sind identisch mit dem, was
++  das Skript rechnet.
++
++  ---
++
++  ## Workflow
++
++  ### Schritt 1 — REF-Dateien laden
++  Lies /workspace/referenzen.json. Lade: Analyse-Framework (8 Schritte), Scoring-Rubrik (K1-K6), Hook-Swipe-File, Format-Glossar.
++
++  ### Schritt 2 — Brand Knowledge laden
++  Lies /workspace/wissensbasis.json. Extrahiere:
++  - SNL USPs, Kern-Benefit, Produktpreise, Hero Product
++  - Zielgruppe, Psychografie, Pain Points, Kaufmotive
++  - Bekannte Konkurrenten und deren Positionierung (aus 08_brand_competitors)
++  - Erlaubte Claims (aus 10_brand_claims) — was SNL kommunizieren darf
++  - Marken-DNA: was ist ON-BRAND / OFF-BRAND für SNL
++  Diese Daten sind die Referenz für alle Wettbewerbs-Einordnungen und SNL-Empfehlungen.
++
++  ### Schritt 3 — Breakdowns laden
++  Lies /workspace/breakdowns.json. Die Daten stammen aus der Tabelle ad_research (alle verfügbaren Felder).
++  - status "keine" → informiere den User und stoppe.
++  - status "alle_analysiert" → informiere den User, alle Breakdowns sind verarbeitet.
++  - Sonst: liste die zu analysierenden Ads auf.
++
++  ### Schritt 4 — K1-K6 Scoring (für jede Ad)
++  Nutze Brand Knowledge aktiv beim Scoring:
++  - Wettbewerbs-Einordnung: Competitor-Stärken/Schwächen DIREKT gegen SNL-USPs abgleichen
++  - Empfehlungen: nur Hooks/Formeln empfehlen die mit SNL ON-BRAND und erlaubten Claims kompatibel sind
++  - Differenzierung: wo SNL klar besser ist als der Competitor konkret benennen
++
++  Scoring-Formel: Gesamt-Score = (K1×0.30) + (K2×0.20) + (K3×0.15) + (K4×0.20) + (K5×0.10) + (K6×0.05)
++
++  Score-Klassen:
++  - 4.5–5.0 → Ausnahme-Ad
++  - 3.5–4.4 → Starke Ad
++  - 2.5–3.4 → Durchschnittliche Ad
++  - 1.5–2.4 → Schwache Ad
++  - 1.0–1.4 → Keine Relevanz
++
++  ### Schritt 5 — Für jede Ad: Analysedatei schreiben
++  Schreibe /mnt/session/outputs/analysen/<ad_id>.json mit:
++  - ad_id, advertiser, score (Zahl), klasse (Text), content (vollständiger Markdown-Report)
++
++  Der content muss enthalten:
++  - K1-K6 Scoring-Tabelle mit Begründungen
++  - Warum funktioniert diese Ad?
++  - Hook-Analyse (Typ, Schmerz/Wunsch, Hook-Text verbatim, Stärke/Schwäche)
++  - Copy-Analyse (Formel, Trigger, Struktur, Stärken/Schwächen)
++  - Format-Analyse
++  - Wettbewerbs-Einordnung (Stärken/Schwächen vs. SNL, Kommunikationsvorteil für SNL)
++  - Empfehlungen für SNL (konkret, nicht generisch)
++
++  ### Schritt 6 — Abschluss ausgeben
++
++  Zeige Zusammenfassung:
++  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
++  ✅ SNL Creative Analyst abgeschlossen
++  Analysiert: [N] Ads
++  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
++
++  Für jede Ad:
++  • [Advertiser] ([ad_id]) — Score: [X.X]/5.0 — [Klasse]
++
++  Top-Empfehlung:
++  [Die wichtigste einzelne Empfehlung aus dieser Analyse-Session]
++
++  Falls ≥ 2 Ads mit Score ≥ 3.0: füge Trend-Report hinzu:
++  - Hook-Trend, Format-Trend, Copy-Trend, Trust-Trend, Aufsteigender Trend
++
++  Nenne am Ende, welche Dateien du geschrieben hast. Die Übernahme in die
++  Datenbank passiert erst danach.
++
++  ---
++
++  ## Qualitätsregeln
++
++  **Konkret statt generisch:**
++  - ❌ "Guter Hook" → ✅ "Schmerz-Hook: 'Meine Wimpern waren nach Extensions komplett zerstört' — trifft Extension-Reue direkt"
++  - ❌ "Schwache Visuals" → ✅ "Kein Before/After — visueller Transformationsbeweis fehlt komplett. Begrenzt K2 auf max. 3/5"
++
++  **Empfehlungen mit Beispiel:**
++  - ❌ "SNL sollte mehr UGC machen"
++  - ✅ "SNL sollte Schmerz-Hook testen: 'Meine Extensions haben meine Wimpern ruiniert' — Competitor [X] nutzt diesen Mechanismus und läuft seit [N] Tagen"
++
++tools:
++  - type: agent_toolset_20260401
++    default_config:
++      enabled: true
++      permission_policy:
++        type: always_allow
++    configs:
++      - name: web_search
++        enabled: false
++      - name: web_fetch
++        enabled: false
+diff --git a/agents/creative-analyst/werkzeuge/score.js b/agents/creative-analyst/werkzeuge/score.js
+new file mode 100755
+index 0000000..2288dbe
+--- /dev/null
++++ b/agents/creative-analyst/werkzeuge/score.js
+@@ -0,0 +1,31 @@
++#!/usr/bin/env node
++// K1-K6 Scoring — identisch mit lib/agents/creativeAnalyst.ts, Zeilen 185-192.
++// Aendert sich die Rubrik, aendert sie sich hier. Nicht im Prompt.
++
++const GEWICHTE = [0.30, 0.20, 0.15, 0.20, 0.10, 0.05]
++
++const KLASSEN = [
++  { ab: 4.5, bis: 5.0, name: 'Ausnahme-Ad' },
++  { ab: 3.5, bis: 4.4, name: 'Starke Ad' },
++  { ab: 2.5, bis: 3.4, name: 'Durchschnittliche Ad' },
++  { ab: 1.5, bis: 2.4, name: 'Schwache Ad' },
++  { ab: 1.0, bis: 1.4, name: 'Keine Relevanz' },
++]
++
++const werte = process.argv.slice(2).map(Number)
++
++if (werte.length !== 6 || werte.some(w => isNaN(w) || w < 1 || w > 5)) {
++  console.error('Aufruf: node score.js <K1> <K2> <K3> <K4> <K5> <K6>   (je 1 bis 5)')
++  process.exit(1)
++}
++
++const score = Math.round(werte.reduce((s, w, i) => s + w * GEWICHTE[i], 0) * 100) / 100
++const treffer = KLASSEN.find(k => score >= k.ab && score <= k.bis)
++
++// Randfall: Die Klassengrenzen lassen Luecken (4.4 bis 4.5, 3.4 bis 3.5).
++// Ein Score von 4.45 faellt in keine Klasse. Wir geben "Unbekannt" zurueck,
++// statt still zu raten. Fachentscheidung nach der Migration.
++console.log(JSON.stringify({
++  score,
++  klasse: treffer ? treffer.name : 'Unbekannt',
++}))
+diff --git a/agents/creative-researcher/LIESMICH.md b/agents/creative-researcher/LIESMICH.md
+new file mode 100644
+index 0000000..a8530f2
+--- /dev/null
++++ b/agents/creative-researcher/LIESMICH.md
+@@ -0,0 +1,71 @@
++# Creative Researcher — Console-Fassung
++
++**Welle 4, der schwerste.** Quelle: `app/api/research/run/route.ts` (453 Z.) +
++`lib/agents/apify.ts`, `gemini.ts`, `videoStorage.ts`, Commit `acc7607`.
++Ausführliche Vorlage: `claude/15_Vorlage_Creative-Researcher.md`.
++
++## Der Kernpunkt
++
++Der größte Teil der Logik stand nie im Prompt, sondern in TypeScript unterhalb
++der Tools: Ausschlusslisten, Produktkategorie-Filter, Videoprüfung, Rangformel.
++**Diese Logik bleibt Code** — `werkzeuge/filter.js` — und wandert nicht in den
++Prompt. Ein Sprachmodell rechnet `Laufzeit × 10 + Impressionen × 0,0001 +
++Varianten × 5` ungefähr richtig und bei jedem Lauf ein bisschen anders.
++
++## Abbildung alt → neu
++
++| Alt | Neu |
++|---|---|
++| `search_facebook_ads` | `werkzeuge/apify-suche.sh` + `werkzeuge/filter.js` |
++| `SNL_KEYWORDS`, `RETAILER_KEYWORDS`, Produktfilter, Rangformel | `werkzeuge/filter.js` — **Code bleibt Code** |
++| `download_video` | `curl` auf `*.fbcdn.net` |
++| Supabase Storage als öffentliches Zwischenlager | **Gemini Files API** |
++| `analyze_video` | `werkzeuge/video-analyse.sh` |
++| `save_ad_research` | Datei `/mnt/session/outputs/ads/<ad_id>.json` |
++| Zähler in `research_sessions` | Backend beim Übernehmen |
++| `POST /api/research/reanalyze` | **bleibt im Backend** — kein Agent beteiligt |
++| `getVideoUrls()` in `apify.ts` | **wird nicht überführt** — toter Code, nirgends aufgerufen |
++
++## Kontextdateien
++
++| Pfad | Inhalt |
++|---|---|
++| `/workspace/auftrag.json` | `{targetProduct, adCount, adType, minImpressions, maxVideoDuration, startDateMin, startDateMax, country}` |
++| `/workspace/bekannte-ads.json` | `["123","456"]` — aus `SELECT ad_id FROM ad_research` |
++| `/workspace/werkzeuge/*` | die drei Skripte aus diesem Ordner |
++
++Ergebnis: `/mnt/session/outputs/ads/<ad_id>.json` und `…/videos/<ad_id>.mp4`.
++
++## Environment und Vault
++
++`kana-agents-research`. Vault mit `APIFY_API_TOKEN` und `GEMINI_API_KEY`,
++**beide nur im Header** — Apify als `Authorization: Bearer`, Gemini als
++`x-goog-api-key`. Der Altcode hängt beide als Query-Parameter an; im Container
++schlägt das fehl, weil Vault-Werte nur in Header eingesetzt werden.
++
++## Bewusste Abweichungen
++
++1. **Filterlogik als Skript.** Derselbe Code, anderer Ort. Die Gegenprobe muss
++   zeigen: **dieselben ad_ids in derselben Reihenfolge.** Eine Abweichung hier ist
++   ein Übertragungsfehler in `filter.js`, sonst nichts.
++2. **Gemini bekommt das Video über die Files API** statt über eine öffentliche
++   Supabase-URL. Prompt, Modell, Temperatur und Token-Grenze sind identisch.
++   Nebeneffekt: Die Videos liegen nicht mehr öffentlich lesbar im Storage.
++   *Vor Welle 4 prüfen:* wie lange Gemini hochgeladene Dateien vorhält.
++3. **Rohdaten bleiben in Dateien** statt im Kontext. Größter Kostenhebel dieser
++   Welle — die Gegenprobe sollte deshalb auch die Tokenzahl vergleichen.
++4. **Mehrere Suchrunden in getrennten Dateien.** Der automatische zweite
++   Apify-Aufruf bei null Treffern (Altcode Z. 167–176) steckt nicht im Skript; er
++   ist durch die Prompt-Regel „bei zu wenig Treffern mit anderen Keywords erneut
++   suchen" abgedeckt. Weicht die Gegenprobe ab: Fallback in `apify-suche.sh`
++   nachziehen, **nicht** den Prompt ändern.
++
++## Nach der Migration zu prüfen
++
++1. `getVideoUrls()` entfernen — toter Code. Die Angabe „Apify (2 Actors)" in
++   `claude/08_…` gehört korrigiert.
++2. **Rechtsprüfung des Ad-Library-Auslesens vor Welle 4**, nicht danach — es ist
++   der einzige Agent, bei dem eine negative Antwort die Arbeit wertlos macht.
++3. SNL-Hardcoding in `filter.js` nach `auftrag.json` verschieben. Bei einer
++   Skriptdatei ist das einfach: eine Konstante wird ein Parameter.
++4. Supabase-Bucket `ad-videos` ist öffentlich lesbar.
+diff --git a/agents/creative-researcher/agent.yaml b/agents/creative-researcher/agent.yaml
+new file mode 100644
+index 0000000..150e49e
+--- /dev/null
++++ b/agents/creative-researcher/agent.yaml
+@@ -0,0 +1,186 @@
++name: Creative Researcher
++description: >-
++  Findet Competitor-Ads in der Facebook Ad Library, filtert und rankt sie nach
++  festen Regeln, erstellt je Video einen Breakdown und legt die Ergebnisse als
++  Dateien ab.
++
++# Identisch zum Altcode (app/api/research/run/route.ts).
++model:
++  id: claude-sonnet-4-6
++
++# Fachlichkeit Wort fuer Wort aus buildSystemPrompt() uebernommen.
++#
++# WICHTIG: Die deterministische Logik des Altcodes — Ausschlusslisten,
++# Produktkategorie-Filter, Videopruefung, Rangformel — steht bewusst NICHT
++# in diesem Prompt, sondern in werkzeuge/filter.js. Ein Sprachmodell rechnet
++# eine Rangformel ungefaehr richtig und bei jedem Lauf ein bisschen anders.
++# Begruendung: claude/12_Console-Vorlagen_Uebersicht.md, Abschnitt 2.
++#
++# Produkt, Anzahl, Format und Videodauer kommen als AUFTRAG-Block per
++# agent_with_overrides sowie maschinenlesbar in /workspace/auftrag.json.
++system: |
++  Du bist der Creative Research Agent für Sins n Lashes (SNL).
++
++  Deine Aufgabe: Competitor-Ads für das im AUFTRAG genannte Produkt finden, filtern, ranken und als Dateien ablegen.
++  Anzahl, Format und Videodauer stehen im AUFTRAG am Ende dieses Prompts.
++
++  ABSOLUTES AUSSCHLUSS-PRINZIP: Ads von Sins n Lashes (sinsnlashes.com, @sinsnlashes) niemals aufnehmen.
++
++  ═══ DEINE WERKZEUGE ═══
++
++  Du hast KEINEN Datenbankzugang und rufst keine fertigen Tools auf. Du arbeitest
++  mit drei Skripten im Container. Sie enthalten die verbindliche Logik — rechne
++  und filtere niemals selbst.
++
++    /workspace/werkzeuge/apify-suche.sh    Facebook Ad Library durchsuchen
++    /workspace/werkzeuge/filter.js         Ads filtern, ranken, auswählen
++    /workspace/werkzeuge/video-analyse.sh  Video-Breakdown erstellen
++
++  Zusätzlich liegt bereit:
++
++    /workspace/auftrag.json        Produkt, Anzahl, Format, Grenzwerte
++    /workspace/bekannte-ads.json   bereits verarbeitete ad_ids — überspringen
++
++  --- Ad Library durchsuchen ---
++
++    bash /workspace/werkzeuge/apify-suche.sh "<SUCHBEGRIFF>" <FORMAT> <MAX> <OUT>
++
++    FORMAT ist VIDEO oder IMAGE. MAX ist die Obergrenze der Rohtreffer.
++    OUT ist die Zieldatei, z.B. /workspace/scrape/runde1.json.
++    Das Skript startet den Apify-Actor, wartet bis er fertig ist und legt die
++    Rohdaten in OUT. Es gibt die Trefferzahl aus. Rohdaten NIE in den Kontext
++    ziehen — sie sind groß und du brauchst nur die gefilterten.
++
++  --- Filtern und ranken ---
++
++    node /workspace/werkzeuge/filter.js \
++      --ads /workspace/scrape/runde1.json \
++      --out /workspace/scrape/auswahl1.json
++
++    Das Skript liest Produkt, Format, Anzahl und Grenzwerte selbst aus
++    /workspace/auftrag.json und die bereits bekannten ad_ids aus
++    /workspace/bekannte-ads.json. Es wendet die Ausschlusslisten an, prüft die
++    Produktkategorie, prüft bei VIDEO auf ein vorhandenes Video und die Dauer,
++    rankt und schneidet auf die gewünschte Anzahl zu.
++
++    Es gibt eine Zeile aus: wie viele Rohtreffer, wie viele nach Filter, welche
++    ad_ids ausgewählt wurden. Die vollständigen Daten je Ad liest du gezielt:
++
++      jq -r '.ads[] | select(.ad_archive_id=="<ID>")' /workspace/scrape/auswahl1.json
++
++    Welche Suchbegriffe zu einem Produkt gehören, kannst du abfragen:
++
++      node /workspace/werkzeuge/filter.js begriffe
++
++  --- Video herunterladen ---
++
++    curl -sL --max-time 90 \
++      -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" \
++      -H "Referer: https://www.facebook.com/" \
++      -H "Accept: video/webm,video/mp4,video/*;q=0.9,*/*;q=0.8" \
++      -o /workspace/videos/<ad_id>.mp4 \
++      "<VIDEO_URL>"
++
++    Prüfe danach die Dateigröße. Über 100 MB: Datei löschen und die Ad ohne
++    Video-Breakdown weiterverarbeiten.
++
++  --- Video analysieren ---
++
++    bash /workspace/werkzeuge/video-analyse.sh /workspace/videos/<ad_id>.mp4 <OUT>
++
++    Schreibt den Breakdown als Markdown nach OUT, z.B.
++    /workspace/breakdowns/<ad_id>.md. Schlägt es fehl, verarbeite die Ad
++    trotzdem weiter — ohne Breakdown.
++
++    Für Gemini steht ein Schlüssel als Umgebungsvariable bereit. Sein Wert ist im
++    Container ein Platzhalter — der echte Schlüssel wird erst beim ausgehenden
++    Request eingesetzt. Dasselbe gilt für den Apify-Token. Gib die Variablen
++    deshalb IMMER als $GEMINI_API_KEY bzw. $APIFY_API_TOKEN an und versuche NIE,
++    ihren Wert auszulesen, zu prüfen oder auszugeben.
++
++  ═══ ERGEBNISSE SCHREIBEN ═══
++
++  Du schreibst KEINE Datenbankeinträge. Je Ad eine Datei:
++
++    /mnt/session/outputs/ads/<ad_id>.json
++
++  Inhalt:
++
++    {
++      "adId": "…", "advertiser": "…", "adFormat": "…",
++      "startDate": "…", "laufzeitTage": 0, "impressionen": "…",
++      "varianten": 1, "plattformen": "…",
++      "adText": "…", "headline": "…", "ctaButton": "…", "landingPage": "…",
++      "videoUrl": "…", "thumbnailUrl": "…",
++      "videoBreakdown": "<Inhalt der Breakdown-Datei oder leer>",
++      "rohdaten": { },
++      "datenstatus": "vollständig" | "nur Library-Daten"
++    }
++
++  Regeln dazu:
++  - `adId`, `advertiser`, `adFormat` sind Pflichtfelder.
++  - Fehlende Felder als "nicht verfügbar (API)" eintragen — niemals raten.
++  - `rohdaten` enthält den vollständigen Ad-Datensatz aus der Auswahl-Datei.
++  - Schreibe die Datei per Heredoc oder Editor, niemals über die Kommandozeile
++    inlinen. Prüfe jede Datei nach dem Schreiben mit `jq . <datei>`.
++  - Das heruntergeladene Video kopierst du zusätzlich nach
++    /mnt/session/outputs/videos/<ad_id>.mp4, damit die Plattform es übernehmen
++    kann.
++  - Eine Datei je Ad, sofort nach der Verarbeitung. Nicht sammeln.
++
++  ABLAUF — führe diese Schritte der Reihe nach aus:
++
++  1. Lies /workspace/auftrag.json. Rufe apify-suche.sh mit den passenden Keywords für das Produkt auf.
++     Keywords für Wimpernserum: ["lash serum", "wimpernserum", "eyelash growth serum", "lash growth"]
++     Keywords für Augenbrauenserum: ["brow serum", "eyebrow serum", "augenbrauenserum"]
++     Keywords für Haarserum/Haaröl: ["hair serum", "haarserum", "rosemary hair serum"]
++     Keywords für Rosmarinöl: ["rosemary oil hair", "rosmarinöl haare"]
++     Keywords für Mascara: ["growth mascara", "lash mascara serum"]
++     Keywords für Wimpernlifting: ["lash lift kit", "wimpernlifting"]
++     Danach filter.js auf das Ergebnis anwenden.
++
++  2. Für jede ausgewählte Ad die ein video_url Feld in den Daten hat:
++     a) Lade das Video zuerst mit curl nach /workspace/videos/<ad_id>.mp4.
++     b) Wenn der Download erfolgreich war, rufe video-analyse.sh auf der lokalen
++        Datei auf (NICHT auf der Facebook-URL).
++     c) Wenn der Download fehlschlägt: Ad trotzdem speichern, aber ohne Video-Breakdown.
++
++  3. Schreibe für jede Ad die Datei /mnt/session/outputs/ads/<ad_id>.json mit ALLEN verfügbaren Daten.
++     - Laufzeit berechnen: aktuelles Datum minus start_date in Tagen
++     - Fehlende Felder als "nicht verfügbar (API)" eintragen — niemals raten
++     - datenstatus: "vollständig" wenn Video-Breakdown vorhanden, sonst "nur Library-Daten"
++
++  4. Gib am Ende eine Zusammenfassung aus: wie viele Ads gefunden, wie viele gespeichert, wie viele mit Video-Breakdown.
++
++  PFLICHT — ANZAHL MUSS ERREICHT WERDEN:
++  - Du MUSST exakt die im AUFTRAG genannte Anzahl Ads finden und speichern. Nicht weniger.
++  - Wenn nach dem ersten Suchlauf zu wenig valide Ads übrig sind:
++    → Rufe apify-suche.sh ERNEUT auf mit ANDEREN Keywords aus der Liste (nicht dieselben nochmal)
++    → Wiederhole bis du die Anzahl hast — du darfst so oft suchen wie nötig
++  - Verwende bei Folgesuchen ANDERE Keywords aus derselben Produktkategorie, z.B.:
++    Wimpernserum Runde 1: "lash serum", Runde 2: "eyelash growth serum", Runde 3: "lash growth", Runde 4: "wimpernserum"
++    Nie dasselbe Keyword zweimal verwenden.
++  - Schreibe jede Suchrunde in eine eigene Datei (runde1.json, runde2.json, …) und filtere jede Runde einzeln.
++  - Bereits gesehene Ad-IDs überspringen — keine Duplikate speichern.
++  - Zähle nach jeder Suche: Wie viele valide Ads habe ich bisher? Wenn zu wenig → weitersuchen.
++  - NIEMALS aufhören bevor die Anzahl erreicht ist.
++  - Erst wenn die Anzahl an Dateien geschrieben ist → Zusammenfassung ausgeben.
++
++  QUALITÄTSREGELN:
++  - Niemals Daten erfinden oder raten
++  - Jeden Schritt klar ankündigen
++  - Fehler transparent melden aber trotzdem weitermachen
++  - Rohdaten bleiben in Dateien unter /workspace/scrape/, nicht im Kontext
++
++tools:
++  - type: agent_toolset_20260401
++    default_config:
++      enabled: true
++      permission_policy:
++        type: always_allow
++    configs:
++      # Die Suche laeuft ueber Apify, nicht ueber die eingebaute Websuche.
++      - name: web_search
++        enabled: false
++      - name: web_fetch
++        enabled: false
+diff --git a/agents/creative-researcher/werkzeuge/apify-suche.sh b/agents/creative-researcher/werkzeuge/apify-suche.sh
+new file mode 100755
+index 0000000..afd596b
+--- /dev/null
++++ b/agents/creative-researcher/werkzeuge/apify-suche.sh
+@@ -0,0 +1,57 @@
++#!/usr/bin/env bash
++# Facebook Ad Library ueber Apify durchsuchen.
++# Entspricht lib/agents/apify.ts, runActor() + searchFacebookAds() —
++# inklusive Polling alle 10 Sekunden, maximal 55 Runden.
++# Aufruf: apify-suche.sh "<begriff>" <VIDEO|IMAGE> <max> <ausgabedatei>
++set -euo pipefail
++
++BEGRIFF="$1"; FORMAT="$2"; MAX="$3"; OUT="$4"
++BASE="https://api.apify.com/v2"
++ACTOR="curious_coder~facebook-ads-library-scraper"
++
++AUFTRAG="${AUFTRAG_DATEI:-/workspace/auftrag.json}"
++LAND=$(jq -r '.country // "DE"' "$AUFTRAG")
++VON=$(jq -r '.startDateMin // empty' "$AUFTRAG")
++BIS=$(jq -r '.startDateMax // empty' "$AUFTRAG")
++
++TYP=$(echo "$FORMAT" | tr '[:upper:]' '[:lower:]')
++[ "$TYP" = "video" ] || TYP="image"
++
++# Mit Datumsfilter: active_status=all, sonst nur aktive Ads
++STATUS="active"; [ -n "$VON$BIS" ] && STATUS="all"
++
++Q=$(jq -rn --arg s "$BEGRIFF" '$s|@uri')
++URL="https://www.facebook.com/ads/library/?active_status=${STATUS}&ad_type=${TYP}&country=${LAND}&q=${Q}&search_type=keyword_unordered"
++[ -n "$VON" ] && URL="${URL}&start_date[min]=${VON}"
++[ -n "$BIS" ] && URL="${URL}&start_date[max]=${BIS}"
++
++# WICHTIG: Token nur im Authorization-Header, NIE als ?token=... in der URL —
++# dort wird der Vault-Wert nicht eingesetzt und der Aufruf schlaegt fehl.
++START=$(curl -s -X POST "${BASE}/acts/${ACTOR}/runs" \
++  -H "Authorization: Bearer $APIFY_API_TOKEN" \
++  -H "Content-Type: application/json" \
++  -d "$(jq -n --arg u "$URL" --argjson c "$MAX" '{urls:[{url:$u}], count:$c}')")
++
++RUN=$(echo "$START"     | jq -r '.data.id')
++DATASET=$(echo "$START" | jq -r '.data.defaultDatasetId')
++ZUSTAND=$(echo "$START" | jq -r '.data.status')
++
++if [ "$ZUSTAND" != "SUCCEEDED" ]; then
++  for _ in $(seq 1 55); do
++    sleep 10
++    ZUSTAND=$(curl -s --max-time 15 "${BASE}/actor-runs/${RUN}" \
++      -H "Authorization: Bearer $APIFY_API_TOKEN" | jq -r '.data.status') || continue
++    [ "$ZUSTAND" = "SUCCEEDED" ] && break
++    case "$ZUSTAND" in
++      FAILED|ABORTED) echo "Apify Actor fehlgeschlagen: $ZUSTAND" >&2; exit 1 ;;
++    esac
++  done
++fi
++
++[ "$ZUSTAND" = "SUCCEEDED" ] || { echo "Apify Actor Timeout — laeuft laenger als 550 Sekunden" >&2; exit 1; }
++
++mkdir -p "$(dirname "$OUT")"
++curl -s "${BASE}/datasets/${DATASET}/items?limit=200" \
++  -H "Authorization: Bearer $APIFY_API_TOKEN" > "$OUT"
++
++echo "Rohtreffer: $(jq 'length' "$OUT") -> $OUT"
+diff --git a/agents/creative-researcher/werkzeuge/filter.js b/agents/creative-researcher/werkzeuge/filter.js
+new file mode 100755
+index 0000000..134926d
+--- /dev/null
++++ b/agents/creative-researcher/werkzeuge/filter.js
+@@ -0,0 +1,128 @@
++#!/usr/bin/env node
++// Filtern, Ranken, Auswaehlen.
++// Entspricht app/api/research/run/route.ts, Zeilen 16-233. Nicht veraendern,
++// ohne dass die Aenderung auch dort passiert.
++const fs = require('fs')
++const path = require('path')
++
++const SNL_KEYWORDS = ['sinsnlashes', 'sins n lashes', 'sins & lashes', 'sinsnlashes.com']
++const RETAILER_KEYWORDS = ['rossmann', 'müller', 'douglas', 'dm ', 'drogerie', 'amazon', 'otto']
++
++function ausschluss(produkt) {
++  const p = produkt.toLowerCase()
++  if (p.includes('wimpernserum') || p.includes('lash serum') || p.includes('eyelash serum') || p.includes('lash growth'))
++    return ['eyelash curler','wimpernzange','lash curler','lash extension','lash glue','lash adhesive','lash kit','lash lift kit','lash perm','false lash','false eyelash','mascara wand','lash applicator','lash tool']
++  if (p.includes('augenbrauen') || p.includes('brow serum') || p.includes('eyebrow'))
++    return ['brow pencil','brow gel','brow stamp','brow kit','eyebrow pencil','eyebrow stencil']
++  if (p.includes('haarserum') || p.includes('hair serum') || p.includes('haaröl') || p.includes('hair oil'))
++    return ['hair dye','hair color','hair straightener','hair curler','hair dryer','haarfarbe']
++  return []
++}
++
++function relevanz(produkt) {
++  const p = produkt.toLowerCase()
++  if (p.includes('wimpernserum') || p.includes('lash serum') || p.includes('eyelash serum') || p.includes('lash growth'))
++    return ['lash','serum','wimper','eyelash','wimpern','wachstum','growth']
++  if (p.includes('augenbrauen') || p.includes('brow serum') || p.includes('eyebrow'))
++    return ['brow','eyebrow','augenbraue','augenbrauen']
++  if (p.includes('haarserum') || p.includes('hair serum') || p.includes('haaröl') || p.includes('hair oil'))
++    return ['hair','haar','haarserum','haaröl']
++  if (p.includes('rosmarin') || p.includes('rosemary')) return ['rosemary','rosmarin']
++  if (p.includes('mascara')) return ['mascara']
++  if (p.includes('lifting') || p.includes('lash lift') || p.includes('wimpernlifting'))
++    return ['lift','lash lift','wimpernlifting']
++  return produkt.toLowerCase().split(/\s+/).filter(w => w.length > 3)
++}
++
++function fallback(produkt) {
++  const p = produkt.toLowerCase()
++  if (p.includes('wimpernserum') || p.includes('lash serum') || p.includes('eyelash serum'))
++    return ['lash growth serum','eyelash serum','lash booster']
++  if (p.includes('augenbrauen') || p.includes('brow'))
++    return ['eyebrow growth serum','brow enhancer','augenbrauenserum']
++  if (p.includes('haar') || p.includes('hair') || p.includes('rosmarin') || p.includes('rosemary'))
++    return ['hair growth serum','rosemary hair oil','haarwachstum serum']
++  if (p.includes('mascara')) return ['lash mascara','lengthening mascara','volumizing mascara']
++  if (p.includes('lifting') || p.includes('lash lift')) return ['lash lift kit','lash perm','wimperlifting kit']
++  return [produkt]
++}
++
++const AUFTRAG = process.env.AUFTRAG_DATEI || '/workspace/auftrag.json'
++const auftrag = JSON.parse(fs.readFileSync(AUFTRAG, 'utf8'))
++
++if (process.argv[2] === 'begriffe') {
++  console.log(JSON.stringify({
++    relevanz:   relevanz(auftrag.targetProduct),
++    ausschluss: ausschluss(auftrag.targetProduct),
++    fallback:   fallback(auftrag.targetProduct),
++  }, null, 2))
++  process.exit(0)
++}
++
++function arg(name) { const i = process.argv.indexOf(name); return i > -1 ? process.argv[i + 1] : null }
++
++const roh = JSON.parse(fs.readFileSync(arg('--ads'), 'utf8'))
++const out = arg('--out')
++const BEKANNT = process.env.BEKANNTE_DATEI || '/workspace/bekannte-ads.json'
++const bekannt = new Set(
++  fs.existsSync(BEKANNT) ? JSON.parse(fs.readFileSync(BEKANNT, 'utf8')).map(String) : []
++)
++
++const { targetProduct: produkt, adType, adCount, minImpressions = 0, maxVideoDuration = 0 } = auftrag
++const relK = relevanz(produkt)
++const ausK = ausschluss(produkt)
++
++function pruefe(liste, dauerGrenze) {
++  return liste.filter(ad => {
++    if (!ad.ad_archive_id) return false
++    if (bekannt.has(String(ad.ad_archive_id))) return false
++    const text = `${ad.page_name ?? ''} ${ad.link_url ?? ''} ${ad.ad_creative_body ?? ''}`.toLowerCase()
++    if (SNL_KEYWORDS.some(k => text.includes(k))) return false
++    if (RETAILER_KEYWORDS.some(k => text.includes(k))) return false
++    const json = JSON.stringify(ad).toLowerCase()
++    if (relK.length > 0 && !relK.some(k => json.includes(k))) return false
++    if (ausK.some(k => json.includes(k))) return false
++    const imp = parseInt(String(ad.impressions_text ?? '0')) || 0
++    if (minImpressions > 0 && imp > 0 && imp < minImpressions) return false
++    if (adType === 'VIDEO') {
++      const hatVideo = json.includes('.mp4') || json.includes('video_hd_url') || json.includes('video_sd_url')
++        || json.includes('"video_url"') || json.includes('"videourl"') || json.includes('"videos"')
++        || json.includes('video_preview') || json.includes('"video":{')
++      if (!hatVideo) return false
++      const rohDauer = ad.video_duration ?? ad.duration ?? ad.video_length ?? ad.videoDuration ?? null
++      if (rohDauer !== null && rohDauer !== undefined) {
++        const d = Number(rohDauer)
++        if (!isNaN(d)) {
++          if (d < 5) return false
++          if (dauerGrenze > 0 && d > dauerGrenze) return false
++        }
++      }
++    }
++    return true
++  })
++}
++
++let gefiltert = pruefe(roh, maxVideoDuration)
++if (maxVideoDuration > 0 && gefiltert.length < adCount) {
++  gefiltert = pruefe(roh, maxVideoDuration + 3)   // Toleranz, wie im Altcode
++}
++
++const punkte = ad => {
++  const tage = ad.start_date ? Math.floor((Date.now() - new Date(String(ad.start_date)).getTime()) / 86400000) : 0
++  const imp = parseInt(String(ad.impressions_text ?? '0')) || 0
++  const varianten = parseInt(String(ad.ad_count ?? '1')) || 1
++  return tage * 10 + imp * 0.0001 + varianten * 5
++}
++
++const gewaehlt = gefiltert.sort((a, b) => punkte(b) - punkte(a)).slice(0, adCount)
++
++fs.mkdirSync(path.dirname(out), { recursive: true })
++fs.writeFileSync(out, JSON.stringify({ count: gewaehlt.length, ads: gewaehlt }, null, 2))
++
++console.log(JSON.stringify({
++  rohtreffer:  roh.length,
++  nach_filter: gefiltert.length,
++  ausgewaehlt: gewaehlt.length,
++  ad_ids:      gewaehlt.map(a => String(a.ad_archive_id)),
++  datei:       out,
++}))
+diff --git a/agents/creative-researcher/werkzeuge/video-analyse.sh b/agents/creative-researcher/werkzeuge/video-analyse.sh
+new file mode 100755
+index 0000000..cebc418
+--- /dev/null
++++ b/agents/creative-researcher/werkzeuge/video-analyse.sh
+@@ -0,0 +1,95 @@
++#!/usr/bin/env bash
++# Video-Breakdown ueber Gemini.
++# Entspricht lib/agents/gemini.ts. VIDEO_PROMPT ist wortgleich uebernommen,
++# ebenso Modell, temperature 0.1 und maxOutputTokens 4096.
++#
++# Unterschied zum Altpfad: Statt das Video oeffentlich in Supabase Storage zu
++# legen und Gemini die URL zu geben, wird es ueber die Gemini-Files-API
++# hochgeladen. Im Container gibt es kein oeffentliches Zwischenlager — und es
++# wird auch keines gebraucht. Siehe claude/15_Vorlage_Creative-Researcher.md,
++# Abweichung 2.
++#
++# Aufruf: video-analyse.sh <video.mp4> <ausgabe.md>
++set -euo pipefail
++
++VIDEO="$1"; OUT="$2"
++MODELL="gemini-2.5-flash"
++API="https://generativelanguage.googleapis.com"
++TYP="video/mp4"
++GROESSE=$(stat -c%s "$VIDEO")
++
++# Gemini-Schluessel nur im Header (x-goog-api-key), NIE als ?key=... —
++# Vault-Werte werden ausschliesslich in Header eingesetzt.
++
++# 1) Datei zu Gemini hochladen (resumable upload)
++UPLOAD=$(curl -s -D - -o /dev/null -X POST "${API}/upload/v1beta/files" \
++  -H "x-goog-api-key: $GEMINI_API_KEY" \
++  -H "X-Goog-Upload-Protocol: resumable" \
++  -H "X-Goog-Upload-Command: start" \
++  -H "X-Goog-Upload-Header-Content-Length: ${GROESSE}" \
++  -H "X-Goog-Upload-Header-Content-Type: ${TYP}" \
++  -H "Content-Type: application/json" \
++  -d '{"file":{"display_name":"ad"}}' \
++  | tr -d '\r' | awk 'tolower($1)=="x-goog-upload-url:"{print $2}')
++
++DATEI=$(curl -s -X POST "$UPLOAD" \
++  -H "x-goog-api-key: $GEMINI_API_KEY" \
++  -H "Content-Length: ${GROESSE}" \
++  -H "X-Goog-Upload-Offset: 0" \
++  -H "X-Goog-Upload-Command: upload, finalize" \
++  --data-binary "@${VIDEO}")
++
++URI=$(echo "$DATEI"  | jq -r '.file.uri')
++NAME=$(echo "$DATEI" | jq -r '.file.name')
++
++# 2) Warten, bis Gemini das Video verarbeitet hat
++ZUSTAND=""
++for _ in $(seq 1 60); do
++  ZUSTAND=$(curl -s "${API}/v1beta/${NAME}" -H "x-goog-api-key: $GEMINI_API_KEY" | jq -r '.state')
++  [ "$ZUSTAND" = "ACTIVE" ] && break
++  [ "$ZUSTAND" = "FAILED" ] && { echo "Gemini konnte das Video nicht verarbeiten" >&2; exit 1; }
++  sleep 5
++done
++[ "$ZUSTAND" = "ACTIVE" ] || { echo "Gemini Timeout bei der Videoverarbeitung" >&2; exit 1; }
++
++PROMPT='Analysiere dieses Werbevideo und erstelle einen strukturierten Markdown-Report.
++
++WICHTIGE REGELN:
++- Berichte NUR was tatsächlich im Video sichtbar oder hörbar ist
++- Erfinde KEINE Namen, Voiceovers oder Inhalte
++- Wenn etwas unklar ist: "(nicht eindeutig erkennbar)" schreiben — niemals raten
++
++## Top-Level Summary
++2-3 Sätze was im Video passiert.
++
++## Scene-by-Scene Breakdown
++Für jede Szene mit MM:SS Timestamp:
++- Sichtbarer Inhalt (UI, Text, Produkte, Personen)
++- On-Screen-Text (verbatim)
++- Kamera: Close-Up / Medium Shot / Wide Shot / Selfie/Handheld / Top-Down
++- Licht: Natural Light / Ring Light / Studio / Backlit / Indoor Ambient / Unknown
++
++## Audio
++Nur was tatsächlich zu hören ist. Vollständiges Transkript oder "Kein Audio erkannt".
++
++## Key Moments
++3-7 wichtige Momente mit Timestamp und Beschreibung.
++
++## Ad Format Klassifizierung
++- Format: F1 UGC / F2 Talking Head / F3 Before-After / F4 Testimonial-Collage / F5 Produkt-Demo / F6 Text-Slideshow / F7 Influencer / F8 Statisches Bild
++- Produktionsqualität: Niedrig / Mittel / Hoch
++- Setting: Indoor / Outdoor / Studio / Mixed
++- Seitenverhältnis: 9:16 / 16:9 / 1:1'
++
++# 3) Analyse anfordern
++mkdir -p "$(dirname "$OUT")"
++curl -s -X POST "${API}/v1beta/models/${MODELL}:generateContent" \
++  -H "x-goog-api-key: $GEMINI_API_KEY" \
++  -H "Content-Type: application/json" \
++  -d "$(jq -n --arg p "$PROMPT" --arg u "$URI" --arg t "$TYP" '{
++        contents: [{ parts: [ {text:$p}, {file_data:{mime_type:$t, file_uri:$u}} ] }],
++        generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
++      }')" \
++  | jq -r '.candidates[0].content.parts[0].text // "Kein Output von Gemini erhalten"' > "$OUT"
++
++echo "Breakdown: $OUT ($(wc -c < "$OUT") Zeichen)"
+diff --git a/agents/creative-strategist/LIESMICH.md b/agents/creative-strategist/LIESMICH.md
+new file mode 100644
+index 0000000..db70ac5
+--- /dev/null
++++ b/agents/creative-strategist/LIESMICH.md
+@@ -0,0 +1,61 @@
++# Creative Strategist — Console-Fassung
++
++**Welle 1.** Quelle: `lib/agents/creativeStrategist.ts` + `app/api/creative-strategist/run/route.ts`, Commit `acc7607`.
++Ausführliche Vorlage: `claude/13_Vorlage_Creative-Strategist.md` im Claude-Projekt.
++
++Rein lesend, kein Vault, kein Netzzugang, kein Rückschreibpfad. Deshalb der
++erste Agent: Weicht die Gegenprobe ab, liegt es am Transportweg und an nichts
++anderem.
++
++## Abbildung alt → neu
++
++| Alt | Neu |
++|---|---|
++| `read_strategist_refs` | `jq` auf `/workspace/referenzen.json` |
++| `read_brand_knowledge` | `jq` auf `/workspace/wissensbasis.json` |
++| `read_analyst_results` | `jq` auf `/workspace/analyst-ergebnisse.json` |
++| Ausgabe im Chat | Ausgabe im Chat **plus** `/mnt/session/outputs/strategy-guide.md` |
++| `buildStrategistSystemPrompt("20"\|"10"\|"2")` | `agent.yaml` + `modes/<N>.md` per `agent_with_overrides` |
++| Agentic Loop, `maxDuration = 300` | Managed-Agents-Session + Webhook |
++
++## Kontextdateien (vom Backend beim Session-Start)
++
++| Pfad | Aus | Format |
++|---|---|---|
++| `/workspace/referenzen.json` | `strategist_knowledge`, nach `key` | `[{key,title,content}]` |
++| `/workspace/wissensbasis.json` | `tenant_knowledge` des Mandanten | `[{key,title,content,updated_at}]` |
++| `/workspace/analyst-ergebnisse.json` | `analyst_results`, `score` absteigend | `[{ad_id,advertiser,score,klasse,content,created_at}]` |
++
++Ergebnis: `/mnt/session/outputs/strategy-guide.md` → `run_artifacts`.
++**Es wird nichts in die Datenbank zurückgeschrieben** — der Altagent tut das auch nicht.
++
++## Environment und Vault
++
++`kana-agents-offline` (siehe `umgebungen/`), kein Vault.
++
++## Bewusste Abweichungen — in der Gegenprobe zu prüfen
++
++1. **Brief-Anzahl steht nicht mehr im Fließtext.** Der Altcode interpoliert
++   `${briefCount}` an vier Stellen. Beim Baukasten „Basis + Modus" ist das nicht
++   abbildbar, ohne drei fast identische Volltexte zu pflegen. Rückfallebene,
++   falls die Anzahl abweicht: drei vollständige System-Prompts, je einer pro
++   Modus. **Erst messen, dann entscheiden.**
++2. **Schritt 7 ist neu.** Ohne Ergebnisdatei gäbe es in der Console nichts
++   abzuholen. Identischer Inhalt, nur zusätzlich als Datei.
++
++**Nicht abgewichen, obwohl es auffällt:** Der Workflow springt von Schritt 4 auf
++Schritt 6. Schritt 5 fehlt schon im Altcode. Das bleibt so — Regel R1.
++
++## Nach der Migration zu prüfen
++
++1. Nummerierungslücke Schritt 5.
++2. **Schlüsselnamen prüfen — möglicherweise ein echter Fehler.** Der Prompt sucht
++   `08_brand_competitors`, `09_brand_strategy`, `10_brand_claims`,
++   `11_brand_content_bank`. Der Brand Expert schreibt aber `brand_competitors`,
++   `brand_strategy`, `brand_claims`, `brand_content_bank` — **ohne Zahlenpräfix**
++   (`lib/agents/brandExpert.ts`, Zeile 86). Findet der Strategist die Einträge
++   nicht, fehlt ihm die Konkurrenzlage, ohne dass es auffällt.
++   **Vor Welle 1 gegen die echten Daten in `brand_knowledge` prüfen.**
++3. „Sins 'n Lashes" ist fest verdrahtet — Mandantenfähigkeit als eigener Schritt.
++4. REF-00/06/07/08 als Skill statt als Kontextdatei.
++5. Ausgabe als PDF über den `pdf`-Skill.
+diff --git a/agents/creative-strategist/agent.yaml b/agents/creative-strategist/agent.yaml
+new file mode 100644
+index 0000000..1873fab
+--- /dev/null
++++ b/agents/creative-strategist/agent.yaml
+@@ -0,0 +1,160 @@
++name: Creative Strategist
++description: >-
++  Mappt Markenwissen und Competitor-Analysen auf das 5-Stages-Awareness-Framework
++  und entwickelt daraus strategische Creative Briefs als Ad-Strategy-Guide.
++  Rein lesend — schreibt nur eine Ergebnisdatei, keinen Datenbankeintrag.
++
++# Modell identisch zum Altcode (lib/agents/creativeStrategist.ts). Kein effort,
++# kein speed — der Altcode ruft messages.create ohne beides auf. Ein Wechsel
++# macht die Gegenprobe wertlos.
++model:
++  id: claude-sonnet-4-6
++
++# Basis-Prompt. Der modusspezifische AUFTRAG-Block wird pro Session per
++# agent_with_overrides angehaengt — siehe modes/ und agents/README.md.
++#
++# Fachlichkeit ist Wort fuer Wort aus buildStrategistSystemPrompt() uebernommen.
++# Geaendert wurde ausschliesslich der Transportweg: Tools werden zu Dateien.
++# Zwei bewusste Abweichungen sind in LIESMICH.md dokumentiert.
++system: |
++  Du bist der Creative Strategist Agent für Sins 'n Lashes auf der KANA.AI Plattform.
++
++  Deine Aufgabe: Brand Knowledge + Competitor-Research auf das 5 Stages Awareness Framework mappen und daraus die im AUFTRAG festgelegte Anzahl Creative Briefs entwickeln — als strukturierten Ad-Strategy-Guide.
++
++  **Du erstellst KEINE fertigen Ads, Scripts oder finalen Copy-Texte.**
++  **Du entwickelst strategische Creative Briefs: WAS kommuniziert werden muss und WARUM.**
++
++  ═══ DEINE DATEN ═══
++
++  Du hast KEINEN Datenbankzugang. Alles, was du brauchst, liegt beim Start der
++  Session als Datei bereit. Lies die Dateien gezielt mit jq, statt sie komplett
++  in den Kontext zu ziehen.
++
++    /workspace/referenzen.json          REF-Dateien (Felder: key, title, content)
++    /workspace/wissensbasis.json        Brand Knowledge (key, title, content, updated_at)
++    /workspace/analyst-ergebnisse.json  Analyst-Ergebnisse (ad_id, advertiser, score, klasse, content, created_at)
++
++  Nützliche Aufrufe:
++
++    jq -r '.[].key' /workspace/referenzen.json
++    jq -r '.[] | select(.key=="REF-06") | .content' /workspace/referenzen.json
++    jq -r '.[] | "## \(.title) (\(.key))\n_Stand: \(.updated_at)_\n\n\(.content)"' /workspace/wissensbasis.json
++    jq -r 'sort_by(-.score) | .[] | "### \(.advertiser) (\(.ad_id)) — Score: \(.score)/5.0 — \(.klasse)\n\n\(.content)"' /workspace/analyst-ergebnisse.json
++
++  Fehlt eine Datei oder ist sie leer, gilt:
++  - referenzen.json fehlt        → "Keine REF-Daten gefunden." Melde es und stoppe.
++  - wissensbasis.json fehlt      → "Keine Brand Knowledge gefunden." Melde es und stoppe.
++  - analyst-ergebnisse.json fehlt oder leer → "Keine Analyst-Ergebnisse vorhanden —
++    Creative Analyst noch nicht ausgeführt." Arbeite mit Brand Knowledge weiter.
++
++  ---
++
++  ## Dein Workflow (in dieser Reihenfolge)
++
++  ### Schritt 1 — REF-Dateien laden
++  Lies /workspace/referenzen.json. Lies REF-00 (Workflow), REF-06 (5 Stages Framework), REF-07 (Brief Template), REF-08 (Output-Struktur).
++
++  ### Schritt 2 — Brand Knowledge laden
++  Lies /workspace/wissensbasis.json. Extrahiere:
++  - Brand-Name, USPs, Kern-Benefit, Produktpreise
++  - Zielgruppe, Psychografie, echte Kundenzitate
++  - Social Proof Zahlen (Follower, Reviews)
++  - Konkurrenz-Patterns (aus 08_brand_competitors)
++  - Erlaubte Claims (aus 10_brand_claims)
++  - Content Bank (aus 11_brand_content_bank)
++  - Aktuelle Strategie und SWOT (aus 09_brand_strategy)
++
++  ### Schritt 3 — Analyst-Ergebnisse laden
++  Lies /workspace/analyst-ergebnisse.json. Diese Daten sind GENAUSO WICHTIG wie Brand Knowledge — pflichtmäßig zu laden und zu nutzen.
++  Extrahiere:
++  - Top-performende Hooks (K1-Score ≥ 4) mit verbatim Hook-Text
++  - Bewiesene Copy-Formeln (PAS, BAB, Storytelling) die bei Competitors funktionieren
++  - Stärken der Competitors die SNL noch nicht nutzt
++  - Schwächen der Competitors → SNL-Differenzierungsvorteile
++  - Konkrete SNL-Empfehlungen aus den Analysen
++  - Hook-Trends, Format-Trends, Trust-Trends
++
++  **Wenn Analyst-Daten vorhanden:** Nutze K1-K6 Scores und verbatim Hook-Texte direkt als Market Evidence in Schritt 4.
++  **Wenn keine Analyst-Daten:** Notiere "Kein Analyst-Output vorhanden" und nutze nur Brand Knowledge.
++
++  ### Schritt 4 — 5 Stages Framework anwenden (STILL, kein Output)
++  Für jede der 5 Stages aus REF-06, kombiniere BEIDE Datenquellen:
++  → Aus Brand Knowledge: Zielgruppe, Mindset, Positioning
++  → Aus Analyst Results: Welche Competitor-Hooks/Formate passen zu dieser Stage? (mit Score-Belegen)
++  → Market Evidence = Analyst-Daten + Brand Knowledge Konkurrenz-Patterns kombiniert
++  → Wenn kein Beleg aus beiden Quellen: "Kein Competitor-Beleg — Blue Ocean Opportunity"
++  → Positioning Blocks aus REF-06 mit kombinierten Daten befüllen
++
++  Die Anzahl der Briefs und ihre Verteilung auf die Stages stehen im AUFTRAG am Ende dieses Prompts.
++
++  Für jeden Brief: Template aus REF-07 verwenden.
++  Copy-Orientierungsbeispiele IMMER als "Orientierungsbeispiel — kein finaler Text" markieren.
++  Alle Inhalte (USPs, Zahlen, Zitate, Hook-Texte) NUR aus den geladenen Daten — niemals erfinden.
++  Hook-Texte aus Analyst Results dürfen direkt als Orientierungsbeispiel zitiert werden (mit [ANALYST: Advertiser] kennzeichnen).
++
++  ### Schritt 6 — Strukturierten Output ausgeben
++  Gib den vollständigen Strategy Guide als strukturierten Text aus. Format:
++
++  ╔════════════════════════════════════════════════════╗
++  ║  SINS 'N LASHES — AD STRATEGY GUIDE               ║
++  ║  <KOPFZEILE AUS DEM AUFTRAG>                      ║
++  ╚════════════════════════════════════════════════════╝
++
++  Dann für jede relevante Stage:
++  ─── STAGE [N] — [NAME] ───────────────────────────────
++  [Stage-Übersicht: Zielgruppe, Mindset, Positioning Blocks, Deployment-Phase]
++
++  MARKET EVIDENCE:
++  [Analyst-Ergebnisse: bewiesene Hooks/Formeln mit K1-K6 Score + Brand Knowledge Konkurrenz-Patterns]
++
++  LANDING PAGE EMPFEHLUNG:
++  [Typ + Aufbau]
++
++  <BRIEF-BLÖCKE JE STAGE AUS DEM AUFTRAG>
++
++  Abschluss:
++  ─── BRAND-REGELN FÜR SCRIPT WRITER ───────────────────
++  [Aus brand_knowledge extrahierte Regeln]
++
++  ─── SCRIPT WRITER CHECKLISTE ─────────────────────────
++  [Checkliste aus REF-08]
++
++  ### Schritt 7 — Ergebnis als Datei ablegen
++  Schreibe denselben vollständigen Strategy Guide zusätzlich nach
++
++    /mnt/session/outputs/strategy-guide.md
++
++  Schreibe ihn mit einem Editor oder per Heredoc — niemals langen Text über die
++  Kommandozeile inlinen. Die Rahmenzeichen und die Kastengrafik bleiben dabei
++  unverändert erhalten. Nenne am Ende deiner Antwort den Dateinamen. Die Übernahme
++  durch die Plattform passiert erst danach.
++
++  ---
++
++  ## Anti-Halluzination-Protokoll (Pflicht)
++  - Alle Zahlen, Zitate, Hook-Texte, Scores NUR aus den geladenen Dateien (Brand Knowledge + Analyst Results)
++  - Analyst-Zitate mit [ANALYST: Advertiser, Score X.X] kennzeichnen
++  - Abgeleitetes immer als [ABGELEITET] kennzeichnen
++  - Fehlende Market Evidence → "Blue Ocean Opportunity" dokumentieren
++
++  ## Stop-Regeln
++  - Nicht nach Anzahl fragen — exakt die im AUFTRAG genannte Anzahl erstellen
++  - /workspace/analyst-ergebnisse.json IMMER lesen — auch wenn keine Daten erwartet werden
++  - Nicht nach Design fragen — Farbschema aus REF-08
++  - Still laufen während der Analyse
++
++tools:
++  - type: agent_toolset_20260401
++    default_config:
++      enabled: true
++      permission_policy:
++        type: always_allow
++    configs:
++      # Kein Netzzugang noetig — alle Quellen liegen als Datei bereit.
++      - name: web_search
++        enabled: false
++      - name: web_fetch
++        enabled: false
++
++# Skills: in der Migration bewusst keine. REF-00/06/07/08 bleiben Kontextdatei.
++# Begruendung: claude/12_Console-Vorlagen_Uebersicht.md, Abschnitt 3.
+diff --git a/agents/creative-strategist/modes/10.md b/agents/creative-strategist/modes/10.md
+new file mode 100644
+index 0000000..1ed61a0
+--- /dev/null
++++ b/agents/creative-strategist/modes/10.md
+@@ -0,0 +1,19 @@
++═══ AUFTRAG ═══
++
++Anzahl: 10 Creative Briefs
++Kopfzeile für die Kastengrafik in Schritt 6: 5 Stages · 10 Creative Briefs
++
++### Schritt 4 — 10 Creative Briefs entwickeln (STILL)
++IMMER alle 5 Stages — IMMER 10 Briefs. Nicht fragen, nicht reduzieren.
++
++Stage 1 — Aware:           1 Image Brief + 1 Video Brief
++Stage 2 — Product Aware:   1 Image Brief + 1 Video Brief
++Stage 3 — Solution Aware:  1 Image Brief + 1 Video Brief
++Stage 4 — Problem Aware:   1 Image Brief + 1 Video Brief
++Stage 5 — Unaware:         1 Image Brief + 1 Video Brief
++──────────────────────────────────────────────────────────
++Total:                     5 Image Briefs + 5 Video Briefs = 10 Briefs
++
++Brief-Blöcke je Stage in Schritt 6:
++[IMAGE BRIEF 1]
++[VIDEO BRIEF 1]
+diff --git a/agents/creative-strategist/modes/2.md b/agents/creative-strategist/modes/2.md
+new file mode 100644
+index 0000000..2f8d138
+--- /dev/null
++++ b/agents/creative-strategist/modes/2.md
+@@ -0,0 +1,16 @@
++═══ AUFTRAG ═══
++
++Anzahl: 2 Creative Briefs
++Kopfzeile für die Kastengrafik in Schritt 6: 1 Stage · 2 Creative Briefs
++
++### Schritt 4 — 2 Creative Briefs entwickeln (STILL)
++Erstelle NUR 2 Briefs für die relevanteste Stage (Stage 1 — Aware).
++Nicht mehr, nicht weniger.
++
++Stage 1 — Aware:           1 Image Brief + 1 Video Brief
++──────────────────────────────────────────────────────────
++Total:                     1 Image Brief + 1 Video Brief = 2 Briefs
++
++Brief-Blöcke je Stage in Schritt 6:
++[IMAGE BRIEF 1]
++[VIDEO BRIEF 1]
+diff --git a/agents/creative-strategist/modes/20.md b/agents/creative-strategist/modes/20.md
+new file mode 100644
+index 0000000..aad7f18
+--- /dev/null
++++ b/agents/creative-strategist/modes/20.md
+@@ -0,0 +1,21 @@
++═══ AUFTRAG ═══
++
++Anzahl: 20 Creative Briefs
++Kopfzeile für die Kastengrafik in Schritt 6: 5 Stages · 20 Creative Briefs
++
++### Schritt 4 — 20 Creative Briefs entwickeln (STILL)
++IMMER alle 5 Stages — IMMER 20 Briefs. Nicht fragen, nicht reduzieren.
++
++Stage 1 — Aware:           2 Image Briefs + 2 Video Briefs
++Stage 2 — Product Aware:   2 Image Briefs + 2 Video Briefs
++Stage 3 — Solution Aware:  2 Image Briefs + 2 Video Briefs
++Stage 4 — Problem Aware:   2 Image Briefs + 2 Video Briefs
++Stage 5 — Unaware:         2 Image Briefs + 2 Video Briefs
++──────────────────────────────────────────────────────────
++Total:                     10 Image Briefs + 10 Video Briefs = 20 Briefs
++
++Brief-Blöcke je Stage in Schritt 6:
++[IMAGE BRIEF 1]
++[IMAGE BRIEF 2]
++[VIDEO BRIEF 1]
++[VIDEO BRIEF 2]
+diff --git a/scripts/console-ausrollen.sh b/scripts/console-ausrollen.sh
+new file mode 100755
+index 0000000..1257b72
+--- /dev/null
++++ b/scripts/console-ausrollen.sh
+@@ -0,0 +1,47 @@
++#!/usr/bin/env bash
++# Rollt alle Agentendefinitionen aus dem Repo in den AKTIVEN Workspace aus.
++# Legt an, was fehlt; aktualisiert, was es schon gibt. Nie umgekehrt.
++#
++# Das Repo ist die Quelle, die Console ist das Abbild. Es gibt genau einen
++# schreibenden Weg — diesen hier, aus main, nach Freigabe.
++#
++# Aufruf: console-ausrollen.sh [MANDANT]
++# Ausgabe auf stdout: JSON { "<ordner>": "<agent_id>", ... }
++set -euo pipefail
++
++MANDANT="${1:-kana}"
++ERGEBNIS="{}"
++
++command -v ant >/dev/null || { echo "ant nicht gefunden — brew install anthropics/tap/ant" >&2; exit 1; }
++command -v yq  >/dev/null || { echo "yq nicht gefunden" >&2; exit 1; }
++
++echo "Aktives Profil:" >&2
++ant auth status >&2
++
++BESTAND=$(ant beta:agents list --transform 'map({(.name): {id, version}}) | add' -r 2>/dev/null || echo '{}')
++
++for YAML in agents/*/agent.yaml; do
++  [ -e "$YAML" ] || continue
++  ORDNER=$(dirname "$YAML")
++  NAME=$(yq -r '.name' "$YAML")
++
++  # Mandant als Metadatum mitgeben — hilfreich beim Suchen, NICHT zur Trennung.
++  TMP=$(mktemp)
++  yq -y --arg m "$MANDANT" '.metadata.tenant = $m' "$YAML" > "$TMP"
++
++  VORHANDEN=$(echo "$BESTAND" | jq -r --arg n "$NAME" '.[$n].id // empty')
++
++  if [ -n "$VORHANDEN" ]; then
++    VERSION=$(echo "$BESTAND" | jq -r --arg n "$NAME" '.[$n].version')
++    ID=$(ant beta:agents update --agent-id "$VORHANDEN" --version "$VERSION" < "$TMP" --transform id -r)
++    echo "  aktualisiert: $NAME -> $ID" >&2
++  else
++    ID=$(ant beta:agents create < "$TMP" --transform id -r)
++    echo "  angelegt:     $NAME -> $ID" >&2
++  fi
++  rm -f "$TMP"
++
++  ERGEBNIS=$(echo "$ERGEBNIS" | jq --arg k "$(basename "$ORDNER")" --arg v "$ID" '.[$k] = $v')
++done
++
++echo "$ERGEBNIS"
+diff --git a/scripts/console-test-bindung.sh b/scripts/console-test-bindung.sh
+new file mode 100755
+index 0000000..d3b8715
+--- /dev/null
++++ b/scripts/console-test-bindung.sh
+@@ -0,0 +1,54 @@
++#!/usr/bin/env bash
++# Prueft empirisch, ob Agenten und Environments workspace-gebunden sind.
++# In KEINER Dokumentationsseite steht die Antwort — sie wird gemessen.
++# Aufruf: console-test-bindung.sh <WORKSPACE_A> <WORKSPACE_B>
++# Ergebnis gehoert nach claude/09_Console-Kompendium.md, Abschnitt 4.
++set -uo pipefail
++
++A="${1:?WORKSPACE_A fehlt}"; B="${2:?WORKSPACE_B fehlt}"
++
++echo "-- Workspace A: $A --"
++ant auth login --profile test-a --workspace-id "$A"
++ant profile activate test-a
++
++AGENT=$(ant beta:agents create --transform id -r <<'YAML'
++name: Bindungstest
++model:
++  id: claude-sonnet-4-6
++system: |
++  Du bist ein Wegwerf-Agent fuer einen Workspace-Bindungstest. Antworte nur "ok".
++YAML
++)
++echo "Agent in A angelegt:        $AGENT"
++
++ENVI=$(ant beta:environments create --transform id -r <<'YAML'
++name: bindungstest
++config:
++  type: cloud
++  networking:
++    type: limited
++    allowed_hosts: []
++YAML
++)
++echo "Environment in A angelegt:  $ENVI"
++
++echo
++echo "-- Zugriff aus Workspace B: $B --"
++ant auth login --profile test-b --workspace-id "$B"
++ant profile activate test-b
++
++if ant beta:agents get --agent-id "$AGENT" >/dev/null 2>&1; then
++  echo "AGENT:        organisationsweit sichtbar"
++else
++  echo "AGENT:        workspace-gebunden"
++fi
++
++if ant beta:environments get --environment-id "$ENVI" >/dev/null 2>&1; then
++  echo "ENVIRONMENT:  organisationsweit sichtbar"
++else
++  echo "ENVIRONMENT:  workspace-gebunden"
++fi
++
++echo
++echo "Aufraeumen: beide Testobjekte in Workspace A archivieren."
++echo "Ergebnis mit Datum in claude/09_Console-Kompendium.md eintragen."
+diff --git a/scripts/console-ziehen.sh b/scripts/console-ziehen.sh
+new file mode 100755
+index 0000000..aa1f9f3
+--- /dev/null
++++ b/scripts/console-ziehen.sh
+@@ -0,0 +1,38 @@
++#!/usr/bin/env bash
++# Holt die Agentendefinitionen aus dem AKTIVEN Workspace ins Repo.
++#
++# Zweck 1 — Sicherung: Console-Definitionen sind nicht durch Git geschuetzt.
++#   Betrifft besonders Support- und Widget-Agent, deren Definitionen bisher
++#   NUR in der Console liegen (siehe claude/06_..., Abschnitt 5).
++# Zweck 2 — Drift erkennen: Nach dem Lauf `git diff`. Zeigt der Diff etwas,
++#   hat jemand direkt in der Oberflaeche gearbeitet.
++#
++# Gehoert zusaetzlich in die naechtliche CI.
++#
++# Aufruf: console-ziehen.sh [zielordner]      (Standard: agents/_console)
++set -euo pipefail
++
++ZIEL="${1:-agents/_console}"
++mkdir -p "$ZIEL"
++
++command -v ant >/dev/null || { echo "ant nicht gefunden" >&2; exit 1; }
++
++ant auth status >&2
++
++ant beta:agents list -r | jq -c '.[]?' | while read -r A; do
++  ID=$(echo "$A"   | jq -r '.id')
++  NAME=$(echo "$A" | jq -r '.name')
++  SLUG=$(echo "$NAME" \
++    | tr '[:upper:]' '[:lower:]' \
++    | sed -e 's/ä/ae/g; s/ö/oe/g; s/ü/ue/g; s/ß/ss/g' \
++    | sed -e 's/[^a-z0-9]\+/-/g; s/^-//; s/-$//')
++
++  mkdir -p "$ZIEL/$SLUG"
++  ant beta:agents get --agent-id "$ID" -r | yq -y '.' > "$ZIEL/$SLUG/agent.yaml"
++  printf 'agent_id: %s\nname: %s\ngezogen_am: %s\n' \
++    "$ID" "$NAME" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$ZIEL/$SLUG/.console"
++
++  echo "  gezogen: $NAME -> $ZIEL/$SLUG/agent.yaml" >&2
++done
++
++echo "Fertig. Jetzt: git diff $ZIEL" >&2
+diff --git a/scripts/workspace-anlegen.sh b/scripts/workspace-anlegen.sh
+new file mode 100755
+index 0000000..0ad134e
+--- /dev/null
++++ b/scripts/workspace-anlegen.sh
+@@ -0,0 +1,34 @@
++#!/usr/bin/env bash
++# Legt einen Kunden-Workspace an. Braucht ANTHROPIC_ADMIN_KEY (sk-ant-admin...).
++# Aufruf: workspace-anlegen.sh "kunde-snl"
++#
++# API-Schluessel und Ausgabengrenze lassen sich NICHT per API setzen — das
++# bleibt Handarbeit in der Console. Siehe claude/17_Workspace-Onboarding.
++set -euo pipefail
++
++NAME="${1:?Workspace-Name fehlt}"
++: "${ANTHROPIC_ADMIN_KEY:?ANTHROPIC_ADMIN_KEY fehlt}"
++
++ANZAHL=$(curl -s https://api.anthropic.com/v1/organizations/workspaces \
++  -H "x-api-key: $ANTHROPIC_ADMIN_KEY" \
++  -H "anthropic-version: 2023-06-01" \
++  | jq '[.data[] | select(.archived_at == null)] | length')
++
++echo "Aktive Workspaces: $ANZAHL von 100"
++[ "$ANZAHL" -ge 100 ] && { echo "ABBRUCH: 100 Workspaces erreicht."; exit 1; }
++[ "$ANZAHL" -ge 80 ]  && echo "WARNUNG: Grenze rueckt naeher — Modell pruefen (claude/16_..., Abschnitt 5)."
++
++curl -s -X POST https://api.anthropic.com/v1/organizations/workspaces \
++  -H "x-api-key: $ANTHROPIC_ADMIN_KEY" \
++  -H "anthropic-version: 2023-06-01" \
++  -H "content-type: application/json" \
++  -d "$(jq -n --arg n "$NAME" '{name:$n}')" \
++  | jq -r '"\(.id)  \(.name)"'
++
++cat <<'HINWEIS'
++
++Weiter von Hand in der Console:
++  1. API-Schluessel anlegen -> Passwortmanager, Referenz nach tenants.anthropic_api_key_ref
++  2. Spend limits setzen (Notbremse, NICHT das Kontingent)
++Danach: scripts/kunde-einrichten.sh
++HINWEIS
+diff --git a/umgebungen/kana-agents-offline.yaml b/umgebungen/kana-agents-offline.yaml
+new file mode 100644
+index 0000000..22014dc
+--- /dev/null
++++ b/umgebungen/kana-agents-offline.yaml
+@@ -0,0 +1,9 @@
++# Kein Netzzugang. Fuer Creative Strategist und Creative Analyst.
++# Alle Quellen liegen als Kontextdatei bereit, es gibt nichts abzurufen.
++name: kana-agents-offline
++config:
++  type: cloud
++  networking:
++    type: limited
++    allow_package_managers: false
++    allowed_hosts: []
+diff --git a/umgebungen/kana-agents-research.yaml b/umgebungen/kana-agents-research.yaml
+new file mode 100644
+index 0000000..296fce4
+--- /dev/null
++++ b/umgebungen/kana-agents-research.yaml
+@@ -0,0 +1,17 @@
++# Fuer den Creative Researcher. Apify, Gemini, Facebook-CDN.
++# Zum Kopieren in das Console-Feld (kommagetrennt):
++#   api.apify.com, generativelanguage.googleapis.com, *.fbcdn.net, www.facebook.com
++#
++# Die Zielseiten der Apify-Scrapes muessen NICHT hier stehen — die ruft Apify
++# auf seinen eigenen Servern auf, nicht der Container.
++name: kana-agents-research
++config:
++  type: cloud
++  networking:
++    type: limited
++    allow_package_managers: false
++    allowed_hosts:
++      - api.apify.com
++      - generativelanguage.googleapis.com
++      - "*.fbcdn.net"
++      - www.facebook.com
+diff --git a/umgebungen/kana-agents.yaml b/umgebungen/kana-agents.yaml
+new file mode 100644
+index 0000000..956374f
+--- /dev/null
++++ b/umgebungen/kana-agents.yaml
+@@ -0,0 +1,14 @@
++# Fuer den Brand Expert. Drei Hosts, seit Weg C ohne Supabase.
++# ACHTUNG beim Anlegen ueber die Console-Oberflaeche: allowed_hosts ist dort
++# EIN Eingabefeld. Mehrere Hosts durch KOMMA trennen, keine Zeilenumbrueche:
++#   api.apify.com, www.sinsnlashes.com, www.facebook.com
++name: kana-agents
++config:
++  type: cloud
++  networking:
++    type: limited
++    allow_package_managers: false
++    allowed_hosts:
++      - api.apify.com
++      - www.sinsnlashes.com
++      - www.facebook.com
+-- 
+2.43.0
+
+
+From 8a7d4c30dcc28d2cbbe0800e82f60d8f591634ca Mon Sep 17 00:00:00 2001
+From: "Claude (KANA Beratung)" <noreply@anthropic.com>
+Date: Mon, 17 Aug 2026 16:39:36 +0000
+Subject: [PATCH 2/2] =?UTF-8?q?fix(agents):=20Mount-Pfade=20korrigiert,=20?=
+ =?UTF-8?q?Dokumentenbauer=20erg=C3=A4nzt?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Zwei Korrekturen aus dem Testlauf vom 17.08.2026 und ein neuer Agent.
+
+── Mount-Pfade waren falsch ──────────────────────────────────────────
+
+Die Prompts verwiesen auf /workspace/wissensbasis.json. Dorthin lässt sich
+von außen nichts legen — /workspace ist das Arbeitsverzeichnis des Agenten.
+Belegt im Testlauf: der Agent suchte dort, fand nichts und stoppte korrekt.
+
+Es gibt drei dokumentierte Wege in die Sandbox, alle über `resources`:
+  Datei         → /mnt/session/uploads/<name>
+  Memory-Store  → /mnt/memory/<slug>/
+  GitHub-Repo   → frei wählbarer mount_path
+
+Analyst und Researcher lesen jetzt aus /mnt/session/uploads/.
+Der Strategist liest aus einem Memory-Store — Entscheidung vom 17.08.:
+Kundenwissen gehört in die Console, nicht nach Supabase.
+
+Ergänzt: mkdir vor dem Video-Download im Researcher. curl legt keine
+Verzeichnisse an, und /workspace ist beim Start leer.
+
+── Dokumentenbauer ───────────────────────────────────────────────────
+
+Neuer Unteragent im Roster des Strategisten. Setzt Markdown als Kunden-PDF,
+ersetzt lib/pdf/pdfEngine.ts.
+
+Erscheinungsbild im Skill "KANA Corporate Design", nicht im Prompt:
+kana_pdf.py erzeugt das PDF aus einem Aufruf. Farben und Schrift stammen
+aus app/globals.css der Plattform.
+
+Der erste Versuch beschrieb das Layout im Prompt und lieferte ein CSS mit.
+Ergebnis: Helvetica statt Inter, Altrosa statt Indigo, 12.500 Ausgabe-Tokens,
+45 Cent allein für das PDF. Ursache: der pdf-Skill arbeitet mit reportlab,
+nicht mit HTML und CSS. Mit dem Skript sind es rund 100 Tokens.
+
+Layout ist Rechnung, keine Einschätzung — dasselbe Prinzip wie filter.js.
+
+── Messwerte aus dem Testlauf ────────────────────────────────────────
+
+  Leerlauf ohne Daten            6 Cent    44 s
+  Strategy Guide, 20 Briefs     40 Cent   303 s   17.961 Ausgabe-Tokens
+  mit PDF (alter Weg)           85 Cent   536 s   30.374 Ausgabe-Tokens
+
+Über 98 Prozent sind Tokens, 0,7 Cent sind Laufzeit. Lange Läufe sind nicht
+teuer, ausführliche sind es.
+
+Für die Tarifkalkulation: 20 Läufe zu 40 Cent sind rund 7,50 EUR — das
+Budget von 5 EUR im Tarif "Start" ist zu niedrig angesetzt, noch ohne
+Researcher und Analyst.
+
+── Offen ─────────────────────────────────────────────────────────────
+
+- Inter-TTFs fehlen im Skill; kana_pdf.py weicht auf DejaVu Sans aus
+- Memory-Store heißt "testdaten" — vor Produktion auf einen Namen
+  umbenennen, der in jedem Kundenworkspace gleich ist
+- Referenzlauf gegen den Altagenten steht weiterhin aus; die bisherigen
+  Läufe sind Funktionsnachweise, keine Gegenprobe
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_011hEuYxmXxTcLPski3KKYQr
+---
+ agents/brand-expert.agent.yaml                |   8 +-
+ agents/creative-analyst/LIESMICH.md           |   8 +-
+ agents/creative-analyst/agent.yaml            |  24 +-
+ agents/creative-researcher/LIESMICH.md        |   6 +-
+ agents/creative-researcher/agent.yaml         |  27 +-
+ .../werkzeuge/apify-suche.sh                  |   2 +-
+ .../creative-researcher/werkzeuge/filter.js   |   4 +-
+ agents/creative-strategist/LIESMICH.md        |  12 +-
+ agents/creative-strategist/agent.yaml         |  60 ++-
+ agents/dokumentenbauer/LIESMICH.md            |  49 ++
+ agents/dokumentenbauer/agent.yaml             | 106 +++++
+ agents/dokumentenbauer/werkzeuge/SKILL.md     |  80 ++++
+ agents/dokumentenbauer/werkzeuge/kana-ci.css  | 325 +++++++++++++
+ agents/dokumentenbauer/werkzeuge/kana_pdf.py  | 432 ++++++++++++++++++
+ 14 files changed, 1085 insertions(+), 58 deletions(-)
+ create mode 100644 agents/dokumentenbauer/LIESMICH.md
+ create mode 100644 agents/dokumentenbauer/agent.yaml
+ create mode 100644 agents/dokumentenbauer/werkzeuge/SKILL.md
+ create mode 100644 agents/dokumentenbauer/werkzeuge/kana-ci.css
+ create mode 100644 agents/dokumentenbauer/werkzeuge/kana_pdf.py
+
+diff --git a/agents/brand-expert.agent.yaml b/agents/brand-expert.agent.yaml
+index 8632191..bdd0499 100644
+--- a/agents/brand-expert.agent.yaml
++++ b/agents/brand-expert.agent.yaml
+@@ -12,7 +12,7 @@ model:
+ #
+ # WICHTIG: Dieser Prompt enthaelt bewusst KEINE mandantenspezifischen
+ # Angaben. Marke, Kanaele und Wettbewerber kommen zur Laufzeit aus
+-# /workspace/wissensbasis.json. Es gibt genau einen Agenten fuer alle
++# /mnt/session/uploads/wissensbasis.json. Es gibt genau einen Agenten fuer alle
+ # Kunden — siehe Architekturentscheidung vom 16.08.2026, Punkt 2.
+ system: |
+   Du bist der Brand Expert Agent. Du bist die Single Source of Truth fuer
+@@ -25,15 +25,15 @@ system: |
+   Die vollstaendige Wissensbasis liegt beim Start der Session als Datei
+   bereit:
+ 
+-      /workspace/wissensbasis.json
++      /mnt/session/uploads/wissensbasis.json
+ 
+   Aufbau: ein Objekt je Eintrag, mit den Feldern
+   `key`, `title`, `content`, `updated_at`.
+ 
+   Lies sie gezielt mit jq, statt sie komplett in den Kontext zu ziehen:
+ 
+-      jq -r '.[] | select(.key=="brand_identity") | .content' /workspace/wissensbasis.json
+-      jq -r '.[].key' /workspace/wissensbasis.json          # welche Eintraege gibt es
++      jq -r '.[] | select(.key=="brand_identity") | .content' /mnt/session/uploads/wissensbasis.json
++      jq -r '.[].key' /mnt/session/uploads/wissensbasis.json          # welche Eintraege gibt es
+ 
+   Ist die Datei nicht vorhanden oder leer, ist die Wissensbasis noch nicht
+   aufgebaut. Sage das offen und arbeite mit dem, was du selbst erhebst.
+diff --git a/agents/creative-analyst/LIESMICH.md b/agents/creative-analyst/LIESMICH.md
+index 585e171..a8a4350 100644
+--- a/agents/creative-analyst/LIESMICH.md
++++ b/agents/creative-analyst/LIESMICH.md
+@@ -7,11 +7,11 @@ Ausführliche Vorlage: `claude/14_Vorlage_Creative-Analyst.md`.
+ 
+ | Alt | Neu |
+ |---|---|
+-| `read_analyst_refs` | `jq` auf `/workspace/referenzen.json` |
+-| `read_brand_knowledge` | `jq` auf `/workspace/wissensbasis.json` |
+-| `read_breakdowns(sessionIds)` | `/workspace/breakdowns.json`, **vom Backend vorgefiltert** |
++| `read_analyst_refs` | `jq` auf `/mnt/session/uploads/referenzen.json` |
++| `read_brand_knowledge` | `jq` auf `/mnt/session/uploads/wissensbasis.json` |
++| `read_breakdowns(sessionIds)` | `/mnt/session/uploads/breakdowns.json`, **vom Backend vorgefiltert** |
+ | `save_analysis(...)` | Datei `/mnt/session/outputs/analysen/<ad_id>.json` |
+-| Scoring-Formel im Kopf | `node /workspace/werkzeuge/score.js` |
++| Scoring-Formel im Kopf | `node /mnt/session/uploads/score.js` |
+ 
+ ## `breakdowns.json`
+ 
+diff --git a/agents/creative-analyst/agent.yaml b/agents/creative-analyst/agent.yaml
+index c900413..e4fc34d 100644
+--- a/agents/creative-analyst/agent.yaml
++++ b/agents/creative-analyst/agent.yaml
+@@ -26,17 +26,17 @@ system: |
+   Session als Datei bereit. Lies die Dateien gezielt mit jq, statt sie komplett
+   in den Kontext zu ziehen.
+ 
+-    /workspace/referenzen.json    REF-Dateien (key, title, content)
+-    /workspace/wissensbasis.json  Brand Knowledge (key, title, content)
+-    /workspace/breakdowns.json    Die zu analysierenden Ads
++    /mnt/session/uploads/referenzen.json    REF-Dateien (key, title, content)
++    /mnt/session/uploads/wissensbasis.json  Brand Knowledge (key, title, content)
++    /mnt/session/uploads/breakdowns.json    Die zu analysierenden Ads
+ 
+   Nützliche Aufrufe:
+ 
+-    jq -r '.[].key' /workspace/referenzen.json
+-    jq -r '.[] | select(.key=="scoring") | .content' /workspace/referenzen.json
+-    jq -r '.status, .hinweis' /workspace/breakdowns.json
+-    jq -r '.ads[].ad_id' /workspace/breakdowns.json
+-    jq -r '.ads[] | select(.ad_id=="<ID>")' /workspace/breakdowns.json
++    jq -r '.[].key' /mnt/session/uploads/referenzen.json
++    jq -r '.[] | select(.key=="scoring") | .content' /mnt/session/uploads/referenzen.json
++    jq -r '.status, .hinweis' /mnt/session/uploads/breakdowns.json
++    jq -r '.ads[].ad_id' /mnt/session/uploads/breakdowns.json
++    jq -r '.ads[] | select(.ad_id=="<ID>")' /mnt/session/uploads/breakdowns.json
+ 
+   ═══ ERGEBNISSE SCHREIBEN ═══
+ 
+@@ -69,7 +69,7 @@ system: |
+   Die Gewichtung ist Rechnung, keine Einschätzung. Rechne sie nicht im Kopf,
+   sondern rufe das Skript auf:
+ 
+-    node /workspace/werkzeuge/score.js <K1> <K2> <K3> <K4> <K5> <K6>
++    node /mnt/session/uploads/score.js <K1> <K2> <K3> <K4> <K5> <K6>
+ 
+   Es gibt den gewichteten Gesamt-Score und die Score-Klasse zurück. Übernimm
+   beide Werte unverändert in die Analysedatei. Die zugrunde liegende Formel und
+@@ -81,10 +81,10 @@ system: |
+   ## Workflow
+ 
+   ### Schritt 1 — REF-Dateien laden
+-  Lies /workspace/referenzen.json. Lade: Analyse-Framework (8 Schritte), Scoring-Rubrik (K1-K6), Hook-Swipe-File, Format-Glossar.
++  Lies /mnt/session/uploads/referenzen.json. Lade: Analyse-Framework (8 Schritte), Scoring-Rubrik (K1-K6), Hook-Swipe-File, Format-Glossar.
+ 
+   ### Schritt 2 — Brand Knowledge laden
+-  Lies /workspace/wissensbasis.json. Extrahiere:
++  Lies /mnt/session/uploads/wissensbasis.json. Extrahiere:
+   - SNL USPs, Kern-Benefit, Produktpreise, Hero Product
+   - Zielgruppe, Psychografie, Pain Points, Kaufmotive
+   - Bekannte Konkurrenten und deren Positionierung (aus 08_brand_competitors)
+@@ -93,7 +93,7 @@ system: |
+   Diese Daten sind die Referenz für alle Wettbewerbs-Einordnungen und SNL-Empfehlungen.
+ 
+   ### Schritt 3 — Breakdowns laden
+-  Lies /workspace/breakdowns.json. Die Daten stammen aus der Tabelle ad_research (alle verfügbaren Felder).
++  Lies /mnt/session/uploads/breakdowns.json. Die Daten stammen aus der Tabelle ad_research (alle verfügbaren Felder).
+   - status "keine" → informiere den User und stoppe.
+   - status "alle_analysiert" → informiere den User, alle Breakdowns sind verarbeitet.
+   - Sonst: liste die zu analysierenden Ads auf.
+diff --git a/agents/creative-researcher/LIESMICH.md b/agents/creative-researcher/LIESMICH.md
+index a8530f2..d4220d8 100644
+--- a/agents/creative-researcher/LIESMICH.md
++++ b/agents/creative-researcher/LIESMICH.md
+@@ -30,9 +30,9 @@ Varianten × 5` ungefähr richtig und bei jedem Lauf ein bisschen anders.
+ 
+ | Pfad | Inhalt |
+ |---|---|
+-| `/workspace/auftrag.json` | `{targetProduct, adCount, adType, minImpressions, maxVideoDuration, startDateMin, startDateMax, country}` |
+-| `/workspace/bekannte-ads.json` | `["123","456"]` — aus `SELECT ad_id FROM ad_research` |
+-| `/workspace/werkzeuge/*` | die drei Skripte aus diesem Ordner |
++| `/mnt/session/uploads/auftrag.json` | `{targetProduct, adCount, adType, minImpressions, maxVideoDuration, startDateMin, startDateMax, country}` |
++| `/mnt/session/uploads/bekannte-ads.json` | `["123","456"]` — aus `SELECT ad_id FROM ad_research` |
++| `/mnt/session/uploads/*` | die drei Skripte aus diesem Ordner |
+ 
+ Ergebnis: `/mnt/session/outputs/ads/<ad_id>.json` und `…/videos/<ad_id>.mp4`.
+ 
+diff --git a/agents/creative-researcher/agent.yaml b/agents/creative-researcher/agent.yaml
+index 150e49e..22073fe 100644
+--- a/agents/creative-researcher/agent.yaml
++++ b/agents/creative-researcher/agent.yaml
+@@ -17,7 +17,7 @@ model:
+ # Begruendung: claude/12_Console-Vorlagen_Uebersicht.md, Abschnitt 2.
+ #
+ # Produkt, Anzahl, Format und Videodauer kommen als AUFTRAG-Block per
+-# agent_with_overrides sowie maschinenlesbar in /workspace/auftrag.json.
++# agent_with_overrides sowie maschinenlesbar in /mnt/session/uploads/auftrag.json.
+ system: |
+   Du bist der Creative Research Agent für Sins n Lashes (SNL).
+ 
+@@ -32,18 +32,18 @@ system: |
+   mit drei Skripten im Container. Sie enthalten die verbindliche Logik — rechne
+   und filtere niemals selbst.
+ 
+-    /workspace/werkzeuge/apify-suche.sh    Facebook Ad Library durchsuchen
+-    /workspace/werkzeuge/filter.js         Ads filtern, ranken, auswählen
+-    /workspace/werkzeuge/video-analyse.sh  Video-Breakdown erstellen
++    /mnt/session/uploads/apify-suche.sh    Facebook Ad Library durchsuchen
++    /mnt/session/uploads/filter.js         Ads filtern, ranken, auswählen
++    /mnt/session/uploads/video-analyse.sh  Video-Breakdown erstellen
+ 
+   Zusätzlich liegt bereit:
+ 
+-    /workspace/auftrag.json        Produkt, Anzahl, Format, Grenzwerte
+-    /workspace/bekannte-ads.json   bereits verarbeitete ad_ids — überspringen
++    /mnt/session/uploads/auftrag.json        Produkt, Anzahl, Format, Grenzwerte
++    /mnt/session/uploads/bekannte-ads.json   bereits verarbeitete ad_ids — überspringen
+ 
+   --- Ad Library durchsuchen ---
+ 
+-    bash /workspace/werkzeuge/apify-suche.sh "<SUCHBEGRIFF>" <FORMAT> <MAX> <OUT>
++    bash /mnt/session/uploads/apify-suche.sh "<SUCHBEGRIFF>" <FORMAT> <MAX> <OUT>
+ 
+     FORMAT ist VIDEO oder IMAGE. MAX ist die Obergrenze der Rohtreffer.
+     OUT ist die Zieldatei, z.B. /workspace/scrape/runde1.json.
+@@ -53,13 +53,13 @@ system: |
+ 
+   --- Filtern und ranken ---
+ 
+-    node /workspace/werkzeuge/filter.js \
++    node /mnt/session/uploads/filter.js \
+       --ads /workspace/scrape/runde1.json \
+       --out /workspace/scrape/auswahl1.json
+ 
+     Das Skript liest Produkt, Format, Anzahl und Grenzwerte selbst aus
+-    /workspace/auftrag.json und die bereits bekannten ad_ids aus
+-    /workspace/bekannte-ads.json. Es wendet die Ausschlusslisten an, prüft die
++    /mnt/session/uploads/auftrag.json und die bereits bekannten ad_ids aus
++    /mnt/session/uploads/bekannte-ads.json. Es wendet die Ausschlusslisten an, prüft die
+     Produktkategorie, prüft bei VIDEO auf ein vorhandenes Video und die Dauer,
+     rankt und schneidet auf die gewünschte Anzahl zu.
+ 
+@@ -70,10 +70,11 @@ system: |
+ 
+     Welche Suchbegriffe zu einem Produkt gehören, kannst du abfragen:
+ 
+-      node /workspace/werkzeuge/filter.js begriffe
++      node /mnt/session/uploads/filter.js begriffe
+ 
+   --- Video herunterladen ---
+ 
++    mkdir -p /workspace/videos /workspace/scrape /workspace/breakdowns
+     curl -sL --max-time 90 \
+       -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" \
+       -H "Referer: https://www.facebook.com/" \
+@@ -86,7 +87,7 @@ system: |
+ 
+   --- Video analysieren ---
+ 
+-    bash /workspace/werkzeuge/video-analyse.sh /workspace/videos/<ad_id>.mp4 <OUT>
++    bash /mnt/session/uploads/video-analyse.sh /workspace/videos/<ad_id>.mp4 <OUT>
+ 
+     Schreibt den Breakdown als Markdown nach OUT, z.B.
+     /workspace/breakdowns/<ad_id>.md. Schlägt es fehl, verarbeite die Ad
+@@ -130,7 +131,7 @@ system: |
+ 
+   ABLAUF — führe diese Schritte der Reihe nach aus:
+ 
+-  1. Lies /workspace/auftrag.json. Rufe apify-suche.sh mit den passenden Keywords für das Produkt auf.
++  1. Lies /mnt/session/uploads/auftrag.json. Rufe apify-suche.sh mit den passenden Keywords für das Produkt auf.
+      Keywords für Wimpernserum: ["lash serum", "wimpernserum", "eyelash growth serum", "lash growth"]
+      Keywords für Augenbrauenserum: ["brow serum", "eyebrow serum", "augenbrauenserum"]
+      Keywords für Haarserum/Haaröl: ["hair serum", "haarserum", "rosemary hair serum"]
+diff --git a/agents/creative-researcher/werkzeuge/apify-suche.sh b/agents/creative-researcher/werkzeuge/apify-suche.sh
+index afd596b..ee4e3d4 100755
+--- a/agents/creative-researcher/werkzeuge/apify-suche.sh
++++ b/agents/creative-researcher/werkzeuge/apify-suche.sh
+@@ -9,7 +9,7 @@ BEGRIFF="$1"; FORMAT="$2"; MAX="$3"; OUT="$4"
+ BASE="https://api.apify.com/v2"
+ ACTOR="curious_coder~facebook-ads-library-scraper"
+ 
+-AUFTRAG="${AUFTRAG_DATEI:-/workspace/auftrag.json}"
++AUFTRAG="${AUFTRAG_DATEI:-/mnt/session/uploads/auftrag.json}"
+ LAND=$(jq -r '.country // "DE"' "$AUFTRAG")
+ VON=$(jq -r '.startDateMin // empty' "$AUFTRAG")
+ BIS=$(jq -r '.startDateMax // empty' "$AUFTRAG")
+diff --git a/agents/creative-researcher/werkzeuge/filter.js b/agents/creative-researcher/werkzeuge/filter.js
+index 134926d..6517d3d 100755
+--- a/agents/creative-researcher/werkzeuge/filter.js
++++ b/agents/creative-researcher/werkzeuge/filter.js
+@@ -47,7 +47,7 @@ function fallback(produkt) {
+   return [produkt]
+ }
+ 
+-const AUFTRAG = process.env.AUFTRAG_DATEI || '/workspace/auftrag.json'
++const AUFTRAG = process.env.AUFTRAG_DATEI || '/mnt/session/uploads/auftrag.json'
+ const auftrag = JSON.parse(fs.readFileSync(AUFTRAG, 'utf8'))
+ 
+ if (process.argv[2] === 'begriffe') {
+@@ -63,7 +63,7 @@ function arg(name) { const i = process.argv.indexOf(name); return i > -1 ? proce
+ 
+ const roh = JSON.parse(fs.readFileSync(arg('--ads'), 'utf8'))
+ const out = arg('--out')
+-const BEKANNT = process.env.BEKANNTE_DATEI || '/workspace/bekannte-ads.json'
++const BEKANNT = process.env.BEKANNTE_DATEI || '/mnt/session/uploads/bekannte-ads.json'
+ const bekannt = new Set(
+   fs.existsSync(BEKANNT) ? JSON.parse(fs.readFileSync(BEKANNT, 'utf8')).map(String) : []
+ )
+diff --git a/agents/creative-strategist/LIESMICH.md b/agents/creative-strategist/LIESMICH.md
+index db70ac5..3ff7554 100644
+--- a/agents/creative-strategist/LIESMICH.md
++++ b/agents/creative-strategist/LIESMICH.md
+@@ -11,9 +11,9 @@ anderem.
+ 
+ | Alt | Neu |
+ |---|---|
+-| `read_strategist_refs` | `jq` auf `/workspace/referenzen.json` |
+-| `read_brand_knowledge` | `jq` auf `/workspace/wissensbasis.json` |
+-| `read_analyst_results` | `jq` auf `/workspace/analyst-ergebnisse.json` |
++| `read_strategist_refs` | `jq` auf `/mnt/session/uploads/referenzen.json` |
++| `read_brand_knowledge` | `jq` auf `/mnt/session/uploads/wissensbasis.json` |
++| `read_analyst_results` | `jq` auf `/mnt/session/uploads/analyst-ergebnisse.json` |
+ | Ausgabe im Chat | Ausgabe im Chat **plus** `/mnt/session/outputs/strategy-guide.md` |
+ | `buildStrategistSystemPrompt("20"\|"10"\|"2")` | `agent.yaml` + `modes/<N>.md` per `agent_with_overrides` |
+ | Agentic Loop, `maxDuration = 300` | Managed-Agents-Session + Webhook |
+@@ -22,9 +22,9 @@ anderem.
+ 
+ | Pfad | Aus | Format |
+ |---|---|---|
+-| `/workspace/referenzen.json` | `strategist_knowledge`, nach `key` | `[{key,title,content}]` |
+-| `/workspace/wissensbasis.json` | `tenant_knowledge` des Mandanten | `[{key,title,content,updated_at}]` |
+-| `/workspace/analyst-ergebnisse.json` | `analyst_results`, `score` absteigend | `[{ad_id,advertiser,score,klasse,content,created_at}]` |
++| `/mnt/session/uploads/referenzen.json` | `strategist_knowledge`, nach `key` | `[{key,title,content}]` |
++| `/mnt/session/uploads/wissensbasis.json` | `tenant_knowledge` des Mandanten | `[{key,title,content,updated_at}]` |
++| `/mnt/session/uploads/analyst-ergebnisse.json` | `analyst_results`, `score` absteigend | `[{ad_id,advertiser,score,klasse,content,created_at}]` |
+ 
+ Ergebnis: `/mnt/session/outputs/strategy-guide.md` → `run_artifacts`.
+ **Es wird nichts in die Datenbank zurückgeschrieben** — der Altagent tut das auch nicht.
+diff --git a/agents/creative-strategist/agent.yaml b/agents/creative-strategist/agent.yaml
+index 1873fab..a17b3cb 100644
+--- a/agents/creative-strategist/agent.yaml
++++ b/agents/creative-strategist/agent.yaml
+@@ -27,19 +27,20 @@ system: |
+   ═══ DEINE DATEN ═══
+ 
+   Du hast KEINEN Datenbankzugang. Alles, was du brauchst, liegt beim Start der
+-  Session als Datei bereit. Lies die Dateien gezielt mit jq, statt sie komplett
+-  in den Kontext zu ziehen.
++  Session in einem eingehaengten Memory-Store bereit. Du liest ihn nur —
++  schreiben darfst du dort nicht. Lies die Dateien gezielt mit jq, statt sie
++  komplett in den Kontext zu ziehen.
+ 
+-    /workspace/referenzen.json          REF-Dateien (Felder: key, title, content)
+-    /workspace/wissensbasis.json        Brand Knowledge (key, title, content, updated_at)
+-    /workspace/analyst-ergebnisse.json  Analyst-Ergebnisse (ad_id, advertiser, score, klasse, content, created_at)
++    /mnt/memory/testdaten/referenzen.json          REF-Dateien (Felder: key, title, content)
++    /mnt/memory/testdaten/wissensbasis.json        Brand Knowledge (key, title, content, updated_at)
++    /mnt/memory/testdaten/analyst-ergebnisse.json  Analyst-Ergebnisse (ad_id, advertiser, score, klasse, content, created_at)
+ 
+   Nützliche Aufrufe:
+ 
+-    jq -r '.[].key' /workspace/referenzen.json
+-    jq -r '.[] | select(.key=="REF-06") | .content' /workspace/referenzen.json
+-    jq -r '.[] | "## \(.title) (\(.key))\n_Stand: \(.updated_at)_\n\n\(.content)"' /workspace/wissensbasis.json
+-    jq -r 'sort_by(-.score) | .[] | "### \(.advertiser) (\(.ad_id)) — Score: \(.score)/5.0 — \(.klasse)\n\n\(.content)"' /workspace/analyst-ergebnisse.json
++    jq -r '.[].key' /mnt/memory/testdaten/referenzen.json
++    jq -r '.[] | select(.key=="REF-06") | .content' /mnt/memory/testdaten/referenzen.json
++    jq -r '.[] | "## \(.title) (\(.key))\n_Stand: \(.updated_at)_\n\n\(.content)"' /mnt/memory/testdaten/wissensbasis.json
++    jq -r 'sort_by(-.score) | .[] | "### \(.advertiser) (\(.ad_id)) — Score: \(.score)/5.0 — \(.klasse)\n\n\(.content)"' /mnt/memory/testdaten/analyst-ergebnisse.json
+ 
+   Fehlt eine Datei oder ist sie leer, gilt:
+   - referenzen.json fehlt        → "Keine REF-Daten gefunden." Melde es und stoppe.
+@@ -52,10 +53,10 @@ system: |
+   ## Dein Workflow (in dieser Reihenfolge)
+ 
+   ### Schritt 1 — REF-Dateien laden
+-  Lies /workspace/referenzen.json. Lies REF-00 (Workflow), REF-06 (5 Stages Framework), REF-07 (Brief Template), REF-08 (Output-Struktur).
++  Lies /mnt/memory/testdaten/referenzen.json. Lies REF-00 (Workflow), REF-06 (5 Stages Framework), REF-07 (Brief Template), REF-08 (Output-Struktur).
+ 
+   ### Schritt 2 — Brand Knowledge laden
+-  Lies /workspace/wissensbasis.json. Extrahiere:
++  Lies /mnt/memory/testdaten/wissensbasis.json. Extrahiere:
+   - Brand-Name, USPs, Kern-Benefit, Produktpreise
+   - Zielgruppe, Psychografie, echte Kundenzitate
+   - Social Proof Zahlen (Follower, Reviews)
+@@ -65,7 +66,7 @@ system: |
+   - Aktuelle Strategie und SWOT (aus 09_brand_strategy)
+ 
+   ### Schritt 3 — Analyst-Ergebnisse laden
+-  Lies /workspace/analyst-ergebnisse.json. Diese Daten sind GENAUSO WICHTIG wie Brand Knowledge — pflichtmäßig zu laden und zu nutzen.
++  Lies /mnt/memory/testdaten/analyst-ergebnisse.json. Diese Daten sind GENAUSO WICHTIG wie Brand Knowledge — pflichtmäßig zu laden und zu nutzen.
+   Extrahiere:
+   - Top-performende Hooks (K1-Score ≥ 4) mit verbatim Hook-Text
+   - Bewiesene Copy-Formeln (PAS, BAB, Storytelling) die bei Competitors funktionieren
+@@ -129,6 +130,27 @@ system: |
+   unverändert erhalten. Nenne am Ende deiner Antwort den Dateinamen. Die Übernahme
+   durch die Plattform passiert erst danach.
+ 
++  ### Schritt 8 — PDF setzen lassen
++  Uebergib die Aufgabe an den Dokumentenbauer. Nenne ihm den vollstaendigen
++  Pfad der eben geschriebenen Datei:
++
++      /mnt/session/outputs/strategy-guide.md
++
++  Gib ihm den INHALT nicht mit — er liest die Datei selbst. Den Guide ein
++  zweites Mal zu uebertragen kostet ein zweites Mal.
++
++  Pruefe danach:
++
++      ls -la /mnt/session/outputs/
++
++  - Ist strategy-guide.pdf entstanden: nenne am Ende beide Dateien mit Pfad
++    und Groesse.
++  - Ist es nicht entstanden: melde es offen. Der Guide selbst bleibt gueltig
++    und ist das Ergebnis. Starte den Dokumentenbauer NICHT erneut.
++
++  Der Dokumentenbauer laeuft genau einmal. Du erzeugst das PDF unter keinen
++  Umstaenden selbst — Satz und Layout sind nicht deine Aufgabe.
++
+   ---
+ 
+   ## Anti-Halluzination-Protokoll (Pflicht)
+@@ -139,9 +161,11 @@ system: |
+ 
+   ## Stop-Regeln
+   - Nicht nach Anzahl fragen — exakt die im AUFTRAG genannte Anzahl erstellen
+-  - /workspace/analyst-ergebnisse.json IMMER lesen — auch wenn keine Daten erwartet werden
++  - /mnt/memory/testdaten/analyst-ergebnisse.json IMMER lesen — auch wenn keine Daten erwartet werden
+   - Nicht nach Design fragen — Farbschema aus REF-08
+   - Still laufen während der Analyse
++  - Den Guide nach Schritt 6 nicht erneut ausgeben — auch nicht gekürzt oder
++    zusammengefasst. Er steht in der Datei.
+ 
+ tools:
+   - type: agent_toolset_20260401
+@@ -158,3 +182,13 @@ tools:
+ 
+ # Skills: in der Migration bewusst keine. REF-00/06/07/08 bleiben Kontextdatei.
+ # Begruendung: claude/12_Console-Vorlagen_Uebersicht.md, Abschnitt 3.
++#
++# Roster: der Dokumentenbauer laeuft als Unteragent in derselben Session.
++# In der Console als multiagent-Roster eingetragen. Sobald A7
++# "Marketing-Abteilung" kommt, wandert er dorthin — ein Koordinator darf
++# keinen Koordinator im Roster haben (nur eine Ebene).
++#
++# ACHTUNG Speichername: Der Mount-Pfad entsteht aus dem Anzeigenamen des
++# Memory-Stores. "testdaten" ist ein Testname. Vor Produktion umbenennen —
++# der Store muss in JEDEM Kundenworkspace gleich heissen, sonst ist der
++# Prompt kundenspezifisch. Siehe claude/16_Mandantenmodell_Workspaces.md.
+diff --git a/agents/dokumentenbauer/LIESMICH.md b/agents/dokumentenbauer/LIESMICH.md
+new file mode 100644
+index 0000000..c25d3ce
+--- /dev/null
++++ b/agents/dokumentenbauer/LIESMICH.md
+@@ -0,0 +1,49 @@
++# Dokumentenbauer — Console-Fassung
++
++**Neu, kein Altcode-Gegenstück.** Ersetzt `lib/pdf/pdfEngine.ts`.
++
++Setzt Markdown-Berichte als Kunden-PDF. Läuft als **Unteragent** im Roster des
++Creative Strategist — eine Session, ein Budget, ein Verbrauchsdatensatz.
++
++## Warum ein eigener Agent statt eines Skills am Strategisten
++
++1. **Ein Layout statt drei.** Analyst und Brand Expert liefern auch Berichte.
++2. **Die Gegenprobe.** Ein Skill ändert, wann Claude etwas heranzieht. Solange
++   der Vergleich mit dem Altagenten aussteht, bleibt der Strategist unberührt.
++
++## Das Erscheinungsbild
++
++Steht im Skill `KANA Corporate Design` (`skill_01LYvZGZuJcjT7RgggMCZpyd`),
++nicht im Prompt. Quelle liegt hier unter `werkzeuge/`:
++
++| Datei | Zweck |
++|---|---|
++| `kana_pdf.py` | erzeugt das PDF. **Ein Aufruf, kein Layoutentwurf.** |
++| `SKILL.md` | Anleitung für den Agenten |
++| `kana-ci.css` | dieselben Werte als Stylesheet — für spätere HTML-Ausgaben |
++
++**Änderungen am Design passieren in `kana_pdf.py`, danach Skill neu hochladen.**
++Dabei immer alle Dateien mitschicken — weggelassene werden nicht übernommen.
++
++## Befund vom 17.08.2026, der zu diesem Aufbau geführt hat
++
++Erster Versuch: Gestaltung im Prompt beschrieben, CSS als Träger.
++Ergebnis: Helvetica statt Inter, Altrosa statt Indigo, 12.500 Ausgabe-Tokens,
++**45 Cent allein für das PDF** — der Lauf verdoppelte sich von 40 auf 85 Cent.
++
++Ursache: Der `pdf`-Skill arbeitet mit **reportlab**, nicht mit HTML und CSS.
++Ein Stylesheet kann er nicht lesen. Und der Agent hat den ganzen Bericht durch
++das Modell geschickt, um ihn neu zu setzen.
++
++Mit `kana_pdf.py` ruft er eine Zeile auf. Rund 100 Ausgabe-Tokens statt 12.500.
++
++> **Layout ist Rechnung, keine Einschätzung** — dasselbe Prinzip wie bei
++> `filter.js` und `score.js`.
++
++## Offen
++
++- **Inter-Schriftdateien fehlen im Skill.** Ohne sie weicht `kana_pdf.py` auf
++  DejaVu Sans aus und sagt das in seiner Ausgabe. Vier TTFs von Google Fonts
++  (`Inter-Regular`, `-SemiBold`, `-Black`, `-Italic`) neben `kana_pdf.py`
++  legen und das Skill neu hochladen.
++- Skill ist workspace-gebunden — bei einem Workspace je Kunde in jeden hinein.
+diff --git a/agents/dokumentenbauer/agent.yaml b/agents/dokumentenbauer/agent.yaml
+new file mode 100644
+index 0000000..dfff15f
+--- /dev/null
++++ b/agents/dokumentenbauer/agent.yaml
+@@ -0,0 +1,106 @@
++name: Dokumentenbauer
++description: >-
++  Setzt Markdown-Berichte als Kunden-PDF im KANA-Erscheinungsbild.
++  Ändert keine Inhalte. Läuft als Unteragent, nie eigenständig im Katalog.
++
++model:
++  id: claude-sonnet-4-6
++
++# Das Erscheinungsbild steht NICHT hier, sondern im Skill
++# "KANA Corporate Design" (kana_pdf.py). Aendert sich das Design, aendert
++# sich das Skill — kein Prompt wird angefasst.
++system: |
++  Du bist der Dokumentenbauer. Du setzt Markdown-Berichte als PDF für Kunden.
++  Sonst nichts.
++
++  DEIN AUFTRAG
++
++  1. Finde die Quelldatei. Wird dir in der Nachricht ein Pfad genannt, nimm
++     diesen. Sonst sieh in dieser Reihenfolge nach:
++
++         ls -la /mnt/session/outputs/
++         ls -la /mnt/session/uploads/
++         ls -la /mnt/memory/*/
++
++     In einer Sitzung mit mehreren Agenten liegt die Quelle fast immer unter
++     /mnt/session/outputs/ — dort legt der Agent vor dir sein Ergebnis ab.
++     Nenne die gewählte Datei ausdrücklich.
++
++  2. Erzeuge das PDF mit dem Skript aus dem Skill "KANA Corporate Design":
++
++         python3 kana_pdf.py <quelle.md> /mnt/session/outputs/<name>.pdf
++
++     Findest du das Skript nicht:
++
++         find / -name kana_pdf.py -not -path "*/proc/*" 2>/dev/null | head -1
++
++     Das ist der gesamte Vorgang. Du baust KEIN HTML, entwirfst KEIN Layout,
++     waehlst KEINE Farben und schreibst den Text NICHT ab. Das Skript liest die
++     Markdown-Datei selbst.
++
++  3. Uebernimm die Ausgabe des Skripts unveraendert in deine Meldung:
++     Zieldatei, Seitenzahl, Groesse, verwendete Schrift.
++
++     Meldet das Skript "Inter nicht im Skill gefunden", sage das ausdruecklich —
++     dann fehlen die Schriftdateien im Skill und das Dokument ist nicht im
++     endgueltigen Erscheinungsbild gesetzt.
++
++  DAS AUSSEHEN IST NICHT DEINE ENTSCHEIDUNG
++
++  Farben, Schriften, Abstände, Deckblatt und Seitenaufbau stehen im Skill. Du
++  legst nichts davon selbst fest und weichst nicht ab, weil es im Einzelfall
++  besser aussähe.
++
++  Findest du das Stylesheet des Skills nicht, brichst du ab und sagst es. Du
++  erfindest KEIN Ersatzdesign. Ein Dokument, das anders aussieht als alle
++  anderen, ist schlechter als gar keines.
++
++  INHALTSTREUE — UNVERHANDELBAR
++
++  Du bist Setzer, nicht Autor.
++
++  - Du änderst KEINEN Wort- oder Zahlenwert. Keine Korrekturen, keine
++    Kürzungen, keine Ergänzungen, keine Umformulierungen.
++  - Du fügst nichts hinzu: kein Datum, das nicht in der Quelle steht, kein
++    Kundenname, keine Fußzeile mit Angaben, die dir niemand gegeben hat.
++  - Findest du im Text einen offensichtlichen Fehler, setzt du ihn trotzdem
++    und weist am Ende deiner Antwort darauf hin.
++  - Die Belegkette bleibt sichtbar: [ANALYST: ...], [ABGELEITET] und Hinweise
++    wie "Orientierungsbeispiel — kein finaler Text" werden ausgezeichnet, nie
++    entfernt. Sie sind Teil der Aussage.
++
++  KOSTEN
++
++  Lies das Markdown NICHT. Du musst den Text nicht kennen, um ihn zu setzen —
++  das Skript liest ihn selbst.
++
++  Ein Bericht von 40 KB durch deinen Kontext zu schicken kostet mehr als der
++  gesamte restliche Lauf. Ein `head` zur Orientierung ist in Ordnung, ein
++  vollstaendiges `read` nicht.
++
++  WENN ETWAS FEHLT
++
++  Fehlt die Quelldatei oder ist sie leer, sagst du das und erzeugst nichts.
++  Du baust kein Ersatzdokument und wartest nicht auf Nachlieferung.
++
++tools:
++  - type: agent_toolset_20260401
++    default_config:
++      enabled: true
++      permission_policy:
++        type: always_allow
++    configs:
++      - name: web_search
++        enabled: false
++      - name: web_fetch
++        enabled: false
++
++skills:
++  - type: anthropic
++    skill_id: pdf
++  - type: custom
++    skill_id: skill_01LYvZGZuJcjT7RgggMCZpyd   # KANA Corporate Design
++    version: latest
++
++# KEIN multiagent-Roster. Ein Unteragent darf selbst keinen Koordinator
++# darstellen — die Plattform erlaubt nur eine Ebene.
+diff --git a/agents/dokumentenbauer/werkzeuge/SKILL.md b/agents/dokumentenbauer/werkzeuge/SKILL.md
+new file mode 100644
+index 0000000..4137b29
+--- /dev/null
++++ b/agents/dokumentenbauer/werkzeuge/SKILL.md
+@@ -0,0 +1,80 @@
++---
++name: kana-corporate-design
++description: Verbindliches Erscheinungsbild von KANA AI für Dokumente an Kunden. Enthält kana_pdf.py, das aus einer Markdown-Datei ein fertiges PDF im KANA-Design erzeugt. Immer verwenden, wenn ein Bericht als PDF gesetzt oder ein Dokument für Kunden ausgeliefert wird.
++---
++
++# KANA AI — Corporate Design
++
++## Das Wichtigste zuerst
++
++Ein PDF wird nicht beschrieben, sondern erzeugt. Ein Aufruf:
++
++    python3 kana_pdf.py <quelle.md> <ziel.pdf>
++
++Das ist alles. Kein HTML bauen, kein Layout entwerfen, keine Farben wählen,
++den Text nicht abschreiben. Das Skript liest die Markdown-Datei und schreibt
++das PDF.
++
++Findest du das Skript nicht:
++
++    find / -name kana_pdf.py -not -path "*/proc/*" 2>/dev/null | head -1
++
++**Warum als Skript und nicht als Anleitung:** Layout ist Rechnung, keine
++Einschätzung. Ein beschriebenes Layout wird bei jedem Lauf ein wenig anders —
++zwei Dokumente aus derselben Quelle sähen verschieden aus. Und der Umweg über
++den Modellkontext kostet bei einem Bericht von 40 KB ein Vielfaches des
++Aufrufs.
++
++Das Skript gibt aus: Zieldatei, Seitenzahl, Größe, verwendete Schrift, Titel.
++Diese Angaben übernimmst du unverändert in deine Meldung.
++
++## Was das Skript erkennt
++
++| In der Quelle | Im PDF |
++|---|---|
++| `# Überschrift` | Kapitel auf neuer Seite, Akzentlinie darunter |
++| `## Überschrift` | Zwischenüberschrift |
++| `### Überschrift` | Unterüberschrift in Indigo |
++| Kästen aus `═ ║ ╔` | gesetzte Titelfläche, Text unverändert |
++| Tabellen | gesetzte Tabelle, Kopfzeile getönt, Kopf wiederholt sich über Seiten |
++| `- [ ]` / `- [x]` | Checkliste mit Kästchen |
++| `[ANALYST: …]` | indigo hervorgehoben |
++| `[ABGELEITET]` | grau hervorgehoben |
++| „Orientierungsbeispiel — kein finaler Text" | kursiv, gedämpft |
++| Codeblöcke, Zitate, Listen, `**fett**`, `*kursiv*`, Links | gesetzt |
++
++Titel und Untertitel des Deckblatts nimmt das Skript aus dem ersten Kasten
++oder der ersten Überschrift. Es erfindet nichts — kein Datum, keinen
++Kundennamen, keine Fußzeile mit Angaben, die nicht in der Quelle stehen.
++
++## Gestaltung
++
++Farben und Schrift stammen aus `app/globals.css` der Plattform:
++Akzent `#6366F1`, Deckblatt `#060A13`, Schrift Inter.
++
++Das **Deckblatt ist dunkel wie die Website, der Inhalt hell.** Bewusst so: ein
++mehrseitiges dunkles PDF ist am Bildschirm ermüdend und beim Ausdrucken
++unbrauchbar. Die Wiedererkennung trägt das Deckblatt.
++
++## Schriften
++
++Liegen `Inter-Regular.ttf`, `Inter-SemiBold.ttf`, `Inter-Black.ttf` und
++`Inter-Italic.ttf` neben diesem Skill, wird Inter verwendet. Sonst weicht das
++Skript auf DejaVu Sans aus und sagt das in seiner Ausgabe.
++
++**Nicht auf die eingebauten reportlab-Schriften ausweichen.** Denen fehlen
++Zeichen wie ☐ • ◦ — sie werden dann still durch ASCII ersetzt oder als
++schwarze Kästen gesetzt.
++
++## Änderungen am Erscheinungsbild
++
++Ausschließlich in `kana_pdf.py`, nie im Prompt eines Agenten. Danach das Skill
++neu hochladen — dabei **immer alle Dateien** mitschicken: weggelassene Dateien
++werden nicht aus der Vorversion übernommen.
++
++## kana-ci.css
++
++Enthält dieselben Gestaltungswerte als Stylesheet. Wird für PDFs **nicht**
++gebraucht — der `pdf`-Skill arbeitet mit reportlab, nicht mit HTML. Die Datei
++liegt bei für spätere HTML-Ausgaben wie Web-Ansicht oder E-Mail, damit die
++Werte an einer Stelle stehen.
+diff --git a/agents/dokumentenbauer/werkzeuge/kana-ci.css b/agents/dokumentenbauer/werkzeuge/kana-ci.css
+new file mode 100644
+index 0000000..8857470
+--- /dev/null
++++ b/agents/dokumentenbauer/werkzeuge/kana-ci.css
+@@ -0,0 +1,325 @@
++/* ═══════════════════════════════════════════════════════════════
++   KANA AI — Corporate Design für PDF-Dokumente
++   ───────────────────────────────────────────────────────────────
++   Abgeleitet aus app/globals.css der Plattform, Commit acc7607.
++   Farbwerte, Schrift und Wortmarke sind unverändert übernommen.
++
++   BEWUSSTE ABWEICHUNG VON DER WEBSITE:
++   Die Website ist dunkel. Ein dunkles PDF ist für ein 30-seitiges
++   Dokument die falsche Wahl — es ist am Bildschirm ermüdend, beim
++   Ausdrucken unbrauchbar und verbraucht Toner ohne Nutzen.
++   Deshalb: Deckblatt dunkel wie die Website, Inhalt hell.
++   Die Wiedererkennung trägt das Deckblatt, die Lesbarkeit den Rest.
++
++   Änderungen am Erscheinungsbild passieren HIER, nicht im Prompt
++   eines Agenten.
++   ═══════════════════════════════════════════════════════════════ */
++
++@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
++
++:root {
++  --accent:        #6366F1;   /* Indigo, Primärakzent */
++  --accent-light:  #818CF8;
++  --accent-bright: #A5B4FC;
++  --dark:          #060A13;   /* Deckblatt-Hintergrund */
++  --dark-2:        #0C1220;
++  --ink:           #16202F;   /* Fließtext, nicht reines Schwarz */
++  --ink-soft:      #4A5A6E;
++  --ink-mute:      #7A8FA6;
++  --line:          #E2E8F0;
++  --tint:          #F4F5FF;   /* Indigo, stark aufgehellt */
++  --success:       #34D399;
++}
++
++/* ── Seite ────────────────────────────────────────────────────── */
++
++@page {
++  size: A4;
++  margin: 22mm 20mm 20mm 20mm;
++
++  @bottom-right {
++    content: counter(page);
++    font-family: 'Inter', sans-serif;
++    font-size: 8.5pt;
++    color: #7A8FA6;
++  }
++  @bottom-left {
++    content: "KANA AI";
++    font-family: 'Inter', sans-serif;
++    font-size: 8.5pt;
++    font-weight: 700;
++    letter-spacing: -0.2px;
++    color: #7A8FA6;
++  }
++}
++
++@page :first { margin: 0; }          /* Deckblatt randlos */
++
++html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
++
++body {
++  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
++  font-size: 10.5pt;
++  line-height: 1.62;
++  color: var(--ink);
++  background: #FFFFFF;
++  hyphens: auto;
++}
++
++/* ── Deckblatt ────────────────────────────────────────────────── */
++
++.deckblatt {
++  page: first;
++  page-break-after: always;
++  background: var(--dark);
++  color: #F1F5F9;
++  height: 297mm;
++  padding: 45mm 24mm 24mm 24mm;
++  position: relative;
++}
++
++/* Wortmarke: Punkt + Schriftzug, wie in der Navigation der Website */
++.wortmarke {
++  display: flex;
++  align-items: center;
++  gap: 9px;
++  font-weight: 900;
++  font-size: 15pt;
++  letter-spacing: -0.5px;
++  color: #F1F5F9;
++}
++.wortmarke::before {
++  content: "";
++  width: 9px; height: 9px;
++  background: var(--accent);
++  border-radius: 50%;
++  box-shadow: 0 0 16px var(--accent);
++}
++
++.deckblatt .titel {
++  margin-top: 62mm;
++  font-size: 30pt;
++  font-weight: 800;
++  line-height: 1.18;
++  letter-spacing: -0.8px;
++}
++.deckblatt .untertitel {
++  margin-top: 7mm;
++  font-size: 12.5pt;
++  font-weight: 400;
++  color: #B8C5D6;
++}
++.deckblatt .streifen {
++  margin-top: 14mm;
++  width: 54mm; height: 4px;
++  border-radius: 2px;
++  background: linear-gradient(135deg, #6366F1, #818CF8);
++}
++.deckblatt .fuss {
++  position: absolute;
++  bottom: 24mm; left: 24mm; right: 24mm;
++  font-size: 9pt;
++  color: #7A8FA6;
++  border-top: 1px solid rgba(255,255,255,0.10);
++  padding-top: 5mm;
++}
++
++/* ── Überschriften ────────────────────────────────────────────── */
++
++h1 {
++  font-size: 19pt; font-weight: 800; letter-spacing: -0.5px;
++  color: var(--ink);
++  margin: 0 0 6mm 0; padding-bottom: 3mm;
++  border-bottom: 2px solid var(--accent);
++  page-break-before: always;   /* jedes Hauptkapitel auf neuer Seite */
++  page-break-after: avoid;
++}
++h1:first-of-type { page-break-before: avoid; }
++
++h2 {
++  font-size: 13.5pt; font-weight: 700; letter-spacing: -0.3px;
++  color: var(--ink);
++  margin: 9mm 0 3mm 0;
++  page-break-after: avoid;
++}
++h2::before {                    /* schmaler Akzentstrich links */
++  content: ""; display: inline-block;
++  width: 3px; height: 0.92em;
++  background: var(--accent);
++  margin-right: 3.5mm;
++  vertical-align: -0.1em;
++  border-radius: 2px;
++}
++
++h3 {
++  font-size: 11pt; font-weight: 700;
++  color: var(--accent);
++  margin: 6mm 0 2mm 0;
++  page-break-after: avoid;
++}
++
++h4 { font-size: 10.5pt; font-weight: 600; color: var(--ink-soft); margin: 4mm 0 1.5mm 0; }
++
++/* ── Fließtext ────────────────────────────────────────────────── */
++
++p { margin: 0 0 3.2mm 0; orphans: 3; widows: 3; }
++strong { font-weight: 700; color: var(--ink); }
++em { font-style: italic; color: var(--ink-soft); }
++
++ul, ol { margin: 0 0 3.5mm 0; padding-left: 6mm; }
++li { margin-bottom: 1.3mm; }
++li::marker { color: var(--accent); }
++
++hr {
++  border: none; height: 1px;
++  background: var(--line);
++  margin: 7mm 0;
++}
++
++a { color: var(--accent); text-decoration: none; }
++
++/* ── Titelflächen (ersetzen die ASCII-Kästen der Quelle) ──────── */
++
++.titelflaeche {
++  background: var(--tint);
++  border-left: 4px solid var(--accent);
++  border-radius: 0 8px 8px 0;
++  padding: 6mm 7mm;
++  margin: 6mm 0 8mm 0;
++  page-break-inside: avoid;
++}
++.titelflaeche .zeile-1 {
++  font-size: 15pt; font-weight: 800; letter-spacing: -0.4px;
++  color: var(--ink);
++}
++.titelflaeche .zeile-2 {
++  margin-top: 1.5mm;
++  font-size: 10pt; font-weight: 500;
++  color: var(--accent);
++}
++
++/* Abschnittstrenner (ersetzt ─── STAGE N ─── der Quelle) */
++.abschnitt {
++  display: flex; align-items: center; gap: 4mm;
++  margin: 9mm 0 4mm 0;
++  font-size: 12pt; font-weight: 700; letter-spacing: -0.2px;
++  color: var(--ink);
++  page-break-after: avoid;
++}
++.abschnitt::after {
++  content: ""; flex: 1; height: 1px; background: var(--line);
++}
++
++/* ── Tabellen ─────────────────────────────────────────────────── */
++
++table {
++  width: 100%;
++  border-collapse: collapse;
++  margin: 4mm 0 6mm 0;
++  font-size: 9.5pt;
++  page-break-inside: avoid;
++}
++thead th {
++  background: var(--tint);
++  color: var(--ink);
++  font-weight: 700;
++  text-align: left;
++  padding: 2.6mm 3mm;
++  border-bottom: 2px solid var(--accent);
++}
++tbody td {
++  padding: 2.4mm 3mm;
++  border-bottom: 1px solid var(--line);
++  vertical-align: top;
++}
++tbody tr:last-child td { border-bottom: none; }
++
++/* ── Belegkette: [ANALYST: ...] und [ABGELEITET] ──────────────── */
++/* Diese Markierungen sind kein Arbeitsrest, sondern zeigen dem
++   Kunden, was belegt und was abgeleitet ist. Sie werden sichtbar
++   ausgezeichnet, nicht versteckt.                                */
++
++.beleg {
++  display: inline-block;
++  font-size: 8.2pt; font-weight: 600;
++  padding: 0.4mm 1.8mm;
++  border-radius: 4px;
++  background: var(--tint);
++  color: var(--accent);
++  border: 1px solid rgba(99,102,241,0.28);
++  white-space: nowrap;
++}
++.beleg-abgeleitet {
++  background: #F8FAFC;
++  color: var(--ink-mute);
++  border-color: var(--line);
++}
++.hinweis-entwurf {
++  font-size: 8.8pt; font-style: italic; color: var(--ink-mute);
++}
++
++/* ── Codeblöcke und Monospace ─────────────────────────────────── */
++
++code {
++  font-family: 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
++  font-size: 9pt;
++  background: #F4F6F9;
++  padding: 0.3mm 1.2mm;
++  border-radius: 3px;
++  color: var(--ink);
++}
++pre {
++  font-family: 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
++  font-size: 8.8pt; line-height: 1.5;
++  background: #F7F9FC;
++  border: 1px solid var(--line);
++  border-radius: 8px;
++  padding: 4mm 5mm;
++  margin: 3mm 0 5mm 0;
++  overflow-wrap: break-word;
++  white-space: pre-wrap;
++  page-break-inside: avoid;
++}
++pre code { background: none; padding: 0; }
++
++blockquote {
++  margin: 4mm 0;
++  padding: 1mm 0 1mm 5mm;
++  border-left: 3px solid var(--accent-bright);
++  color: var(--ink-soft);
++}
++
++/* ── Inhaltsverzeichnis ───────────────────────────────────────── */
++
++.inhalt { page-break-after: always; }
++.inhalt h1 { page-break-before: avoid; }
++.inhalt ol { list-style: none; padding-left: 0; }
++.inhalt li {
++  display: flex; align-items: baseline; gap: 2mm;
++  padding: 1.6mm 0;
++  border-bottom: 1px dotted var(--line);
++  font-size: 10pt;
++}
++.inhalt li .nr { color: var(--accent); font-weight: 700; min-width: 8mm; }
++.inhalt li .seite { margin-left: auto; color: var(--ink-mute); font-size: 9pt; }
++
++/* ── Checklisten ──────────────────────────────────────────────── */
++
++.checkliste { list-style: none; padding-left: 0; }
++.checkliste li {
++  position: relative;
++  padding-left: 7mm;
++  margin-bottom: 2.2mm;
++}
++.checkliste li::before {
++  content: "";
++  position: absolute; left: 0; top: 0.35em;
++  width: 3.6mm; height: 3.6mm;
++  border: 1.5px solid var(--accent);
++  border-radius: 3px;
++}
++
++/* ── Umbruchsteuerung ─────────────────────────────────────────── */
++
++.zusammenhalten { page-break-inside: avoid; }
++.neue-seite     { page-break-before: always; }
+diff --git a/agents/dokumentenbauer/werkzeuge/kana_pdf.py b/agents/dokumentenbauer/werkzeuge/kana_pdf.py
+new file mode 100644
+index 0000000..f28eb3d
+--- /dev/null
++++ b/agents/dokumentenbauer/werkzeuge/kana_pdf.py
+@@ -0,0 +1,432 @@
++#!/usr/bin/env python3
++"""
++KANA AI — Markdown nach PDF im Corporate Design.
++
++    python3 kana_pdf.py <quelle.md> <ziel.pdf>
++
++Warum ein Skript und keine Beschreibung im Prompt:
++Layout ist Rechnung, keine Einschaetzung. Ein beschriebenes Layout wird bei
++jedem Lauf ein wenig anders. Dieses Skript erzeugt aus derselben Quelle immer
++dasselbe Dokument — und kostet dabei fast nichts, weil der Agent den Text
++nicht durch das Modell schicken muss.
++
++Farben und Schrift stammen aus app/globals.css der Plattform.
++Deckblatt dunkel wie die Website, Inhalt hell — ein mehrseitiges dunkles PDF
++ist am Bildschirm ermuedend und beim Ausdrucken unbrauchbar.
++"""
++
++import re
++import sys
++import os
++from pathlib import Path
++
++from reportlab.lib import colors
++from reportlab.lib.enums import TA_LEFT
++from reportlab.lib.pagesizes import A4
++from reportlab.lib.styles import ParagraphStyle
++from reportlab.lib.units import mm
++from reportlab.pdfbase import pdfmetrics
++from reportlab.pdfbase.ttfonts import TTFont
++from reportlab.platypus import (
++    BaseDocTemplate, Frame, PageTemplate, Paragraph, Spacer,
++    Table, TableStyle, PageBreak, KeepTogether, NextPageTemplate,
++)
++
++# ── Farben (aus app/globals.css) ──────────────────────────────────────────
++AKZENT       = colors.HexColor("#6366F1")
++AKZENT_HELL  = colors.HexColor("#818CF8")
++DUNKEL       = colors.HexColor("#060A13")
++TINT         = colors.HexColor("#F4F5FF")
++TEXT         = colors.HexColor("#16202F")
++TEXT_WEICH   = colors.HexColor("#4A5A6E")
++TEXT_STUMM   = colors.HexColor("#7A8FA6")
++LINIE        = colors.HexColor("#E2E8F0")
++WEISS_WARM   = colors.HexColor("#F1F5F9")
++
++RAND = 20 * mm
++
++
++# ── Schriften ─────────────────────────────────────────────────────────────
++def schriften_registrieren():
++    """Inter, wenn im Skill mitgeliefert. Sonst DejaVu (voller Unicode-Satz).
++
++    NICHT die eingebauten reportlab-Schriften nehmen: denen fehlen Zeichen wie
++    ☐ • ◦ — sie werden dann still durch ASCII ersetzt oder als Kasten gesetzt.
++    """
++    hier = Path(__file__).resolve().parent
++    inter = {
++        "KANA":      ["Inter-Regular.ttf",  "Inter_18pt-Regular.ttf"],
++        "KANA-Bd":   ["Inter-SemiBold.ttf", "Inter_18pt-SemiBold.ttf"],
++        "KANA-Blk":  ["Inter-Black.ttf",    "Inter_18pt-Black.ttf"],
++        "KANA-It":   ["Inter-Italic.ttf",   "Inter_18pt-Italic.ttf"],
++    }
++    gefunden = True
++    for name, kandidaten in inter.items():
++        pfad = next((hier / k for k in kandidaten if (hier / k).exists()), None)
++        if pfad is None:
++            gefunden = False
++            break
++        pdfmetrics.registerFont(TTFont(name, str(pfad)))
++
++    if gefunden:
++        quelle = "Inter"
++    else:
++        d = "/usr/share/fonts/truetype/dejavu"
++        paare = [("KANA", "DejaVuSans.ttf"), ("KANA-Bd", "DejaVuSans-Bold.ttf"),
++                 ("KANA-Blk", "DejaVuSans-Bold.ttf"), ("KANA-It", "DejaVuSans-Oblique.ttf")]
++        for name, datei in paare:
++            pdfmetrics.registerFont(TTFont(name, os.path.join(d, datei)))
++        quelle = "DejaVu Sans (Inter nicht im Skill gefunden)"
++
++    pdfmetrics.registerFont(TTFont("KANA-Mono", "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"))
++    pdfmetrics.registerFontFamily("KANA", normal="KANA", bold="KANA-Bd", italic="KANA-It")
++    return quelle
++
++
++# ── Absatzformate ─────────────────────────────────────────────────────────
++def formate():
++    f = {}
++    f["fliess"] = ParagraphStyle("fliess", fontName="KANA", fontSize=9.5, leading=15,
++                                 textColor=TEXT, spaceAfter=3.4 * mm, alignment=TA_LEFT)
++    f["h1"] = ParagraphStyle("h1", parent=f["fliess"], fontName="KANA-Blk", fontSize=17,
++                             leading=21, textColor=TEXT, spaceBefore=0, spaceAfter=4 * mm)
++    f["h2"] = ParagraphStyle("h2", parent=f["fliess"], fontName="KANA-Bd", fontSize=12.5,
++                             leading=16, textColor=TEXT, spaceBefore=7 * mm, spaceAfter=2.5 * mm)
++    f["h3"] = ParagraphStyle("h3", parent=f["fliess"], fontName="KANA-Bd", fontSize=10.5,
++                             leading=14, textColor=AKZENT, spaceBefore=5 * mm, spaceAfter=1.8 * mm)
++    f["h4"] = ParagraphStyle("h4", parent=f["fliess"], fontName="KANA-Bd", fontSize=9.5,
++                             textColor=TEXT_WEICH, spaceBefore=3 * mm, spaceAfter=1.2 * mm)
++    f["liste"] = ParagraphStyle("liste", parent=f["fliess"], leftIndent=5 * mm,
++                                bulletIndent=1.5 * mm, spaceAfter=1.3 * mm)
++    f["code"] = ParagraphStyle("code", parent=f["fliess"], fontName="KANA-Mono", fontSize=8,
++                               leading=11, textColor=TEXT, backColor=colors.HexColor("#F7F9FC"),
++                               borderColor=LINIE, borderWidth=0.5, borderPadding=4,
++                               spaceBefore=2 * mm, spaceAfter=4 * mm)
++    f["titelflaeche_1"] = ParagraphStyle("tf1", parent=f["fliess"], fontName="KANA-Blk",
++                                         fontSize=14, leading=18, textColor=TEXT, spaceAfter=1 * mm)
++    f["titelflaeche_2"] = ParagraphStyle("tf2", parent=f["fliess"], fontName="KANA-Bd",
++                                         fontSize=9.5, textColor=AKZENT, spaceAfter=0)
++    f["tab"] = ParagraphStyle("tab", parent=f["fliess"], fontSize=8.5, leading=12, spaceAfter=0)
++    f["tab_kopf"] = ParagraphStyle("tabk", parent=f["tab"], fontName="KANA-Bd")
++    # Deckblatt
++    f["dw"] = ParagraphStyle("dw", fontName="KANA-Blk", fontSize=14, textColor=WEISS_WARM, leading=18)
++    f["dt"] = ParagraphStyle("dt", fontName="KANA-Blk", fontSize=27, textColor=WEISS_WARM,
++                             leading=33, spaceBefore=60 * mm)
++    f["du"] = ParagraphStyle("du", fontName="KANA", fontSize=12, textColor=colors.HexColor("#B8C5D6"),
++                             leading=17, spaceBefore=6 * mm)
++    return f
++
++
++# ── Inline-Auszeichnung ───────────────────────────────────────────────────
++def inline(text):
++    """Markdown-Inline nach reportlab-Markup. Der Wortlaut bleibt unveraendert —
++    es kommt nur Auszeichnung darum."""
++    t = (text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
++    t = re.sub(r"`([^`]+)`", r'<font face="KANA-Mono" size="8.5">\1</font>', t)
++    t = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t)
++    t = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"<i>\1</i>", t)
++    t = re.sub(r"\[([^\]]+)\]\((https?://[^)]+)\)", r'<link href="\2" color="#6366F1">\1</link>', t)
++
++    # Belegkette sichtbar machen — Text bleibt Wort fuer Wort erhalten
++    t = re.sub(r"(\[ANALYST:[^\]]*\])",
++               r'<font color="#6366F1" face="KANA-Bd">\1</font>', t)
++    t = re.sub(r"(\[ABGELEITET[^\]]*\])",
++               r'<font color="#7A8FA6" face="KANA-Bd">\1</font>', t)
++    t = t.replace("Orientierungsbeispiel — kein finaler Text",
++                  '<font color="#7A8FA6"><i>Orientierungsbeispiel — kein finaler Text</i></font>')
++    return t
++
++
++RAHMEN = set("═║╔╗╚╝─━┌┐└┘│┃")
++
++
++def ist_rahmenzeile(z):
++    kern = z.strip()
++    if not kern:
++        return False
++    return sum(c in RAHMEN for c in kern) / len(kern) > 0.5
++
++
++# ── Markdown lesen ────────────────────────────────────────────────────────
++def bauen(md, f):
++    fluss = []
++    zeilen = md.split("\n")
++    i = 0
++    titel, untertitel = None, None
++
++    while i < len(zeilen):
++        z = zeilen[i]
++        s = z.strip()
++
++        # Codeblock
++        if s.startswith("```"):
++            i += 1
++            block = []
++            while i < len(zeilen) and not zeilen[i].strip().startswith("```"):
++                block.append(zeilen[i])
++                i += 1
++            i += 1
++            # Reine ASCII-Kaesten werden zur Titelflaeche, kein Codeblock
++            inhalt = [b for b in block if b.strip() and not ist_rahmenzeile(b)]
++            if block and all(ist_rahmenzeile(b) or any(c in RAHMEN for c in b) for b in block if b.strip()):
++                texte = [re.sub(r"[" + "".join(RAHMEN) + r"]", "", b).strip() for b in inhalt]
++                texte = [t for t in texte if t]
++                if texte:
++                    fluss.append(titelflaeche(texte, f))
++                    if titel is None and texte:
++                        titel = texte[0]
++                        untertitel = texte[1] if len(texte) > 1 else None
++                continue
++            if block:
++                fluss.append(Paragraph("<br/>".join(
++                    inline(b) or "&nbsp;" for b in block), f["code"]))
++            continue
++
++        # ASCII-Kasten ohne Codefence
++        if ist_rahmenzeile(z) and i + 1 < len(zeilen):
++            block = []
++            while i < len(zeilen) and (ist_rahmenzeile(zeilen[i]) or
++                                       any(c in RAHMEN for c in zeilen[i])):
++                block.append(zeilen[i])
++                i += 1
++            texte = [re.sub(r"[" + "".join(RAHMEN) + r"]", "", b).strip() for b in block]
++            texte = [t for t in texte if t]
++            if texte:
++                fluss.append(titelflaeche(texte, f))
++                if titel is None:
++                    titel = texte[0]
++                    untertitel = texte[1] if len(texte) > 1 else None
++            continue
++
++        # Tabelle
++        if s.startswith("|") and i + 1 < len(zeilen) and re.match(r"^\|[\s:|-]+\|$", zeilen[i + 1].strip()):
++            reihen = []
++            while i < len(zeilen) and zeilen[i].strip().startswith("|"):
++                reihen.append([c.strip() for c in zeilen[i].strip().strip("|").split("|")])
++                i += 1
++            if len(reihen) >= 2:
++                del reihen[1]
++                fluss.append(tabelle(reihen, f))
++            continue
++
++        # Trennlinie
++        if re.match(r"^(-{3,}|_{3,}|\*{3,})$", s):
++            i += 1
++            continue
++
++        # Ueberschriften
++        m = re.match(r"^(#{1,4})\s+(.*)$", s)
++        if m:
++            stufe, txt = len(m.group(1)), m.group(2)
++            if stufe == 1:
++                if titel is None:
++                    titel = txt
++                if fluss:
++                    fluss.append(PageBreak())
++                fluss.append(Paragraph(inline(txt), f["h1"]))
++                fluss.append(akzentlinie())
++            elif stufe == 2:
++                if untertitel is None and titel and not any(
++                        isinstance(x, Paragraph) for x in fluss[-3:] if hasattr(x, "style")):
++                    untertitel = txt
++                fluss.append(Paragraph(inline(txt), f["h2"]))
++            else:
++                fluss.append(Paragraph(inline(txt), f["h" + str(min(stufe, 4))]))
++            i += 1
++            continue
++
++        # Listen
++        m = re.match(r"^[-*+]\s+\[([ xX])\]\s+(.*)$", s)
++        if m:
++            zeichen = "☑" if m.group(1).lower() == "x" else "☐"
++            fluss.append(Paragraph(inline(m.group(2)), f["liste"], bulletText=zeichen))
++            i += 1
++            continue
++        m = re.match(r"^[-*+]\s+(.*)$", s)
++        if m:
++            fluss.append(Paragraph(inline(m.group(1)), f["liste"], bulletText="•"))
++            i += 1
++            continue
++        m = re.match(r"^(\d+)\.\s+(.*)$", s)
++        if m:
++            fluss.append(Paragraph(inline(m.group(2)), f["liste"], bulletText=m.group(1) + "."))
++            i += 1
++            continue
++
++        # Zitat
++        if s.startswith(">"):
++            fluss.append(Paragraph(inline(s.lstrip("> ").strip()),
++                                   ParagraphStyle("z", parent=f["fliess"], leftIndent=5 * mm,
++                                                  textColor=TEXT_WEICH)))
++            i += 1
++            continue
++
++        # Absatz
++        if s:
++            absatz = [s]
++            i += 1
++            while i < len(zeilen) and zeilen[i].strip() and not re.match(
++                    r"^(#{1,4}\s|[-*+]\s|\d+\.\s|\||>|```)", zeilen[i].strip()) \
++                    and not ist_rahmenzeile(zeilen[i]):
++                absatz.append(zeilen[i].strip())
++                i += 1
++            fluss.append(Paragraph(inline(" ".join(absatz)), f["fliess"]))
++            continue
++
++        i += 1
++
++    return fluss, titel, untertitel
++
++
++def akzentlinie():
++    t = Table([[""]], colWidths=[A4[0] - 2 * RAND], rowHeights=[1.6])
++    t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), AKZENT),
++                           ("TOPPADDING", (0, 0), (-1, -1), 0),
++                           ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
++    return KeepTogether([t, Spacer(1, 4 * mm)])
++
++
++def titelflaeche(texte, f):
++    inhalt = [Paragraph(inline(texte[0]), f["titelflaeche_1"])]
++    for weiterer in texte[1:]:
++        inhalt.append(Paragraph(inline(weiterer), f["titelflaeche_2"]))
++    t = Table([[inhalt]], colWidths=[A4[0] - 2 * RAND])
++    t.setStyle(TableStyle([
++        ("BACKGROUND", (0, 0), (-1, -1), TINT),
++        ("LINEBEFORE", (0, 0), (0, -1), 3, AKZENT),
++        ("LEFTPADDING", (0, 0), (-1, -1), 6 * mm),
++        ("RIGHTPADDING", (0, 0), (-1, -1), 5 * mm),
++        ("TOPPADDING", (0, 0), (-1, -1), 5 * mm),
++        ("BOTTOMPADDING", (0, 0), (-1, -1), 5 * mm),
++    ]))
++    return KeepTogether([t, Spacer(1, 6 * mm)])
++
++
++def tabelle(reihen, f):
++    breite = A4[0] - 2 * RAND
++    spalten = max(len(r) for r in reihen)
++    daten = []
++    for nr, reihe in enumerate(reihen):
++        reihe = reihe + [""] * (spalten - len(reihe))
++        stil = f["tab_kopf"] if nr == 0 else f["tab"]
++        daten.append([Paragraph(inline(c), stil) for c in reihe])
++    t = Table(daten, colWidths=[breite / spalten] * spalten, repeatRows=1)
++    t.setStyle(TableStyle([
++        ("BACKGROUND", (0, 0), (-1, 0), TINT),
++        ("LINEBELOW", (0, 0), (-1, 0), 1.4, AKZENT),
++        ("LINEBELOW", (0, 1), (-1, -2), 0.4, LINIE),
++        ("VALIGN", (0, 0), (-1, -1), "TOP"),
++        ("LEFTPADDING", (0, 0), (-1, -1), 3 * mm),
++        ("RIGHTPADDING", (0, 0), (-1, -1), 3 * mm),
++        ("TOPPADDING", (0, 0), (-1, -1), 2.2 * mm),
++        ("BOTTOMPADDING", (0, 0), (-1, -1), 2.2 * mm),
++    ]))
++    return KeepTogether([t, Spacer(1, 5 * mm)])
++
++
++# ── Seitenrahmen ──────────────────────────────────────────────────────────
++def deckblatt_zeichnen(c, doc, titel, untertitel):
++    b, h = A4
++    c.saveState()
++    c.setFillColor(DUNKEL)
++    c.rect(0, 0, b, h, stroke=0, fill=1)
++    x = 24 * mm
++
++    c.setFillColor(AKZENT)
++    c.circle(x + 2.2 * mm, h - 42 * mm, 2.2 * mm, stroke=0, fill=1)
++    c.setFillColor(WEISS_WARM)
++    c.setFont("KANA-Blk", 14)
++    c.drawString(x + 8 * mm, h - 43.5 * mm, "KANA AI")
++
++    c.setFont("KANA-Blk", 27)
++    y = h - 115 * mm
++    for zeile in umbrechen(titel or "Bericht", "KANA-Blk", 27, b - 2 * x):
++        c.drawString(x, y, zeile)
++        y -= 11 * mm
++
++    if untertitel:
++        c.setFillColor(colors.HexColor("#B8C5D6"))
++        c.setFont("KANA", 12)
++        y -= 4 * mm
++        for zeile in umbrechen(untertitel, "KANA", 12, b - 2 * x):
++            c.drawString(x, y, zeile)
++            y -= 6 * mm
++
++    c.setFillColor(AKZENT)
++    c.roundRect(x, y - 12 * mm, 54 * mm, 3, 1.5, stroke=0, fill=1)
++
++    c.setStrokeColor(colors.HexColor("#1E2A3D"))
++    c.setLineWidth(0.6)
++    c.line(x, 32 * mm, b - x, 32 * mm)
++    c.setFillColor(TEXT_STUMM)
++    c.setFont("KANA", 8.5)
++    c.drawString(x, 26 * mm, "KANA AI — Digitale Mitarbeiter on Demand")
++    c.restoreState()
++
++
++def inhalt_zeichnen(c, doc):
++    b, _ = A4
++    c.saveState()
++    c.setFillColor(TEXT_STUMM)
++    c.setFont("KANA-Bd", 8)
++    c.drawString(RAND, 12 * mm, "KANA AI")
++    c.setFont("KANA", 8)
++    c.drawRightString(b - RAND, 12 * mm, str(doc.page - 1))
++    c.setStrokeColor(LINIE)
++    c.setLineWidth(0.4)
++    c.line(RAND, 15.5 * mm, b - RAND, 15.5 * mm)
++    c.restoreState()
++
++
++def umbrechen(text, schrift, groesse, breite):
++    worte, zeilen, aktuell = text.split(), [], ""
++    for w in worte:
++        probe = (aktuell + " " + w).strip()
++        if pdfmetrics.stringWidth(probe, schrift, groesse) <= breite:
++            aktuell = probe
++        else:
++            if aktuell:
++                zeilen.append(aktuell)
++            aktuell = w
++    if aktuell:
++        zeilen.append(aktuell)
++    return zeilen
++
++
++def erzeugen(md_pfad, pdf_pfad):
++    quelle_schrift = schriften_registrieren()
++    f = formate()
++    md = Path(md_pfad).read_text(encoding="utf-8")
++    fluss, titel, untertitel = bauen(md, f)
++
++    doc = BaseDocTemplate(str(pdf_pfad), pagesize=A4,
++                          leftMargin=RAND, rightMargin=RAND,
++                          topMargin=18 * mm, bottomMargin=20 * mm,
++                          title=titel or "KANA AI", author="KANA AI")
++
++    leer = Frame(0, 0, A4[0], A4[1], id="deck",
++                 leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
++    inhalt = Frame(RAND, 20 * mm, A4[0] - 2 * RAND, A4[1] - 38 * mm, id="inhalt",
++                   leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
++
++    doc.addPageTemplates([
++        PageTemplate(id="Deckblatt", frames=[leer],
++                     onPage=lambda c, d: deckblatt_zeichnen(c, d, titel, untertitel)),
++        PageTemplate(id="Inhalt", frames=[inhalt], onPage=inhalt_zeichnen),
++    ])
++
++    doc.build([NextPageTemplate("Inhalt"), PageBreak()] + fluss)
++
++    groesse = Path(pdf_pfad).stat().st_size
++    print(f"PDF: {pdf_pfad}")
++    print(f"Seiten: {doc.page}")
++    print(f"Groesse: {groesse} Bytes")
++    print(f"Schrift: {quelle_schrift}")
++    print(f"Titel: {titel}")
++
++
++if __name__ == "__main__":
++    if len(sys.argv) != 3:
++        print("Aufruf: python3 kana_pdf.py <quelle.md> <ziel.pdf>", file=sys.stderr)
++        sys.exit(1)
++    erzeugen(sys.argv[1], sys.argv[2])
+-- 
+2.43.0
+

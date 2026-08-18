@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { grantAgentAccess, revokeAgentAccess, getDBAgentById } from "@/lib/platform/supabase";
+import {
+  grantAgentAccess,
+  revokeAgentAccess,
+  getDBAgentById,
+  kundendatenSpeichern,
+} from "@/lib/platform/supabase";
+import { mailSenden, betriebsAdressen } from "@/lib/platform/mail";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -70,6 +76,59 @@ export async function POST(req: NextRequest) {
       await grantAgentAccess(userId, masterAgentId);
 
       console.log(`Zugang freigeschaltet: ${userId} -> ${masterDBAgent.name}`);
+
+      // ── Firmendaten aus dem Checkout uebernehmen ────────────────────────
+      // Stripe hat sie gerade erhoben: Rechnungsanschrift, USt-ID, Telefon
+      // sowie unsere drei eigenen Felder. Erhoben wird beim Kauf und nicht
+      // bei der Anmeldung — wer sich nur umsieht, soll kein Formular sehen.
+      const felder = new Map(
+        (session.custom_fields ?? []).map((f) => [f.key, f.text?.value ?? f.dropdown?.value ?? null])
+      );
+      const kunde = session.customer_details;
+
+      await kundendatenSpeichern(userId, {
+        firma:              felder.get("firma") ?? kunde?.name ?? null,
+        ansprechpartner:    kunde?.name ?? null,
+        telefon:            kunde?.phone ?? null,
+        website:            felder.get("website") ?? null,
+        ust_id:             kunde?.tax_ids?.[0]?.value ?? null,
+        rechnungsanschrift: (kunde?.address ?? null) as Record<string, unknown> | null,
+        onboarding_notiz:   felder.get("startpunkt") ?? null,
+      });
+
+      // ── Betrieb benachrichtigen ────────────────────────────────────────
+      // Ein Kauf passiert selten genug, dass er eine Unterbrechung wert ist,
+      // und oft genug, dass man ihn nicht uebersehen darf. Deshalb eine Mail
+      // und kein Punkt in einer Liste, die niemand oeffnet.
+      const empfaenger = betriebsAdressen();
+      if (empfaenger.length) {
+        await mailSenden({
+          an: empfaenger,
+          betreff: `Neuer Kunde: ${felder.get("firma") ?? kunde?.name ?? kunde?.email ?? userId}`,
+          text: [
+            `Neuer Kauf — dieser Kunde braucht einen Workspace.`,
+            ``,
+            `Agent:        ${masterDBAgent.name}`,
+            `Firma:        ${felder.get("firma") ?? "-"}`,
+            `Ansprechpartner: ${kunde?.name ?? "-"}`,
+            `E-Mail:       ${kunde?.email ?? "-"}`,
+            `Telefon:      ${kunde?.phone ?? "-"}`,
+            `Website:      ${felder.get("website") ?? "-"}`,
+            `USt-ID:       ${kunde?.tax_ids?.[0]?.value ?? "-"}`,
+            `Anschrift:    ${[kunde?.address?.line1, kunde?.address?.postal_code, kunde?.address?.city, kunde?.address?.country].filter(Boolean).join(", ") || "-"}`,
+            `Startpunkt:   ${felder.get("startpunkt") ?? "-"}`,
+            ``,
+            `Clerk-User:   ${userId}`,
+            ``,
+            `Naechste Schritte (claude/bauplan-modell-a.md, Abschnitt 5):`,
+            `  1. scripts/workspace-anlegen.sh "<kundenname>"`,
+            `  2. In der Console: API-Schluessel erzeugen und Ausgabenlimit setzen`,
+            `  3. select vault.create_secret('<schluessel>', 'anthropic_wrk_<kunde>', '...');`,
+            `  4. organizations: anthropic_workspace_id und anthropic_key_secret_id setzen,`,
+            `     danach onboarding_status auf 'fertig'.`,
+          ].join("\n"),
+        });
+      }
 
     } catch (error) {
       console.error("Fehler bei der Zugangsvergabe:", error);
