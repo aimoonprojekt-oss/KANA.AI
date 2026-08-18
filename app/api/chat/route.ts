@@ -9,6 +9,7 @@ import {
   completeRun,
   sessionGehoertNutzer,
 } from "@/lib/platform/supabase";
+import { sessionDateienAnhaengen } from "@/lib/agents/sessionRessourcen";
 
 // Managed Agents brauchen pro Request einen langen Lauf — Edge-Runtime
 // würde nach ~30s schließen. Daher Node-Runtime.
@@ -39,7 +40,10 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 2. Request-Daten auslesen ──────────────────────────────────────────────
-  const { agentId, message, sessionId } = await req.json();
+  // `kontext` ist optional und trägt die Auftragsparameter, aus denen L2 die
+  // Datei auftrag.json baut (Produkt, Anzahl, Format, Grenzwerte). Welcher
+  // Agent daraus was macht, steht in lib/agents/sessionRessourcen.ts.
+  const { agentId, message, sessionId, kontext } = await req.json();
 
   if (!agentId || !message) {
     return NextResponse.json({ message: "Fehlende Parameter" }, { status: 400 });
@@ -72,26 +76,29 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Vaults liefern dem Agent seine Credentials (z.B. SUPABASE_SERVICE_ROLE_KEY
-  // für den Brand Expert). Sie lassen sich NUR beim Anlegen der Session
-  // anhängen — nachträglich nicht mehr. Agents ohne Credentials (Support,
-  // Widget) bekommen eine leere Liste und verhalten sich unverändert.
-  const vaultIds =
-    (agentDef as { vault_ids?: string[] } | null)?.vault_ids ??
-    process.env.ANTHROPIC_VAULT_IDS?.split(",").map((s) => s.trim()).filter(Boolean) ??
-    [];
+  // Vaults liefern dem Agent seine Credentials (z.B. APIFY_API_TOKEN für den
+  // Researcher). Vault-IDs lassen sich nur beim Anlegen der Session anhängen.
+  // Agents ohne Credentials bekommen eine leere Liste.
+  //
+  // Die Umgebungsvariable ist nur noch ein Notnagel für den Fall, dass an einem
+  // Agenten nichts hinterlegt ist — sie gilt für ALLE Agenten und alle Mandanten
+  // und ist damit das Gegenteil dessen, was wir wollen.
+  const umgebungsListe = (name: string): string[] =>
+    process.env[name]?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
+
+  const vaultIds = agentDef?.vault_ids?.length
+    ? agentDef.vault_ids
+    : umgebungsListe("ANTHROPIC_VAULT_IDS");
 
   // Memory-Stores tragen das Kundenwissen. Sie werden als Verzeichnis unter
-  // /mnt/memory/<name>/ eingehängt und lassen sich — wie Vaults — NUR beim
-  // Anlegen der Session anhängen, nicht nachträglich.
+  // /mnt/memory/<name>/ eingehängt.
   //
   // read_only ist Absicht: Nur der Datenpfleger schreibt hinein, und zwar
   // über das Backend mit Validierung. Ein Agent, der die Wissensbasis eines
   // Mandanten überschreiben kann, ist ein Agent zu viel.
-  const memoryStoreIds =
-    (agentDef as { memory_store_ids?: string[] } | null)?.memory_store_ids ??
-    process.env.ANTHROPIC_MEMORY_STORE_IDS?.split(",").map((s) => s.trim()).filter(Boolean) ??
-    [];
+  const memoryStoreIds = agentDef?.memory_store_ids?.length
+    ? agentDef.memory_store_ids
+    : umgebungsListe("ANTHROPIC_MEMORY_STORE_IDS");
 
   // ── 5. Anthropic Managed Agents API aufrufen ───────────────────────────────
   // Beta-Felder werden als `any` getypt, da die SDK-TS-Definitionen je nach
@@ -117,22 +124,40 @@ export async function POST(req: NextRequest) {
 
     // Neue Session starten wenn noch keine vorhanden
     if (!activeSessionId) {
+      // L2: Werkzeugskripte und erzeugte Auftragsdateien in den Container legen.
+      // Ohne diesen Schritt findet ein Agent unter /mnt/session/uploads/ nichts
+      // vor und bricht ab — belegt im Testlauf vom 17.08.2026.
+      // Agenten ohne Dateien bekommen eine leere Liste.
+      const dateiRessourcen = await sessionDateienAnhaengen(
+        beta,
+        agentDef,
+        (kontext ?? {}) as Record<string, unknown>
+      );
+
+      const memoryRessourcen = memoryStoreIds.map((id) => ({
+        type: "memory_store" as const,
+        memory_store_id: id,
+        access: "read_only" as const,
+      }));
+
+      const ressourcen = [...memoryRessourcen, ...dateiRessourcen];
+
       const session = await beta.sessions.create({
         agent: activeAgentId,
         environment_id: environmentId,
         ...(vaultIds.length ? { vault_ids: vaultIds } : {}),
-        ...(memoryStoreIds.length
-          ? {
-              resources: memoryStoreIds.map((id) => ({
-                type: "memory_store",
-                memory_store_id: id,
-                access: "read_only",
-              })),
-            }
-          : {}),
+        ...(ressourcen.length ? { resources: ressourcen } : {}),
         // Harter Kostendeckel je Lauf, in ganzen CENT als String.
         // Ohne ihn ist eine Endlosschleife im Agenten ein unbegrenztes
         // Kostenrisiko. Gemessen: ein Strategy Guide mit 20 Briefs = 40 Cent.
+        //
+        // OFFEN (18.08.2026): `budget` kommt im SDK-Typ SessionCreateParams
+        // (@anthropic-ai/sdk 0.95.2) NICHT vor — die ganze Datei geht ueber
+        // einen any-Cast, deshalb faellt das dem Compiler nicht auf. Dass die
+        // API das Feld nicht ablehnt, ist belegt (Sessions werden angelegt);
+        // dass sie es auch DURCHSETZT, ist es nicht. Vor dem ersten zahlenden
+        // Kunden einmal messen: Deckel klein setzen, teuren Lauf starten, sehen
+        // ob er abbricht. Bis dahin gilt der Deckel als unbestaetigt.
         budget: {
           type: "limit",
           max_list_cost: {
