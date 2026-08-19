@@ -791,11 +791,21 @@ export type UsageStat = {
   sessionsLastWeek: number;
 };
 
+/** Ein Tag im Verlaufsdiagramm: summierte Arbeitszeit aller Agents. */
+export type VerlaufPunkt = {
+  tag:        string;   // YYYY-MM-DD
+  minuten:    number;   // Summe aus last_message_at - created_at
+  sitzungen:  number;
+};
+
 export type UsageOverview = {
   stats:           UsageStat[];
   totalThisMonth:  number;
   totalLastMonth:  number;
   recentSessions:  (Session & { agentName: string })[];
+  /** Letzte 30 Tage, lueckenlos — Tage ohne Sitzung stehen mit 0 drin,
+      sonst zieht die Linie ueber Luecken hinweg und taeuscht Betrieb vor. */
+  verlauf:         VerlaufPunkt[];
 };
 
 export async function getUserUsageStats(userId: string): Promise<UsageOverview> {
@@ -845,6 +855,39 @@ export async function getUserUsageStats(userId: string): Promise<UsageOverview> 
     return d >= startOfLastMonth && d < startOfThisMonth;
   }).length;
 
+  /* ── Verlauf der letzten 30 Tage ──
+     Arbeitszeit einer Sitzung = last_message_at - created_at. Fehlt
+     last_message_at, ist die Sitzung nie beantwortet worden und zaehlt mit
+     0 Minuten; eine geschaetzte Dauer waere hier eine erfundene Zahl.
+     Ausreisser ueber 4 Stunden werden gekappt — das sind Sitzungen, die
+     jemand offen liegen gelassen hat, keine Arbeitszeit.               */
+  const TAGE = 30;
+  const KAPPUNG_MIN = 4 * 60;
+
+  const heute = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const proTag = new Map<string, { minuten: number; sitzungen: number }>();
+  for (let i = TAGE - 1; i >= 0; i--) {
+    const d = new Date(heute);
+    d.setDate(heute.getDate() - i);
+    proTag.set(d.toISOString().slice(0, 10), { minuten: 0, sitzungen: 0 });
+  }
+
+  for (const s of sessions ?? []) {
+    const tag = new Date(s.created_at).toISOString().slice(0, 10);
+    const eintrag = proTag.get(tag);
+    if (!eintrag) continue;               // aelter als 30 Tage
+    eintrag.sitzungen++;
+    if (!s.last_message_at) continue;
+    const dauer = (new Date(s.last_message_at).getTime() - new Date(s.created_at).getTime()) / 60000;
+    if (dauer > 0) eintrag.minuten += Math.min(dauer, KAPPUNG_MIN);
+  }
+
+  const verlauf: VerlaufPunkt[] = Array.from(proTag.entries()).map(([tag, v]) => ({
+    tag,
+    minuten: Math.round(v.minuten),
+    sitzungen: v.sitzungen,
+  }));
+
   return {
     stats:          Array.from(agentStats.values()),
     totalThisMonth,
@@ -853,5 +896,6 @@ export async function getUserUsageStats(userId: string): Promise<UsageOverview> 
       ...s,
       agentName: agentMap.get(s.agent_id) ?? "Unbekannt",
     })),
+    verlauf,
   };
 }

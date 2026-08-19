@@ -34,7 +34,7 @@ const TEXTE: Record<Modus, {
     pitchText: "Onboarding-Gespräch, Einrichtung, erste Ergebnisse — ohne Agentur, ohne zusätzliche Stelle.",
     punkte: [
       "Monatlich kündbar, kein Jahresvertrag",
-      "Setup nach dem Gespräch in 3–5 Tagen",
+      "Nach dem Gespräch in wenigen Tagen einsatzbereit",
       "Ein Agent genügt für den Anfang",
       "Abteilungen kommen dazu, wenn du sie brauchst",
     ],
@@ -119,8 +119,19 @@ export const clerkHell = {
   },
   elements: {
     rootBox: { width: "100%" },
-    cardBox: { width: "100%", boxShadow: "none", border: "none" },
-    card: { background: "transparent", border: "none", boxShadow: "none", padding: 0, width: "100%" },
+    /* Clerk animiert die Hoehe des cardBox und klemmt den Inhalt dabei mit
+       overflow: hidden ab. Weil wir das Polster der Karte auf 0 setzen,
+       misst es zu kurz — die Fusszeile wurde um ein paar Pixel
+       abgeschnitten. height: auto schaltet die Hoehenanimation ab,
+       overflow: visible nimmt die Schere weg. */
+    cardBox: {
+      width: "100%", boxShadow: "none", border: "none",
+      height: "auto", minHeight: 0, overflow: "visible",
+    },
+    card: {
+      background: "transparent", border: "none", boxShadow: "none",
+      padding: 0, width: "100%", overflow: "visible",
+    },
     header: { display: "none" },
     footer: { background: "transparent" },
     /* Clerk setzt selbst eine Zeile "Schon ein Zugang vorhanden? Anmelden".

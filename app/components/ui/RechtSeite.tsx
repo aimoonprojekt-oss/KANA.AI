@@ -27,7 +27,7 @@ const IMPRESSUM: Dok = {
   blocks: [
     { title: "Anbieter", text: "[Firmenname], [Rechtsform], [Straße und Hausnummer], [PLZ Ort], Deutschland." },
     { title: "Vertreten durch", text: "[Name der vertretungsberechtigten Person], [Funktion]." },
-    { title: "Kontakt", text: "Telefon [Nummer], E-Mail hallo@kana-ai.de. Anfragen zum Produkt beantworten wir werktags am selben Tag." },
+    { title: "Kontakt", text: "Telefon [Nummer], E-Mail hallo@kana-ai.de. Produktanfragen beantworten wir werktags zeitnah." },
     { title: "Registereintrag", text: "Eingetragen im Handelsregister des Amtsgerichts [Ort], Registernummer [HRB …]. Umsatzsteuer-Identifikationsnummer gemäß § 27a UStG: [DE …]." },
     { title: "Verantwortlich für den Inhalt", text: "[Name], [Adresse]. Redaktionelle Verantwortung nach § 18 Abs. 2 MStV." },
     { title: "Streitschlichtung", text: "Wir sind nicht verpflichtet und nicht bereit, an einem Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen. [Von Kanzlei prüfen lassen.]" },

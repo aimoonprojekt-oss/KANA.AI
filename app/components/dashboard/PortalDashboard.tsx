@@ -8,6 +8,7 @@ import type { DBAgent, UsageOverview } from "@/lib/platform/supabase";
 import { ABTEILUNGEN, abteilungVon, setupVon, eur, type AbteilungId } from "@/lib/abteilungen";
 import KanaMark, { KanaLogo } from "@/app/components/ui/KanaMark";
 import Orbital from "@/app/components/ui/Orbital";
+import Verlaufsdiagramm from "@/app/components/ui/Verlaufsdiagramm";
 
 /* ─── Konstanten ─────────────────────────────────────── */
 const MONTHLY_LIMIT = 50;
@@ -571,6 +572,12 @@ export default function PortalDashboard({
                     {totalMonthly > 0 ? `anteilig von ${fmtEur(totalMonthly)}` : "Abo-Daten unter Abrechnung"}
                   </div>
                 </div>
+              </div>
+
+              {/* Verlauf zuerst: die Frage "laeuft da was und wie viel"
+                  beantwortet eine Kurve schneller als vier Kennzahlen. */}
+              <div style={{ marginBottom: 24 }}>
+                <Verlaufsdiagramm punkte={usage.verlauf} />
               </div>
 
               <div className="stat-card" style={{ marginBottom: 24 }}>

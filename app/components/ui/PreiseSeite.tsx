@@ -210,7 +210,7 @@ export default function PreiseSeite({ agents }: Props) {
             <span className="t-h3" style={{ marginTop: 8 }}>Welcher Agent lohnt sich bei dir zuerst?</span>
             <p style={{ fontSize: 15, lineHeight: 1.6, color: "rgba(241,239,233,0.8)" }}>
               Im Demo-Call sehen wir uns deine Abläufe an und sagen dir, wo der Hebel am größten ist —
-              auch dann, wenn die Antwort lautet: noch nicht. Kostenlos, 30 Minuten.
+              auch dann, wenn die Antwort lautet: noch nicht. Kostenlos und unverbindlich.
             </p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>

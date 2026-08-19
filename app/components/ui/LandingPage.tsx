@@ -27,20 +27,23 @@ const MEHRWERT = [
   { zahl: "3–5×",  text: "Günstiger als eine eigene Stelle, bei gleicher Abdeckung" },
 ];
 
-/* Der Weg vom ersten Kontakt bis zum laufenden Agent. Beantwortet die
-   Frage, die ein Interessent zuerst stellt: was passiert mit mir, und ab
-   wann arbeitet das Ding? Die Fristen decken sich mit dem, was die
-   Vertrauens-Karten und die Preisseite sagen — wer eine aendert, muss die
-   anderen mitziehen. */
+/* Der Weg vom ersten Kontakt bis zum laufenden Agent.
+
+   Bewusst ohne konkrete Fristen: wie lange das Aufsetzen eines Agents
+   tatsaechlich dauert, laesst sich noch nicht verlaesslich sagen. Eine
+   Zahl, die spaeter nicht haelt, kostet mehr Vertrauen als sie beim
+   ersten Lesen bringt. "In wenigen Tagen" gilt ueberall gleich — wenn
+   Erfahrungswerte da sind, kommen die Zahlen hier und in den
+   Vertrauens-Karten, auf der Preisseite und im Zugang zurueck. */
 const WEG = [
   { n: "01", title: "Demo-Call",
-    dauer: "30 Minuten, kostenlos",
+    dauer: "kostenlos und unverbindlich",
     desc: "Wir sehen uns deine Abläufe an und sagen dir, welcher Agent den größten Hebel hat — auch dann, wenn die Antwort lautet: noch keiner." },
   { n: "02", title: "Agent buchen",
-    dauer: "am selben Tag",
+    dauer: "direkt im Portal",
     desc: "Du buchst den Agent im Portal. Monatsbeitrag plus einmalige Einrichtung, monatlich kündbar, Abrechnung über Stripe." },
   { n: "03", title: "Einrichtung",
-    dauer: "3–5 Werktage",
+    dauer: "wenige Tage",
     desc: "Wir binden deine Kanäle und Daten an, hinterlegen Zugänge und stimmen Vorgaben und Tonlage ab. Du prüfst das Ergebnis vor dem Start." },
   { n: "04", title: "Übergabe",
     dauer: "ab dann laufend",
@@ -67,7 +70,7 @@ const TRUST = [
   { title: "Monatlich kündbar",
     desc: "Kein Jahresvertrag, keine Mindestabnahme. Du bindest dich erst, wenn die Ergebnisse überzeugen." },
   { title: "Setup in wenigen Tagen",
-    desc: "Nach dem Onboarding-Gespräch ist dein Agent innerhalb von 3–5 Tagen vollständig einsatzbereit." },
+    desc: "Nach dem Onboarding-Gespräch ist dein Agent innerhalb weniger Tage vollständig einsatzbereit." },
   { title: "Kein internes Team",
     desc: "Keine Recruiting- und Personalkosten, kein Führungsaufwand, keine Vertretungsregelung bei Ausfall." },
 ];
@@ -204,7 +207,7 @@ export default function LandingPage({ agents }: Props) {
           <h2 className="section-title">Vom ersten Gespräch bis zum laufenden Agent</h2>
           <p className="section-lead" style={{ maxWidth: "58ch" }}>
             Vier Schritte, keiner davon aufwendig für dich. Vom Demo-Call bis zum arbeitenden
-            Agent vergeht in der Regel eine knappe Woche.
+            Agent vergehen wenige Tage.
           </p>
         </div>
         <div className="steps">
