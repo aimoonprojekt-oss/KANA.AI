@@ -27,6 +27,27 @@ const MEHRWERT = [
   { zahl: "3–5×",  text: "Günstiger als eine eigene Stelle, bei gleicher Abdeckung" },
 ];
 
+/* Der Weg vom ersten Kontakt bis zum laufenden Agent. Beantwortet die
+   Frage, die ein Interessent zuerst stellt: was passiert mit mir, und ab
+   wann arbeitet das Ding? Die Fristen decken sich mit dem, was die
+   Vertrauens-Karten und die Preisseite sagen — wer eine aendert, muss die
+   anderen mitziehen. */
+const WEG = [
+  { n: "01", title: "Demo-Call",
+    dauer: "30 Minuten, kostenlos",
+    desc: "Wir sehen uns deine Abläufe an und sagen dir, welcher Agent den größten Hebel hat — auch dann, wenn die Antwort lautet: noch keiner." },
+  { n: "02", title: "Agent buchen",
+    dauer: "am selben Tag",
+    desc: "Du buchst den Agent im Portal. Monatsbeitrag plus einmalige Einrichtung, monatlich kündbar, Abrechnung über Stripe." },
+  { n: "03", title: "Einrichtung",
+    dauer: "3–5 Werktage",
+    desc: "Wir binden deine Kanäle und Daten an, hinterlegen Zugänge und stimmen Vorgaben und Tonlage ab. Du prüfst das Ergebnis vor dem Start." },
+  { n: "04", title: "Übergabe",
+    dauer: "ab dann laufend",
+    desc: "Der Agent arbeitet in deinem Arbeitsbereich. Aufträge startest du im Chat, Ergebnisse, Dateien und Kosten stehen im Portal." },
+];
+
+/* Was ein Agent im Tagesgeschäft tut — am Beispiel Marketing. */
 const ABLAUF = [
   { n: "01", title: "Markt analysieren",
     desc: "Der Agent beobachtet Wettbewerb, Preise und Nachfrage in deinem Markt — kontinuierlich, nicht quartalsweise." },
@@ -176,22 +197,23 @@ export default function LandingPage({ agents }: Props) {
         ))}
       </section>
 
-      {/* ── So funktioniert es ── */}
+      {/* ── So funktioniert es: der Weg zum eigenen Agent ── */}
       <section id="ablauf" className="section-plain">
         <div className="section-head">
           <span className="section-tag">So funktioniert es</span>
-          <h2 className="section-title">Vier Schritte bis zum laufenden Betrieb</h2>
+          <h2 className="section-title">Vom ersten Gespräch bis zum laufenden Agent</h2>
           <p className="section-lead" style={{ maxWidth: "58ch" }}>
-            Du legst das Ziel und die Leitplanken fest, die Ausführung übernimmt der Agent — fortlaufend,
-            nicht nur zum Start. Was sich täglich wiederholt, bleibt bei ihm. Deine Zeit bleibt beim Geschäft.
+            Vier Schritte, keiner davon aufwendig für dich. Vom Demo-Call bis zum arbeitenden
+            Agent vergeht in der Regel eine knappe Woche.
           </p>
         </div>
         <div className="steps">
-          {ABLAUF.map((s) => (
-            <div key={s.n} className="step">
-              <span className="step__num">{s.n}</span>
-              <h3 className="step__title">{s.title}</h3>
-              <p className="step__desc">{s.desc}</p>
+          {WEG.map((w) => (
+            <div key={w.n} className="step">
+              <span className="step__num">{w.n}</span>
+              <h3 className="step__title">{w.title}</h3>
+              <span className="step__dauer">{w.dauer}</span>
+              <p className="step__desc">{w.desc}</p>
             </div>
           ))}
         </div>
@@ -242,6 +264,28 @@ export default function LandingPage({ agents }: Props) {
             activeDept={activeDept} onDeptChange={setActiveDept}
             labelSize={12} nodeSize={15} nodePad="10px 17px"
           />
+        </div>
+      </section>
+
+      {/* ── Beispiel: was ein Agent taeglich tut ── */}
+      <section className="section-plain section-plain--abgesetzt">
+        <div className="section-head">
+          <span className="section-tag">Beispiel · Marketing</span>
+          <h2 className="section-title">Was der Agent dann täglich tut</h2>
+          <p className="section-lead" style={{ maxWidth: "58ch" }}>
+            Du legst Ziel und Leitplanken fest, die Ausführung übernimmt der Agent — fortlaufend,
+            nicht nur zum Start. Was sich täglich wiederholt, bleibt bei ihm. Deine Zeit bleibt
+            beim Geschäft.
+          </p>
+        </div>
+        <div className="steps">
+          {ABLAUF.map((s) => (
+            <div key={s.n} className="step">
+              <span className="step__num">{s.n}</span>
+              <h3 className="step__title">{s.title}</h3>
+              <p className="step__desc">{s.desc}</p>
+            </div>
+          ))}
         </div>
       </section>
 

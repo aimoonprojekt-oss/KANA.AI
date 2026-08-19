@@ -429,6 +429,11 @@ p { text-wrap: pretty; }
 
 /* Abschnitt mit Kopf und Inhalt untereinander */
 .section-plain { padding: 72px 48px; border-top: 1px solid var(--hairline); }
+/* Das Beispiel steht abgesetzt, damit es nicht mit dem Weg zum Agent
+   verwechselt wird — zwei Vierer-Reihen direkt hintereinander lesen sich
+   sonst wie ein einziger Ablauf. */
+.section-plain--abgesetzt { background: var(--bg-secondary); }
+.section-plain--abgesetzt .step { background: var(--bg-secondary); }
 .section-head { display: flex; flex-direction: column; gap: 14px; margin-bottom: 40px; }
 
 /* Vier Schritte */
@@ -436,6 +441,7 @@ p { text-wrap: pretty; }
 .step { background: var(--bg-primary); padding: 26px; display: flex; flex-direction: column; gap: 10px; }
 .step__num { font-family: var(--font-mono); font-size: 11px; font-weight: 500; letter-spacing: 0.12em; color: var(--accent); }
 .step__title { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
+.step__dauer { font-family: var(--font-mono); font-size: 11px; color: var(--accent); margin-top: -4px; }
 .step__desc { font-size: 14px; line-height: 1.6; color: var(--text-tertiary); }
 
 /* Plattformen */
