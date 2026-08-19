@@ -17,25 +17,25 @@ interface Props { agents: DBAgent[] }
    Marketing rotiert. Der marketingspezifische Satz steht jetzt weiter
    unten bei den Ausbaustufen, wo er inhaltlich stimmt. */
 const HERO_LEAD =
-  "Unser KI-Agent übernimmt die Aufgaben einer ganzen Abteilung: analysieren, umsetzen, ausliefern – ohne Agentur, ohne Team, ohne deinen Aufwand.";
+  "Ein KI-Agent übernimmt die wiederkehrende Arbeit einer ganzen Abteilung: analysieren, umsetzen, ausliefern. Ohne Agentur, ohne zusätzliche Stelle, ohne Einarbeitung.";
 
 /* Der Mehrwert in Zahlen. Aus 04_INHALTE, auf "du" umgestellt. */
 const MEHRWERT = [
-  { zahl: "20 h+", text: "Marketing-Aufwand pro Woche ohne Agent" },
-  { zahl: "0 h",   text: "Mit deinem Agent — er arbeitet allein weiter" },
-  { zahl: "24/7",  text: "Dein Agent schläft nie und macht keinen Urlaub" },
-  { zahl: "3–5×",  text: "Günstiger als ein eigenes Marketing-Team" },
+  { zahl: "20 h+", text: "Wöchentlicher Aufwand, den die Abteilung heute im Haus bindet" },
+  { zahl: "0 h",   text: "Dein Aufwand, sobald der Agent eingerichtet ist" },
+  { zahl: "24/7",  text: "Verfügbar, ohne Vertretungsregelung und ohne Ausfallzeiten" },
+  { zahl: "3–5×",  text: "Günstiger als eine eigene Stelle, bei gleicher Abdeckung" },
 ];
 
 const ABLAUF = [
   { n: "01", title: "Markt analysieren",
-    desc: "Der Agent beobachtet Trends, Wettbewerber und Chancen in deiner Nische – rund um die Uhr, automatisch." },
+    desc: "Der Agent beobachtet Wettbewerb, Preise und Nachfrage in deinem Markt — kontinuierlich, nicht quartalsweise." },
   { n: "02", title: "Creatives erstellen",
-    desc: "Optimierte Video- und Foto-Ads aus deinen bestehenden Assets. Kein Briefing, kein Freelancer, kein Warten." },
+    desc: "Video- und Bildanzeigen aus deinem vorhandenen Material. Ohne Briefing, ohne externe Dienstleister, ohne Wartezeit." },
   { n: "03", title: "Kampagne schalten",
-    desc: "Fertige Werbemittel gehen automatisch auf die richtigen Kanäle – ohne manuellen Eingriff." },
+    desc: "Fertige Werbemittel gehen auf die passenden Kanäle, im abgestimmten Zeitplan und Budget." },
   { n: "04", title: "Ergebnisse optimieren",
-    desc: "Auswertung, A/B-Test, Anpassung. Der Agent lernt mit jedem Zyklus dazu." },
+    desc: "Auswertung, A/B-Test, Anpassung. Jeder Durchlauf fließt in den nächsten ein." },
 ];
 
 /* Der Satz "auf deutschen Servern" ist bewusst raus: die Datenbank laeuft in
@@ -44,11 +44,11 @@ const TRUST = [
   { title: "DSGVO-konform",
     desc: "Alle Daten werden DSGVO-konform verarbeitet. Volle Compliance, volle Kontrolle." },
   { title: "Monatlich kündbar",
-    desc: "Kein Jahresvertrag, kein Kleingedrucktes. Du committest dich erst wenn du überzeugt bist." },
+    desc: "Kein Jahresvertrag, keine Mindestabnahme. Du bindest dich erst, wenn die Ergebnisse überzeugen." },
   { title: "Setup in wenigen Tagen",
     desc: "Nach dem Onboarding-Gespräch ist dein Agent innerhalb von 3–5 Tagen vollständig einsatzbereit." },
   { title: "Kein internes Team",
-    desc: "Keine Hiring-Kosten, kein Management-Aufwand, keine Urlaubsvertretung. Einfach einschalten und loslegen." },
+    desc: "Keine Recruiting- und Personalkosten, kein Führungsaufwand, keine Vertretungsregelung bei Ausfall." },
 ];
 
 /* Dekorative Punkte im Hero-Hintergrund. Reine Zierde, pointer-events: none. */
@@ -95,7 +95,7 @@ export default function LandingPage({ agents }: Props) {
   const tarifKarten = [
     {
       kicker: "Einstieg", name: "Ein Agent", hervor: false, ab: true,
-      desc: "Ein digitaler Mitarbeiter aus einer Abteilung deiner Wahl.",
+      desc: "Eine klar umrissene Aufgabe, übernommen von einem Agent deiner Wahl.",
       monat: tarife.abEinAgent, setup: tarife.abSetup, einheit: "je Agent / Monat",
       punkte: ["Ein Agent, ein Arbeitsbereich", "Sessions-Kontingent inklusive", "Chat und Dateiablage", "Monatlich kündbar"],
       cta: "Agent auswählen", href: "/preise",
@@ -157,7 +157,7 @@ export default function LandingPage({ agents }: Props) {
               <Wortrolle woerter={VERBEN} index={rotation} />
             </span>
           </h1>
-          <p className="hero-sub">Du machst nichts davon.</p>
+          <p className="hero-sub">Ohne dass du eingreifen musst.</p>
           <p className="hero-lead">{HERO_LEAD}</p>
           <div className="hero-actions">
             <Link href="/sign-up" className="btn btn-primary btn-lg">Kostenlosen Demo-Call buchen</Link>
@@ -180,9 +180,10 @@ export default function LandingPage({ agents }: Props) {
       <section id="ablauf" className="section-plain">
         <div className="section-head">
           <span className="section-tag">So funktioniert es</span>
-          <h2 className="section-title">Vier Schritte, dann läuft es allein</h2>
+          <h2 className="section-title">Vier Schritte bis zum laufenden Betrieb</h2>
           <p className="section-lead" style={{ maxWidth: "58ch" }}>
-            Du gibst das Ziel vor. Den Rest übernimmt der Agent — und zwar jeden Tag, nicht nur beim Start.
+            Du legst das Ziel und die Leitplanken fest. Die Ausführung übernimmt der Agent — fortlaufend,
+            nicht nur zum Start.
           </p>
         </div>
         <div className="steps">

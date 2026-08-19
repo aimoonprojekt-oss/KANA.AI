@@ -19,18 +19,18 @@ const LEISTUNGEN = [
   { title: "Freikontingent",
     desc: "Ein Sessions-Kontingent pro Monat ist enthalten, darüber wird verbrauchsabhängig abgerechnet." },
   { title: "Eigener Arbeitsbereich",
-    desc: "Deine Daten, Assets und Ergebnisse liegen abgetrennt und bleiben bei dir." },
+    desc: "Daten, Material und Ergebnisse liegen in einem abgetrennten Bereich und bleiben in deiner Hand." },
   { title: "Einmalige Einrichtung",
     desc: "Onboarding-Gespräch, Anbindung deiner Kanäle und Daten, Feinschliff der Vorgaben. Fällt einmal je Agent an und steht offen bei jedem Preis." },
   { title: "Monatlich kündbar",
-    desc: "Kein Jahresvertrag, kein Kleingedrucktes. Abrechnung läuft über Stripe." },
+    desc: "Kein Jahresvertrag, keine Mindestabnahme. Die Abrechnung läuft über Stripe." },
 ];
 
 const FAQ = [
   { q: "Wie wird der Verbrauch berechnet?",
     a: "Jeder Agent hat ein monatliches Sessions-Kontingent. Was darüber läuft, wird verbrauchsabhängig abgerechnet und ist im Portal unter Verbrauch jederzeit einsehbar." },
   { q: "Kann ich Agents zwischendurch tauschen?",
-    a: "Ja. Du kannst zum Monatsende wechseln, dazunehmen oder abbestellen. Bestehende Sitzungen und Dateien bleiben erhalten." },
+    a: "Ja. Zum Monatsende kannst du wechseln, ergänzen oder abbestellen. Bestehende Sitzungen und Dateien bleiben erhalten." },
   { q: "Warum kommt zum Monatsbeitrag noch eine Einrichtungsgebühr?",
     a: "Weil die Einrichtung echte Arbeit ist: Onboarding-Gespräch, Anbindung deiner Kanäle und Daten, Abstimmung der Vorgaben und Tonlage. Das passiert einmal je Agent, nicht jeden Monat — deshalb steckt es nicht im laufenden Beitrag, sondern steht offen daneben. Das Gespräch selbst kostet nichts." },
   { q: "Kommt später noch etwas dazu?",
@@ -59,7 +59,7 @@ export default function PreiseSeite({ agents }: Props) {
 
   const plans = [
     { kicker: "Einstieg", name: "Ein Agent", hervor: false, ab: true,
-      desc: "Ein digitaler Mitarbeiter aus einer Abteilung deiner Wahl.",
+      desc: "Eine klar umrissene Aufgabe, übernommen von einem Agent deiner Wahl.",
       monat: monat(tarife.abEinAgent), setup: tarife.abSetup, unit: einheit("Agent"),
       punkte: ["Ein Agent, ein Arbeitsbereich", "Sessions-Kontingent inklusive", "Chat und Dateiablage", kuendigung],
       cta: "Agent auswählen", href: "/sign-up" },
@@ -84,7 +84,8 @@ export default function PreiseSeite({ agents }: Props) {
           Du zahlst pro Agent.<br />Nicht pro Abteilung.
         </h1>
         <p className="t-lead" style={{ color: "var(--text-secondary)", maxWidth: "58ch", textAlign: "center" }}>
-          Jeder Agent läuft als eigenes Abo, monatlich kündbar. Du fängst mit einem an und nimmst dazu, was du brauchst.
+          Jeder Agent ist ein eigenes Abo, monatlich kündbar. Du beginnst mit einem und nimmst dazu, was der
+          Betrieb hergibt.
         </p>
         <div className="seg" style={{ marginTop: 18 }} role="group" aria-label="Abrechnungszeitraum">
           <button type="button" className={`seg-item${!jaehrlich ? " active" : ""}`} onClick={() => setJaehrlich(false)}>Monatlich</button>
@@ -206,10 +207,10 @@ export default function PreiseSeite({ agents }: Props) {
         <aside className="cta-petrol">
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <KanaMark size={44} variant="onaccent" motion="spin" breathe />
-            <span className="t-h3" style={{ marginTop: 8 }}>Unsicher, welcher Agent zuerst?</span>
+            <span className="t-h3" style={{ marginTop: 8 }}>Welcher Agent lohnt sich bei dir zuerst?</span>
             <p style={{ fontSize: 15, lineHeight: 1.6, color: "rgba(241,239,233,0.8)" }}>
-              Im Demo-Call schauen wir dein Setup an und sagen dir, welche Abteilung bei dir den größten Hebel hat.
-              Kostenlos, 30 Minuten.
+              Im Demo-Call sehen wir uns deine Abläufe an und sagen dir, wo der Hebel am größten ist —
+              auch dann, wenn die Antwort lautet: noch nicht. Kostenlos, 30 Minuten.
             </p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>

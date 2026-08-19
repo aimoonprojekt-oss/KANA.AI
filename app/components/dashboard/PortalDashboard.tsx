@@ -279,7 +279,7 @@ export default function PortalDashboard({
               <div>
                 <div style={{ fontWeight: 700, fontSize: 15 }}>Agent freigeschaltet</div>
                 <div className="t-meta" style={{ color: "var(--text-secondary)" }}>
-                  Dein Agent ist einsatzbereit. Viel Erfolg.
+                  Der Agent ist eingerichtet und ab sofort einsatzbereit.
                 </div>
               </div>
               <button className="modal-close-btn" onClick={() => setShowPurchaseSuccess(false)} aria-label="Meldung schließen">
@@ -298,7 +298,7 @@ export default function PortalDashboard({
                 <p>
                   {userAgents.length > 0
                     ? `${userAgents.length} ${userAgents.length === 1 ? "Agent ist" : "Agents sind"} für dich im Einsatz.`
-                    : "Noch kein Agent gebucht. Such dir unten einen aus."}
+                    : "Noch kein Agent gebucht. Im Katalog unten stehen die verfügbaren."}
                 </p>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -716,15 +716,15 @@ export default function PortalDashboard({
               <KanaMark size={62} motion="spin" breathe />
               <h2 className="t-h3" style={{ marginTop: 8 }}>Willkommen bei KANA AI</h2>
               <p className="t-lead" style={{ color: "var(--text-secondary)", textAlign: "center", maxWidth: "46ch" }}>
-                Deine Agents arbeiten in deinem eigenen Bereich. Hier ist, was sie für dich tun.
+                Deine Agents arbeiten in einem abgetrennten Bereich. Das übernehmen sie für dich.
               </p>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 32 }}>
               {[
-                { title: "Markt analysieren", desc: "Trends, Wettbewerber und Chancen — rund um die Uhr." },
-                { title: "Creatives erstellen", desc: "Ads und Inhalte aus deinen bestehenden Assets." },
-                { title: "Kampagnen schalten", desc: "Automatisch auf den richtigen Kanälen veröffentlicht." },
+                { title: "Markt analysieren", desc: "Wettbewerb, Preise und Nachfrage — fortlaufend statt quartalsweise." },
+                { title: "Creatives erstellen", desc: "Anzeigen und Inhalte aus deinem vorhandenen Material." },
+                { title: "Kampagnen schalten", desc: "Auf den passenden Kanälen, im abgestimmten Budget." },
               ].map((f) => (
                 <div key={f.title} className="card-flat" style={{ padding: 20 }}>
                   <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6, letterSpacing: "-0.02em" }}>{f.title}</div>

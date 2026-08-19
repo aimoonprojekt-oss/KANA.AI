@@ -44,7 +44,7 @@ const DATENSCHUTZ: Dok = {
     { title: "Verantwortlicher", text: "[Firmenname], [Adresse], erreichbar unter hallo@kana-ai.de. Datenschutzbeauftragte Stelle: [Angabe oder Hinweis, dass keine Bestellpflicht besteht]." },
     { title: "Welche Daten wir verarbeiten", text: "Wir verarbeiten Daten, die für Zugang, Betrieb und Abrechnung nötig sind:", items: [
       "Zugangsdaten: Name, Firma, E-Mail-Adresse, Passwort-Hash",
-      "Inhalte: deine Eingaben im Chat, hochgeladene Assets, erzeugte Dateien",
+      "Inhalte: deine Eingaben im Chat, hochgeladene Dateien, erzeugte Ergebnisse",
       "Nutzungsdaten: Sitzungen, Laufzeiten, Verbrauch — Grundlage der Abrechnung",
       "Abrechnungsdaten: über den Zahlungsdienstleister [Stripe Payments Europe Ltd.]",
     ] },
