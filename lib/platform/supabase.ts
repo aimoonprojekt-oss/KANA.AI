@@ -49,10 +49,15 @@ export type DBAgent = {
   setup_eur?:         number | null;
 
   // Inhalte fuer den leeren Chat: Fakten-Chips und Startprompts.
-  // Optional wie setup_eur — fehlt die Spalte, bleiben die Bloecke leer,
-  // statt dass die Seite bricht. Migration: docs/2026-08-19-chat-inhalte.sql
-  chat_fakten?:       [string, string][] | null;
-  chat_prompts?:      { kurz: string; text: string }[] | null;
+  // Bewusst als unknown getypt und NICHT als fertige Liste: die Spalten sind
+  // jsonb und werden von Hand befuellt, dort kann alles stehen. Wer sie
+  // liest, muss durch faktenAus()/promptsAus() aus lib/chat-inhalte — der
+  // Typ erzwingt das. Vorher stand hier eine Liste, der Code rief .map()
+  // direkt darauf auf, und eine abweichende Form hat die Chatseite mit
+  // "map is not a function" abgeraeumt.
+  // Migration: docs/2026-08-19-chat-inhalte.sql
+  chat_fakten?:       unknown;
+  chat_prompts?:      unknown;
 
   published:          boolean;
   featured:           boolean;

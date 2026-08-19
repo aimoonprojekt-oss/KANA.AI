@@ -10,6 +10,7 @@ import CreativeStrategist from "@/app/components/agents/CreativeStrategist";
 import CreativeAnalyst from "@/app/components/agents/CreativeAnalyst";
 import KanaMark, { KanaLogo } from "@/app/components/ui/KanaMark";
 import type { DBAgent } from "@/lib/platform/supabase";
+import { faktenAus, promptsAus } from "@/lib/chat-inhalte";
 
 type Message = { role: "user" | "assistant"; content: string };
 type OutputFile = { id: string; filename: string };
@@ -330,8 +331,11 @@ function ChatPageInner({ agentId, agent, meineAgents }: Props) {
     ? `${user.firstName[0]}${user.lastName?.[0] ?? ""}`.toUpperCase()
     : "?";
 
-  const fakten  = agent?.chat_fakten  ?? [];
-  const prompts = agent?.chat_prompts ?? [];
+  /* Beides kommt aus handbefuellten jsonb-Spalten. Die Umwandlung deutet,
+     was sich deuten laesst, und verwirft den Rest — statt die Seite an einer
+     unerwarteten Form scheitern zu lassen. */
+  const fakten  = faktenAus(agent?.chat_fakten);
+  const prompts = promptsAus(agent?.chat_prompts);
   const leer    = messages.length === 0 && !isLoading;
 
   return (
@@ -413,8 +417,8 @@ function ChatPageInner({ agentId, agent, meineAgents }: Props) {
                   {agent?.description && <p className="chat-start__desc">{agent.description}</p>}
                   {fakten.length > 0 && (
                     <div className="chat-start__fakten">
-                      {fakten.map(([k, v]) => (
-                        <span key={k} className="chat-fakt">{k}: {v}</span>
+                      {fakten.map(([k, v], idx) => (
+                        <span key={`${k}-${idx}`} className="chat-fakt">{k}: {v}</span>
                       ))}
                     </div>
                   )}
@@ -427,9 +431,9 @@ function ChatPageInner({ agentId, agent, meineAgents }: Props) {
                     Womit soll er anfangen?
                   </span>
                   <div className="chat-prompt-raster">
-                    {prompts.map((p) => (
+                    {prompts.map((p, idx) => (
                       <button
-                        key={p.kurz}
+                        key={`${p.kurz}-${idx}`}
                         type="button"
                         className={`chat-prompt${input === p.text ? " is-active" : ""}`}
                         onClick={() => setInput(p.text)}
