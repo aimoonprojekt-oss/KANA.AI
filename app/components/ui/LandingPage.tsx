@@ -17,12 +17,12 @@ interface Props { agents: DBAgent[] }
    Marketing rotiert. Der marketingspezifische Satz steht jetzt weiter
    unten bei den Ausbaustufen, wo er inhaltlich stimmt. */
 const HERO_LEAD =
-  "Ein KI-Agent übernimmt die wiederkehrende Arbeit einer ganzen Abteilung: analysieren, umsetzen, ausliefern. Ohne Agentur, ohne zusätzliche Stelle, ohne Einarbeitung.";
+  "Ein KI-Agent übernimmt die wiederkehrende Arbeit einer ganzen Abteilung: analysieren, umsetzen, ausliefern. Deine Zeit bleibt für das, was nur du entscheiden kannst — ohne Agentur, ohne zusätzliche Stelle.";
 
 /* Der Mehrwert in Zahlen. Aus 04_INHALTE, auf "du" umgestellt. */
 const MEHRWERT = [
   { zahl: "20 h+", text: "Wöchentlicher Aufwand, den die Abteilung heute im Haus bindet" },
-  { zahl: "0 h",   text: "Dein Aufwand, sobald der Agent eingerichtet ist" },
+  { zahl: "0 h",   text: "Dein Aufwand im Tagesgeschäft, sobald der Agent läuft" },
   { zahl: "24/7",  text: "Verfügbar, ohne Vertretungsregelung und ohne Ausfallzeiten" },
   { zahl: "3–5×",  text: "Günstiger als eine eigene Stelle, bei gleicher Abdeckung" },
 ];
@@ -182,8 +182,8 @@ export default function LandingPage({ agents }: Props) {
           <span className="section-tag">So funktioniert es</span>
           <h2 className="section-title">Vier Schritte bis zum laufenden Betrieb</h2>
           <p className="section-lead" style={{ maxWidth: "58ch" }}>
-            Du legst das Ziel und die Leitplanken fest. Die Ausführung übernimmt der Agent — fortlaufend,
-            nicht nur zum Start.
+            Du legst das Ziel und die Leitplanken fest, die Ausführung übernimmt der Agent — fortlaufend,
+            nicht nur zum Start. Was sich täglich wiederholt, bleibt bei ihm. Deine Zeit bleibt beim Geschäft.
           </p>
         </div>
         <div className="steps">
