@@ -5,6 +5,10 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 // Routen, die Geld ausgeben (Anthropic, Apify, Gemini), gehoeren NICHT hierher.
 const isPublicRoute = createRouteMatcher([
   "/",              // Landing Page
+  "/preise",        // Preisseite — zeigt dieselben published Agents wie "/"
+  "/recht",         // Impressum und Datenschutz. MUSS ohne Login erreichbar
+                    // sein: die Impressumspflicht nach § 5 DDG verlangt
+                    // unmittelbare Erreichbarkeit ohne Anmeldung.
   "/sign-in(.*)",   // Login
   "/sign-up(.*)",   // Registrierung
   "/api/webhooks/stripe", // Stripe Webhook (muss ohne Auth erreichbar sein)

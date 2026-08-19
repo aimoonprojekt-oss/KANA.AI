@@ -69,6 +69,9 @@ export default function PortalDashboard({
 
   const [view, setView]             = useState<View>("agents");
   const [activeDept, setActiveDept] = useState<AbteilungId>("marketing");
+  /* Meine Agents = gebucht, Alle Agents = Katalog. Der haeufigste Fall
+     zuerst — wer schon gebucht hat, will zu seinen Agents. */
+  const [umfang, setUmfang] = useState<"meine" | "alle">("meine");
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
 
   const [syncing, setSyncing] = useState(false);
@@ -96,12 +99,23 @@ export default function PortalDashboard({
     ...lockedAgents.map((a) => ({ agent: a, owned: false })),
   ];
 
+  const sichtbar = umfang === "meine"
+    ? alleAgenten.filter((e) => e.owned)
+    : alleAgenten;
+
   const abteilungen = ABTEILUNGEN.map((d) => ({
+    ...d,
+    eintraege: sichtbar.filter((e) => abteilungVon(e.agent) === d.id),
+  }));
+
+  /* Das Orbital zeigt immer den ganzen Aufbau, auch unter "Meine Agents" —
+     sonst verschwindet gerade das, was man dazubuchen koennte. */
+  const orbitalAbteilungen = ABTEILUNGEN.map((d) => ({
     ...d,
     eintraege: alleAgenten.filter((e) => abteilungVon(e.agent) === d.id),
   }));
 
-  const orbitalDepts = abteilungen.map((d) => ({
+  const orbitalDepts = orbitalAbteilungen.map((d) => ({
     id: d.id,
     name: d.name,
     angle: d.angle,
@@ -112,7 +126,7 @@ export default function PortalDashboard({
 
   /* Vorschlag fuer die naechste Abteilung: die mit den meisten noch
      buchbaren Agenten, in der noch nichts gebucht ist. */
-  const upsell = abteilungen
+  const upsell = orbitalAbteilungen
     .filter((d) => d.eintraege.length > 0 && d.eintraege.every((e) => !e.owned))
     .sort((a, b) => b.eintraege.length - a.eintraege.length)[0];
   const upsellAbPreis = upsell
@@ -149,6 +163,8 @@ export default function PortalDashboard({
   useEffect(() => {
     const mit = ABTEILUNGEN.find((d) => userAgents.some((a) => abteilungVon(a) === d.id));
     if (mit) setActiveDept(mit.id);
+    /* Wer noch nichts gebucht hat, sieht sonst eine leere Seite. */
+    if (userAgents.length === 0) setUmfang("alle");
   }, [userAgents]);
 
   /* ── Handler ── */
@@ -285,6 +301,23 @@ export default function PortalDashboard({
                     : "Noch kein Agent gebucht. Such dir unten einen aus."}
                 </p>
               </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <div className="seg" role="tablist" aria-label="Umfang">
+                <button
+                  type="button" role="tab" aria-selected={umfang === "meine"}
+                  className={`seg-item${umfang === "meine" ? " active" : ""}`}
+                  onClick={() => { setUmfang("meine"); setSelectedAgent(null); }}
+                >
+                  Meine Agents <span className="seg-item__count">{userAgents.length}</span>
+                </button>
+                <button
+                  type="button" role="tab" aria-selected={umfang === "alle"}
+                  className={`seg-item${umfang === "alle" ? " active" : ""}`}
+                  onClick={() => { setUmfang("alle"); setSelectedAgent(null); }}
+                >
+                  Alle Agents <span className="seg-item__count">{alleAgenten.length}</span>
+                </button>
+              </div>
               <div className="seg" role="tablist" aria-label="Abteilung">
                 {abteilungen.map((d) => (
                   <button
@@ -299,6 +332,7 @@ export default function PortalDashboard({
                   </button>
                 ))}
               </div>
+              </div>
             </div>
 
             <div className="agents-layout">
@@ -311,7 +345,12 @@ export default function PortalDashboard({
 
                 {aktive.eintraege.length === 0 ? (
                   <div className="table-empty">
-                    In {aktive.name} ist noch kein Agent verfügbar.
+                    {umfang === "meine"
+                      ? <>In {aktive.name} hast du noch keinen Agent gebucht.{" "}
+                          <button type="button" className="table-empty__link" onClick={() => setUmfang("alle")}>
+                            Alle Agents ansehen
+                          </button></>
+                      : <>In {aktive.name} ist noch kein Agent verfügbar.</>}
                   </div>
                 ) : (
                   aktive.eintraege.map(({ agent, owned }) => (

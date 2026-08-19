@@ -3,14 +3,34 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { DBAgent } from "@/lib/platform/supabase";
-import { nachAbteilung } from "@/lib/abteilungen";
-import KanaMark, { KanaLogo } from "./KanaMark";
+import { nachAbteilung, tarifeAus, eur } from "@/lib/abteilungen";
 import Orbital from "./Orbital";
+import { KANAELE, TECHNIK, PlattformLogo } from "./PlattformLogos";
+import { SiteNav, SiteFooter } from "./SiteChrome";
 
 interface Props { agents: DBAgent[] }
 
 const HERO_LEAD =
   "Unser KI-Agent analysiert deinen Markt, erstellt deine Werbemittel und schaltet sie automatisch – vollständig ohne Agentur, ohne Team, ohne deinen Aufwand.";
+
+/* Der Mehrwert in Zahlen. Aus 04_INHALTE, auf "du" umgestellt. */
+const MEHRWERT = [
+  { zahl: "20 h+", text: "Marketing-Aufwand pro Woche ohne Agent" },
+  { zahl: "0 h",   text: "Mit deinem Agent — er arbeitet allein weiter" },
+  { zahl: "24/7",  text: "Dein Agent schläft nie und macht keinen Urlaub" },
+  { zahl: "3–5×",  text: "Günstiger als ein eigenes Marketing-Team" },
+];
+
+const ABLAUF = [
+  { n: "01", title: "Markt analysieren",
+    desc: "Der Agent beobachtet Trends, Wettbewerber und Chancen in deiner Nische – rund um die Uhr, automatisch." },
+  { n: "02", title: "Creatives erstellen",
+    desc: "Optimierte Video- und Foto-Ads aus deinen bestehenden Assets. Kein Briefing, kein Freelancer, kein Warten." },
+  { n: "03", title: "Kampagne schalten",
+    desc: "Fertige Werbemittel gehen automatisch auf die richtigen Kanäle – ohne manuellen Eingriff." },
+  { n: "04", title: "Ergebnisse optimieren",
+    desc: "Auswertung, A/B-Test, Anpassung. Der Agent lernt mit jedem Zyklus dazu." },
+];
 
 /* Der Satz "auf deutschen Servern" ist bewusst raus: die Datenbank laeuft in
    eu-central-1, die Agenten bei Anthropic in den USA. Siehe Handoff. */
@@ -39,27 +59,17 @@ const HERO_DOTS_CCW = [
 
 export default function LandingPage({ agents }: Props) {
   const [activeDept, setActiveDept] = useState("marketing");
-  const [scrolled, setScrolled] = useState(false);
   const [typed, setTyped] = useState("");
 
-  /* Abteilungen und Agents kommen aus der Datenbank — nichts mehr fest
-     verdrahtet. Damit wirken featured, price_eur und description endlich. */
+  /* Abteilungen, Agents und Preise kommen aus der Datenbank — nichts mehr
+     fest verdrahtet. Damit wirken featured, price_eur und description. */
   const depts = nachAbteilung(agents);
+  const tarife = tarifeAus(agents);
   const orbitalDepts = depts.map((d) => ({
-    id: d.id,
-    name: d.name,
-    angle: d.angle,
+    id: d.id, name: d.name, angle: d.angle,
     agents: d.agents.map((a) => ({ id: a.id, name: a.name })),
   }));
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  /* Schreibmaschine auf der Einleitung — der einzige Rest des alten Zierrats,
-     bewusst behalten. Die Zeile hat eine Mindesthoehe, damit nichts springt. */
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setTyped(HERO_LEAD);
@@ -76,22 +86,35 @@ export default function LandingPage({ agents }: Props) {
 
   const active = depts.find((d) => d.id === activeDept) ?? depts[0];
 
+  const tarifKarten = [
+    {
+      kicker: "Einstieg", name: "Ein Agent", hervor: false,
+      desc: "Ein digitaler Mitarbeiter aus einer Abteilung deiner Wahl.",
+      betrag: tarife.abEinAgent !== null ? `ab ${eur(tarife.abEinAgent)}` : "—",
+      einheit: "je Agent / Monat",
+      punkte: ["Ein Agent, ein Arbeitsbereich", "Sessions-Kontingent inklusive", "Chat und Dateiablage", "Monatlich kündbar"],
+      cta: "Agent auswählen", href: "/preise",
+    },
+    {
+      kicker: "Empfohlen", name: "Abteilung", hervor: true,
+      desc: "Alle Agents einer Abteilung, aufeinander abgestimmt.",
+      betrag: tarife.abAbteilung !== null ? `ab ${eur(tarife.abAbteilung)}` : "—",
+      einheit: "je Abteilung / Monat",
+      punkte: ["Alle Agents der Abteilung", "Höheres Freikontingent", "Gemeinsame Vorgaben und Tonlage", "Onboarding-Gespräch inklusive"],
+      cta: "Abteilung ansehen", href: "/preise",
+    },
+    {
+      kicker: "Ausbau", name: "Mehrere Abteilungen", hervor: false,
+      desc: "Marketing, Vertrieb, IT und Content am selben Kern.",
+      betrag: "individuell", einheit: "nach Umfang",
+      punkte: ["Beliebige Abteilungen kombinierbar", "Verbrauch gebündelt abgerechnet", "Feste Ansprechperson", "Auswertung im Portal"],
+      cta: "Angebot anfragen", href: "/preise",
+    },
+  ];
+
   return (
     <div className="landing">
-      {/* ── Kopfleiste ── */}
-      <nav className={`landing-nav${scrolled ? " is-scrolled" : ""}`}>
-        <Link href="/" aria-label="KANA AI — Startseite">
-          <KanaLogo size={26} fontSize={19} />
-        </Link>
-        <ul className="nav-links">
-          <li><a href="#ausbaustufen">Abteilungen</a></li>
-          <li><a href="#vertrauen">Vertrauen</a></li>
-          <li><Link href="/sign-in">Anmelden</Link></li>
-        </ul>
-        <div className="nav-actions">
-          <Link href="/sign-up" className="btn btn-outline">Kostenlos starten</Link>
-        </div>
-      </nav>
+      <SiteNav />
 
       {/* ── Hero ── */}
       <header className="hero">
@@ -126,10 +149,40 @@ export default function LandingPage({ agents }: Props) {
           </p>
           <div className="hero-actions">
             <Link href="/sign-up" className="btn btn-primary btn-lg">Kostenlosen Demo-Call buchen</Link>
-            <a href="#ausbaustufen" className="btn btn-ghost btn-lg">So funktioniert es →</a>
+            <a href="#ablauf" className="btn btn-ghost btn-lg">So funktioniert es →</a>
           </div>
         </div>
       </header>
+
+      {/* ── Mehrwert in Zahlen ── */}
+      <section className="section-numbers" aria-label="Mehrwert">
+        {MEHRWERT.map((m) => (
+          <div key={m.zahl} className="number-cell">
+            <span className="number-cell__val">{m.zahl}</span>
+            <span className="number-cell__text">{m.text}</span>
+          </div>
+        ))}
+      </section>
+
+      {/* ── So funktioniert es ── */}
+      <section id="ablauf" className="section-plain">
+        <div className="section-head">
+          <span className="section-tag">So funktioniert es</span>
+          <h2 className="section-title">Vier Schritte, dann läuft es allein</h2>
+          <p className="section-lead" style={{ maxWidth: "58ch" }}>
+            Du gibst das Ziel vor. Den Rest übernimmt der Agent — und zwar jeden Tag, nicht nur beim Start.
+          </p>
+        </div>
+        <div className="steps">
+          {ABLAUF.map((s) => (
+            <div key={s.n} className="step">
+              <span className="step__num">{s.n}</span>
+              <h3 className="step__title">{s.title}</h3>
+              <p className="step__desc">{s.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* ── Ausbaustufen ── */}
       <section id="ausbaustufen" className="section-orbital">
@@ -163,27 +216,80 @@ export default function LandingPage({ agents }: Props) {
           </div>
 
           {active && (
-            <p className="section-lead" style={{ fontSize: 15, color: "var(--text-tertiary)" }}>
-              {active.line}
-            </p>
+            <p className="section-lead" style={{ fontSize: 15, color: "var(--text-tertiary)" }}>{active.line}</p>
           )}
         </div>
 
         <div className="orbital-wrap" style={{ display: "flex", justifyContent: "center" }}>
           <Orbital
             depts={orbitalDepts}
-            size={560}
-            coreR={43}
-            rInner={145}
-            rOuter={245}
-            spread={46}
-            activeDept={activeDept}
-            onDeptChange={setActiveDept}
-            labelSize={12}
-            nodeSize={15}
-            nodePad="10px 17px"
+            size={560} coreR={43} rInner={145} rOuter={245} spread={46}
+            activeDept={activeDept} onDeptChange={setActiveDept}
+            labelSize={12} nodeSize={15} nodePad="10px 17px"
           />
         </div>
+      </section>
+
+      {/* ── Plattformen ── */}
+      <section className="section-platforms" aria-label="Plattformen">
+        <div className="platform-block">
+          <span className="mono-sm" style={{ color: "var(--text-muted)" }}>Arbeitet mit deinen Kanälen und Shops</span>
+          <div className="platform-row">
+            {KANAELE.map((l) => <PlattformLogo key={l.name} logo={l} size={26} />)}
+          </div>
+        </div>
+        <div className="platform-block">
+          <span className="mono-sm" style={{ color: "var(--text-muted)" }}>Läuft auf</span>
+          <div className="platform-row">
+            {TECHNIK.map((l) => <PlattformLogo key={l.name} logo={l} size={24} />)}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Preise ── */}
+      <section id="preise" className="section-plain">
+        <div className="section-head">
+          <span className="section-tag">Preise</span>
+          <h2 className="section-title">Du zahlst pro Agent. Nicht pro Abteilung.</h2>
+          <p className="section-lead" style={{ maxWidth: "58ch" }}>
+            Jeder Agent läuft als eigenes Abo, monatlich kündbar. Du fängst mit einem an und nimmst dazu, was du brauchst.
+          </p>
+        </div>
+
+        <div className="plans">
+          {tarifKarten.map((p) => (
+            <div key={p.name} className={`plan${p.hervor ? " is-featured" : ""}`}>
+              <div className="plan__head">
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                  <span className="mono-sm" style={{ color: "var(--accent)" }}>{p.kicker}</span>
+                  {p.hervor && <span className="badge badge-solid">meist gewählt</span>}
+                </div>
+                <span className="plan__name">{p.name}</span>
+                <p className="plan__desc">{p.desc}</p>
+              </div>
+              <div className="plan__price">
+                <span className="plan__amount">{p.betrag}</span>
+                <span className="plan__unit">{p.einheit}</span>
+              </div>
+              <ul className="plan__list">
+                {p.punkte.map((f) => (
+                  <li key={f}><span className="plan__bullet" />{f}</li>
+                ))}
+              </ul>
+              <div className="plan__foot">
+                <Link href={p.href} className={`btn btn-full ${p.hervor ? "btn-primary" : "btn-outline"}`}>
+                  {p.cta}
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <p className="t-meta" style={{ color: "var(--text-muted)", marginTop: 18 }}>
+          Alle Beträge netto, zzgl. USt.
+          {tarife.abteilungName && ` Der Abteilungspreis ist die Summe der Agents in ${tarife.abteilungName}.`}{" "}
+          <Link href="/preise" style={{ color: "var(--accent)", fontWeight: 600 }}>Alle Details zu den Preisen →</Link>
+        </p>
       </section>
 
       {/* ── Vertrauen ── */}
@@ -196,19 +302,7 @@ export default function LandingPage({ agents }: Props) {
         ))}
       </section>
 
-      {/* ── Fußzeile ── */}
-      <footer className="landing-footer">
-        <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <KanaMark size={18} />
-          <span>© {new Date().getFullYear()} KANA AI. Alle Rechte vorbehalten.</span>
-        </span>
-        {/* Ziel ist /recht?doc=... — die Seite kommt mit dem Recht-Entwurf.
-            Bis dahin bleibt es wie bisher ein toter Anker, kein 404. */}
-        <span className="footer-links">
-          <a href="#">Impressum</a>
-          <a href="#">Datenschutz</a>
-        </span>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
+import { clerkDeutsch } from "./components/ui/clerkDeutsch";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -9,7 +10,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider>
+    /* localization gehoert an den Provider, nicht an <SignIn>/<SignUp>. */
+    <ClerkProvider localization={clerkDeutsch}>
       <html lang="de">
         <head>
           <link rel="preconnect" href="https://fonts.googleapis.com" />

@@ -40,3 +40,45 @@ export function preisText(agent: DBAgent): string {
   if (!agent.price_eur) return "auf Anfrage";
   return `${agent.price_eur} €/Mon.`;
 }
+
+/* ─── Tarife ─────────────────────────────────────────────
+   Die Datenbank kennt heute nur einen Preis je Agent (price_eur).
+   Ein eigener Buendelpreis fuer eine ganze Abteilung existiert nicht —
+   die Abteilungsstufe wird deshalb aus der Summe der Agenten gebildet
+   und als "ab" ausgewiesen. Sobald es eine Spalte fuer Buendelpreise
+   gibt, gehoert sie hierher.                                      */
+
+export type Tarife = {
+  abEinAgent: number | null;
+  abAbteilung: number | null;
+  /** Abteilung, aus der der Abteilungspreis stammt — fuer die Fussnote */
+  abteilungName: string | null;
+};
+
+export function tarifeAus(agents: DBAgent[]): Tarife {
+  const preise = agents.map((a) => a.price_eur).filter((p) => p > 0);
+  const abEinAgent = preise.length > 0 ? Math.min(...preise) : null;
+
+  /* Ein Abteilungspreis ergibt nur Sinn, wenn JEDER Agent der Abteilung
+     einen Preis hat. Sonst kaeme eine Summe heraus, die die Agenten ohne
+     Preis stillschweigend als kostenlos behandelt — im schlimmsten Fall
+     steht dann derselbe Betrag bei "Ein Agent" und bei "Abteilung". */
+  const summen = nachAbteilung(agents)
+    .map((d) => ({
+      name: d.name,
+      summe: d.agents.reduce((s, a) => s + (a.price_eur || 0), 0),
+      vollstaendig: d.agents.length > 1 && d.agents.every((a) => a.price_eur > 0),
+    }))
+    .filter((d) => d.vollstaendig)
+    .sort((a, b) => a.summe - b.summe);
+
+  return {
+    abEinAgent,
+    abAbteilung: summen[0]?.summe ?? null,
+    abteilungName: summen[0]?.name ?? null,
+  };
+}
+
+export function eur(n: number) {
+  return n.toLocaleString("de-DE", { style: "currency", currency: "EUR", minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
