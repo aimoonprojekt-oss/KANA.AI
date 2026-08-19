@@ -6,6 +6,9 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 const isPublicRoute = createRouteMatcher([
   "/",              // Landing Page
   "/preise",        // Preisseite — zeigt dieselben published Agents wie "/"
+  "/ki-transparenz",// Kennzeichnung nach Art. 50 KI-VO. Muss ohne Login
+                    // erreichbar sein: der Hinweis gilt auch fuer Besucher,
+                    // die noch keinen Zugang haben.
   "/recht",         // Impressum und Datenschutz. MUSS ohne Login erreichbar
                     // sein: die Impressumspflicht nach § 5 DDG verlangt
                     // unmittelbare Erreichbarkeit ohne Anmeldung.

@@ -11,6 +11,7 @@ import CreativeAnalyst from "@/app/components/agents/CreativeAnalyst";
 import KanaMark, { KanaLogo } from "@/app/components/ui/KanaMark";
 import type { DBAgent } from "@/lib/platform/supabase";
 import { faktenAus, promptsAus } from "@/lib/chat-inhalte";
+import KiHinweis from "@/app/components/ui/KiHinweis";
 
 type Message = { role: "user" | "assistant"; content: string };
 type OutputFile = { id: string; filename: string };
@@ -415,6 +416,9 @@ function ChatPageInner({ agentId, agent, meineAgents }: Props) {
                 <div className="chat-start__text">
                   <span className="chat-start__name">{agentName}</span>
                   {agent?.description && <p className="chat-start__desc">{agent.description}</p>}
+                  {/* Art. 50 Abs. 1 und 5 KI-VO: klar und erkennbar, beim
+                      ersten Kontakt — deshalb hier und nicht nur im Impressum. */}
+                  <KiHinweis ton="dunkel" lang />
                   {fakten.length > 0 && (
                     <div className="chat-start__fakten">
                       {fakten.map(([k, v], idx) => (
@@ -485,6 +489,7 @@ function ChatPageInner({ agentId, agent, meineAgents }: Props) {
           {outputFiles.length > 0 && (
             <div className="chat-dateien">
               <span className="mono-sm" style={{ color: "var(--dark-text-meta)" }}>Erstellte Dateien</span>
+              <KiHinweis ton="dunkel" />
               {outputFiles.map((f) => (
                 <a
                   key={f.id}
@@ -505,6 +510,8 @@ function ChatPageInner({ agentId, agent, meineAgents }: Props) {
 
         {/* ══ Eingabe ══ */}
         <form className="chat-eingabe" onSubmit={(e) => { e.preventDefault(); sendMessage(); }}>
+          {/* Auch in laufenden Sitzungen sichtbar — nicht nur beim leeren Start. */}
+          <KiHinweis ton="dunkel" />
           <div className="chat-eingabe__feld">
             <textarea
               className="chat-textarea"

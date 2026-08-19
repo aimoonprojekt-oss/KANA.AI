@@ -75,6 +75,14 @@ const TRUST = [
     desc: "Keine Recruiting- und Personalkosten, kein Führungsaufwand, keine Vertretungsregelung bei Ausfall." },
 ];
 
+/* Art. 50 KI-VO verlangt den Hinweis dort, wo die Interaktion beginnt.
+   Auf der Verkaufsseite steht er, weil hier die Erwartung entsteht — und
+   weil ein Versprechen ohne seine Grenzen kein ehrliches Versprechen ist. */
+const KI_TRANSPARENZ = {
+  title: "KI-gestützt, mit Ansage",
+  desc: "Alle Ergebnisse entstehen aus einem Sprachmodell und können Fehler enthalten. Sie sind ein Entwurf, keine Entscheidung — prüfe sie, bevor du sie verwendest.",
+};
+
 /* Dekorative Punkte im Hero-Hintergrund. Reine Zierde, pointer-events: none. */
 const HERO_DOTS_CW = [
   { left: 444, top: -7, size: 14, alpha: 0.55 },
@@ -363,6 +371,15 @@ export default function LandingPage({ agents }: Props) {
             <p className="trust-desc">{t.desc}</p>
           </div>
         ))}
+        <div className="trust-ki">
+          <h3 className="trust-title">{KI_TRANSPARENZ.title}</h3>
+          <p className="trust-desc">
+            {KI_TRANSPARENZ.desc}{" "}
+            <Link href="/ki-transparenz" style={{ color: "var(--accent)", fontWeight: 600 }}>
+              KI-Transparenz und Haftung →
+            </Link>
+          </p>
+        </div>
       </section>
 
       <SiteFooter />

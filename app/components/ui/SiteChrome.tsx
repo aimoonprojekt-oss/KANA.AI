@@ -48,6 +48,7 @@ export function SiteFooter() {
       </span>
       <span className="footer-links">
         <Link href="/preise">Preise</Link>
+        <Link href="/ki-transparenz">KI-Transparenz</Link>
         <Link href="/recht?doc=impressum">Impressum</Link>
         <Link href="/recht?doc=datenschutz">Datenschutz</Link>
       </span>

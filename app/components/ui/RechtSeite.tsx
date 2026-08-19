@@ -49,7 +49,9 @@ const DATENSCHUTZ: Dok = {
       "Abrechnungsdaten: über den Zahlungsdienstleister [Stripe Payments Europe Ltd.]",
     ] },
     { title: "Rechtsgrundlagen", text: "Verarbeitung zur Vertragserfüllung nach Art. 6 Abs. 1 lit. b DSGVO, zur Erfüllung rechtlicher Pflichten nach lit. c und auf Grundlage berechtigter Interessen nach lit. f, etwa zur Sicherung des Betriebs." },
-    { title: "Verarbeitung durch KI-Anbieter", text: "Zur Erbringung der Leistung werden Inhalte an Anbieter von Sprachmodellen übermittelt. [Anbieter, Standort der Verarbeitung und Rechtsgrundlage der Übermittlung hier konkret benennen — auch mögliche Drittlandübermittlung nach Art. 44 ff. DSGVO.]" },
+    { title: "Verarbeitung durch KI-Anbieter", text: "Zur Erbringung der Leistung werden Inhalte an Anbieter von Sprachmodellen übermittelt. [Anbieter, Standort der Verarbeitung und Rechtsgrundlage der Übermittlung hier konkret benennen — auch mögliche Drittlandübermittlung nach Art. 44 ff. DSGVO.] Wie die Ergebnisse entstehen, welche Grenzen sie haben und wofür wir einstehen, steht unter KI-Transparenz und Haftung.", items: [
+      "Kennzeichnung und Grenzen der Ergebnisse: /ki-transparenz",
+    ] },
     { title: "Speicherort und Auftragsverarbeiter", text: "Datenbank und Ablage laufen bei [Anbieter, Region]. Mit allen Dienstleistern bestehen Verträge zur Auftragsverarbeitung nach Art. 28 DSGVO.", items: [
       "[Hosting und Datenbank: Anbieter, Region]",
       "[Modellanbieter: Anbieter, Region]",

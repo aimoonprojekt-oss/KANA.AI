@@ -9,6 +9,7 @@ import { ABTEILUNGEN, abteilungVon, setupVon, eur, type AbteilungId } from "@/li
 import KanaMark, { KanaLogo } from "@/app/components/ui/KanaMark";
 import Orbital from "@/app/components/ui/Orbital";
 import Verlaufsdiagramm from "@/app/components/ui/Verlaufsdiagramm";
+import KiHinweis from "@/app/components/ui/KiHinweis";
 
 /* ─── Konstanten ─────────────────────────────────────── */
 const MONTHLY_LIMIT = 50;
@@ -334,6 +335,10 @@ export default function PortalDashboard({
                 ))}
               </div>
               </div>
+            </div>
+
+            <div className="portal-section" style={{ paddingTop: 0 }}>
+              <KiHinweis lang />
             </div>
 
             <div className="agents-layout">
@@ -705,6 +710,7 @@ export default function PortalDashboard({
               Handler und fuehrte nirgendwohin — deshalb hier nicht wieder
               aufgenommen. */}
           <span className="footer-links">
+            <a href="/ki-transparenz">KI-Transparenz</a>
             <a href={`mailto:${SUPPORT_EMAIL}`}>Support</a>
           </span>
         </footer>

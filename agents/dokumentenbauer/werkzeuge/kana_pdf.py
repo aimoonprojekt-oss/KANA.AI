@@ -399,10 +399,20 @@ def erzeugen(md_pfad, pdf_pfad):
     md = Path(md_pfad).read_text(encoding="utf-8")
     fluss, titel, untertitel = bauen(md, f)
 
+    # Art. 50 Abs. 2 KI-VO verlangt eine MASCHINENLESBARE Markierung der
+    # erzeugten Inhalte — ein sichtbarer Hinweis auf der Seite genuegt nicht.
+    # Die PDF-Metadaten sind der Ort, an dem ein Pruefwerkzeug sie findet.
+    # (Vollstaendig ist das noch nicht: fuer Bilder, Videos und kopierte
+    #  Chat-Texte fehlt eine entsprechende Markierung.
+    #  Siehe docs/ki-verordnung-offene-punkte.md.)
     doc = BaseDocTemplate(str(pdf_pfad), pagesize=A4,
                           leftMargin=RAND, rightMargin=RAND,
                           topMargin=18 * mm, bottomMargin=20 * mm,
-                          title=titel or "KANA AI", author="KANA AI")
+                          title=titel or "KANA AI", author="KANA AI",
+                          creator="KANA AI — KI-generiert (AI-generated)",
+                          subject="Von einem KI-System erzeugter Inhalt. "
+                                  "Kann Fehler enthalten, vor Verwendung pruefen. "
+                                  "Kennzeichnung nach Art. 50 Abs. 2 VO (EU) 2024/1689.")
 
     leer = Frame(0, 0, A4[0], A4[1], id="deck",
                  leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)

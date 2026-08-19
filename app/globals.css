@@ -558,6 +558,13 @@ p { text-wrap: pretty; }
 }
 .trust-title { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 8px; }
 .trust-desc { font-size: 14px; line-height: 1.6; color: var(--text-tertiary); }
+/* Die KI-Karte laeuft ueber die volle Breite und traegt eine Petrol-Kante —
+   sie ist eine Pflichtangabe, keine weitere Verkaufsaussage. */
+.trust-ki {
+  grid-column: 1 / -1; border-top: 1px solid var(--accent-border);
+  padding-top: 24px; margin-top: 8px;
+}
+.trust-ki .trust-desc { max-width: 88ch; }
 
 /* Fusszeile */
 .landing-footer {
@@ -814,6 +821,27 @@ p { text-wrap: pretty; }
   padding: 6px; display: flex; align-items: center; transition: color 0.2s;
 }
 .modal-close-btn:hover { color: var(--text-primary); }
+
+/* KI-Kennzeichnung (Art. 50 KI-VO) — muss "klar und erkennbar" sein,
+   also nicht in Grau versteckt. */
+.ki-hinweis {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 13px; line-height: 1.55; color: var(--text-secondary);
+  border: 1px solid var(--accent-border); background: var(--accent-soft);
+  padding: 10px 12px;
+}
+.ki-hinweis strong { color: var(--text-primary); font-weight: 600; }
+.ki-hinweis__marke {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+  letter-spacing: 0.1em; flex: none;
+  color: #F6F4EF; background: var(--accent); padding: 3px 7px;
+}
+.ki-hinweis.is-dunkel {
+  color: var(--dark-text-muted);
+  border-color: rgba(127,179,168,0.3); background: var(--dark-accent-soft);
+}
+.ki-hinweis.is-dunkel strong { color: var(--dark-text); }
+.ki-hinweis.is-dunkel .ki-hinweis__marke { color: var(--dark-bg-deep); background: var(--dark-accent); }
 
 /* ═══════════════════════════════════════════════════════
    ADMIN  (Verwaltung — im Entwurf nicht enthalten, hier auf
