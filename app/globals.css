@@ -289,6 +289,11 @@ p { text-wrap: pretty; }
 }
 
 .hidden { display: none !important; }
+/* Nur fuer Vorlesegeraete sichtbar. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+}
 
 /* ═══════════════════════════════════════════════════════
    LANDINGPAGE
@@ -343,36 +348,32 @@ p { text-wrap: pretty; }
   letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent);
   background: rgba(246,244,239,0.8); padding: 6px 12px;
 }
-.hero-title { font-size: 88px; font-weight: 800; letter-spacing: -0.05em; line-height: 0.98; margin: 14px 0 0; }
-/* Die erste Zeile traegt die Wortrolle und braucht etwas mehr Luft, sonst
-   schneidet der Ausschnitt die Unterlaengen ab (Marketing, g). */
+/* clamp statt fester 88 px: "Dein Marketing" und "schaltet Ads." muessen
+   auch auf schmalen Fenstern in je eine Zeile passen — umbrechen darf
+   innerhalb eines Paares nichts. Ab rund 1035 px steht wieder die 88 px
+   des Entwurfs. */
+.hero-title { font-size: clamp(38px, 12.5vw, 88px); font-weight: 800; letter-spacing: -0.05em; line-height: 0.98; margin: 14px 0 0; }
+/* Beide Zeilen tragen eine Rolle. Ihre Hoehe kommt aus dem Ausschnitt
+   (1.12em) und ist damit fest — die Ueberschrift springt beim Wechsel
+   weder in der Hoehe noch schiebt sie den Inhalt darunter. */
 .hero-title__zeile { display: block; line-height: 1.12; }
-.hero-title__zeile2 { display: block; line-height: 0.98; }
+.hero-title__zeile2 { display: block; line-height: 1.12; margin-top: -0.1em; }
 
 /* Bewusst in der Textfarbe, nicht in Petrol: "laeuft." ist die eine
    Hervorhebung der Ueberschrift. Zwei Petrol-Woerter nebeneinander nehmen
    sich gegenseitig die Wirkung — die Bewegung reicht als Blickfang. */
 .wortrolle {
-  --wortrolle-hoehe: 1.12em;   /* eine Zeile; die Rolle verschiebt genau darum */
-  display: inline-block; position: relative; vertical-align: bottom;
-  /* Platz fuer den Balken. Das negative margin holt den groessten Teil
-     wieder heraus — es bleiben rund 10 px, damit der Balken als
-     Unterstreichung des Wortes lesbar bleibt und nicht als Trennstrich
-     zur Zeile darunter. */
-  padding-bottom: 16px; margin-bottom: -6px;
-  transition: width .5s cubic-bezier(.22,1,.36,1);
+  /* Eine Zeile. Die Rolle verschiebt um genau diesen Betrag, und der
+     Ausschnitt ist genau so hoch — daran haengt die Hoehenstabilitaet
+     der Ueberschrift: sie bleibt gleich hoch, egal welches Wort steht. */
+  --wortrolle-hoehe: 1.12em;
+  display: inline-block; vertical-align: bottom;
+  transition: width .45s cubic-bezier(.22,1,.36,1);
 }
 .wortrolle__fenster { display: block; overflow: hidden; height: var(--wortrolle-hoehe); }
-/* Der Petrol-Balken zieht den Blick auf das wechselnde Wort, ohne dem
-   "laeuft." die Textfarbe streitig zu machen. Er wandert mit der Breite,
-   weil er am Ausschnitt haengt. */
-.wortrolle::after {
-  content: ""; position: absolute; left: 0; right: 0; bottom: 0;
-  height: 8px; background: var(--accent);
-}
 .wortrolle__track {
   display: flex; flex-direction: column;
-  transition: transform .5s cubic-bezier(.22,1,.36,1);
+  transition: transform .45s cubic-bezier(.22,1,.36,1);
 }
 /* width: max-content ist hier nicht kosmetisch — ohne das fuellt jedes Wort
    die Breite des Ausschnitts, und die Messung misst sich selbst. */
@@ -381,11 +382,6 @@ p { text-wrap: pretty; }
 .hero-sub { font-size: 26px; font-weight: 500; letter-spacing: -0.02em; color: var(--text-tertiary); margin-top: 10px; }
 .hero-lead { font-size: 17px; line-height: 1.6; color: var(--text-secondary); max-width: 56ch; margin: 20px 0 0; min-height: 3.2em; }
 .hero-actions { display: flex; gap: 12px; margin-top: 28px; }
-.caret {
-  display: inline-block; width: 2px; height: 1.05em; vertical-align: text-bottom;
-  background: var(--accent); margin-left: 2px;
-  animation: kanaCaret 1.1s step-end infinite;
-}
 
 /* Abschnitt Ausbaustufen */
 .section-orbital {
@@ -819,9 +815,11 @@ p { text-wrap: pretty; }
   .landing-nav { padding: 0 24px; }
   .nav-links { display: none; }
   .hero { height: auto; padding: 72px 0; }
-  .hero-title { font-size: 48px; }
   .hero-sub { font-size: 20px; }
   .hero-orbit { display: none; }
+  /* Schmalerer Innenrand, damit "Dein Marketing" auch auf 320 px in eine
+     Zeile passt — umbrechen darf innerhalb eines Paares nichts. */
+  .hero-content { padding: 0 24px; }
   .section-orbital, .section-trust, .section-plain, .section-platforms { padding-left: 24px; padding-right: 24px; }
   .preise-head { padding: 48px 24px 32px; }
   .preise-head h1 { font-size: 34px; }

@@ -6,18 +6,18 @@ import type { DBAgent } from "@/lib/platform/supabase";
 import { nachAbteilung, tarifeAus } from "@/lib/abteilungen";
 import Orbital from "./Orbital";
 import Wortrolle from "./Wortrolle";
+import { ROTATIONS, ROTATION_DAUER, rotationAlsSatz } from "@/lib/hero-rotation";
 import PreisBlock from "./PreisBlock";
 import { KANAELE, TECHNIK, PlattformLogo } from "./PlattformLogos";
 import { SiteNav, SiteFooter } from "./SiteChrome";
 
 interface Props { agents: DBAgent[] }
 
-/* Die Woerter, die sich in der Ueberschrift drehen. Reihenfolge ist die
-   Reihenfolge der Rolle. */
-const ROLLE = ["Marketing", "Sales", "Support"];
-
+/* Abteilungsneutral, weil die Ueberschrift durch Support, Sales und
+   Marketing rotiert. Der marketingspezifische Satz steht jetzt weiter
+   unten bei den Ausbaustufen, wo er inhaltlich stimmt. */
 const HERO_LEAD =
-  "Unser KI-Agent analysiert deinen Markt, erstellt deine Werbemittel und schaltet sie automatisch – vollständig ohne Agentur, ohne Team, ohne deinen Aufwand.";
+  "Unser KI-Agent übernimmt die Aufgaben einer ganzen Abteilung: analysieren, umsetzen, ausliefern – ohne Agentur, ohne Team, ohne deinen Aufwand.";
 
 /* Der Mehrwert in Zahlen. Aus 04_INHALTE, auf "du" umgestellt. */
 const MEHRWERT = [
@@ -63,9 +63,14 @@ const HERO_DOTS_CCW = [
   { left: 535, top: 405, size: 8, alpha: 0.35 },
 ];
 
+const ABTEILUNGSWOERTER = ROTATIONS.map((r) => r.department);
+const VERBEN = ROTATIONS.map((r) => r.action);
+
 export default function LandingPage({ agents }: Props) {
   const [activeDept, setActiveDept] = useState("marketing");
-  const [typed, setTyped] = useState("");
+  /* Ein Index fuer beide Zeilen — sonst schlagen Abteilung und Verb
+     versetzt um und es steht kurz "Dein Sales antwortet." da. */
+  const [rotation, setRotation] = useState(0);
 
   /* Abteilungen, Agents und Preise kommen aus der Datenbank — nichts mehr
      fest verdrahtet. Damit wirken featured, price_eur und description. */
@@ -77,16 +82,11 @@ export default function LandingPage({ agents }: Props) {
   }));
 
   useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setTyped(HERO_LEAD);
-      return;
-    }
-    let i = 0;
-    const id = setInterval(() => {
-      i += 1;
-      setTyped(HERO_LEAD.slice(0, i));
-      if (i >= HERO_LEAD.length) clearInterval(id);
-    }, 18);
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const id = setInterval(
+      () => setRotation((v) => (v + 1) % ROTATIONS.length),
+      ROTATION_DAUER,
+    );
     return () => clearInterval(id);
   }, []);
 
@@ -145,16 +145,20 @@ export default function LandingPage({ agents }: Props) {
               darunter, sobald sie auf Sales oder Support stand. */}
           <span className="hero-badge">Digitale Mitarbeiter · End-to-End</span>
           <h1 className="hero-title">
-            <span className="hero-title__zeile">
-              Dein <Wortrolle woerter={ROLLE} />
+            {/* Der ganze Satz einmal am Stueck. Die Rollen darunter sind
+                aria-hidden, sonst liest ein Screenreader Bruchstuecke vor. */}
+            <span className="sr-only">
+              {rotationAlsSatz()} Du machst nichts davon.
             </span>
-            <span className="hero-title__zeile2 accent">läuft.</span>
+            <span className="hero-title__zeile" aria-hidden="true">
+              Dein <Wortrolle woerter={ABTEILUNGSWOERTER} index={rotation} />
+            </span>
+            <span className="hero-title__zeile2 accent" aria-hidden="true">
+              <Wortrolle woerter={VERBEN} index={rotation} />
+            </span>
           </h1>
-          <p className="hero-sub">Du baust dein Business.</p>
-          <p className="hero-lead">
-            {typed}
-            {typed.length < HERO_LEAD.length && <span className="caret" />}
-          </p>
+          <p className="hero-sub">Du machst nichts davon.</p>
+          <p className="hero-lead">{HERO_LEAD}</p>
           <div className="hero-actions">
             <Link href="/sign-up" className="btn btn-primary btn-lg">Kostenlosen Demo-Call buchen</Link>
             <a href="#ablauf" className="btn btn-ghost btn-lg">So funktioniert es →</a>
@@ -198,7 +202,9 @@ export default function LandingPage({ agents }: Props) {
           <span className="section-tag">Ausbaustufen</span>
           <h2 className="section-title">Vier Abteilungen, ein Kern</h2>
           <p className="section-lead">
-            Du startest mit Marketing. Alles andere hängt am selben Kern und kommt dazu, wenn du es brauchst.
+            Du startest mit Marketing: Der Agent analysiert deinen Markt, erstellt deine
+            Werbemittel und schaltet sie automatisch. Alles andere hängt am selben Kern
+            und kommt dazu, wenn du es brauchst.
           </p>
 
           <div className="dept-list">

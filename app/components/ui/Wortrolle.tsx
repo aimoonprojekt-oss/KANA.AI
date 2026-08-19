@@ -11,12 +11,20 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
    Bei prefers-reduced-motion steht das erste Wort still. */
 
-export default function Wortrolle({
-  woerter,
-  intervall = 2400,
-  className,
-}: { woerter: string[]; intervall?: number; className?: string }) {
-  const [i, setI] = useState(0);
+interface Props {
+  woerter: readonly string[];
+  /** Von aussen gesteuert. Dann laeuft kein eigener Taktgeber — noetig,
+      damit zwei Rollen synchron umschlagen. */
+  index?: number;
+  intervall?: number;
+  className?: string;
+}
+
+export default function Wortrolle({ woerter, index, intervall = 2400, className }: Props) {
+  const [eigenerIndex, setEigenerIndex] = useState(0);
+  const gesteuert = index !== undefined;
+  const i = gesteuert ? Math.min(Math.max(index, 0), woerter.length - 1) : eigenerIndex;
+
   const [breite, setBreite] = useState<number | undefined>(undefined);
   const woerterRef = useRef<(HTMLSpanElement | null)[]>([]);
 
@@ -32,18 +40,19 @@ export default function Wortrolle({
   }, [i]);
 
   useEffect(() => {
+    if (gesteuert) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const id = setInterval(() => setI((v) => (v + 1) % woerter.length), intervall);
+    const id = setInterval(() => setEigenerIndex((v) => (v + 1) % woerter.length), intervall);
     return () => clearInterval(id);
-  }, [woerter.length, intervall]);
+  }, [gesteuert, woerter.length, intervall]);
 
   return (
     <span
       className={`wortrolle${className ? " " + className : ""}`}
       style={{ width: breite }}
-      /* Der Ausschnitt zeigt immer nur ein Wort — fuer Vorlesegeraete
-         steht der ganze Satz einmal vollstaendig da. */
-      aria-label={woerter.join(", ")}
+      /* Die Rolle ist fuer Vorlesegeraete unsichtbar. Der vollstaendige
+         Satz steht einmal als sr-only neben der Ueberschrift. */
+      aria-hidden="true"
     >
       {/* Das Fenster schneidet ab, der Balken liegt darunter beim Elternteil —
           sonst faehrt er den Unterlaengen ins Gesicht (das g von Marketing). */}
