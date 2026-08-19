@@ -39,6 +39,15 @@ export type DBAgent = {
   category:           string | null;
   thumbnail_url:      string | null;
   price_eur:          number;
+
+  // Einmalige Einrichtungsgebuehr je Agent, in Euro. Wird auf Landingpage,
+  // Preisseite und im Portal offen neben dem Monatsbeitrag ausgewiesen —
+  // versteckte Einmalkosten sind der haeufigste Grund fuer Rueckfragen.
+  // Optional, weil die Spalte in aelteren Datenbanken fehlen kann; dann
+  // liefert select("*") sie nicht mit und der Wert ist undefined.
+  // Migration: docs/2026-08-19-setup-gebuehr.sql
+  setup_eur?:         number | null;
+
   published:          boolean;
   featured:           boolean;
   stripe_price_id:    string | null;  // Stripe Price ID (price_xxx)

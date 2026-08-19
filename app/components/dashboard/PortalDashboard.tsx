@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { SignOutButton } from "@clerk/nextjs";
 import { X, ArrowRight, LogOut } from "lucide-react";
 import type { DBAgent, UsageOverview } from "@/lib/platform/supabase";
-import { ABTEILUNGEN, abteilungVon, type AbteilungId } from "@/lib/abteilungen";
+import { ABTEILUNGEN, abteilungVon, setupVon, eur, type AbteilungId } from "@/lib/abteilungen";
 import KanaMark, { KanaLogo } from "@/app/components/ui/KanaMark";
 import Orbital from "@/app/components/ui/Orbital";
 
@@ -378,15 +378,27 @@ export default function PortalDashboard({
                             Chat öffnen
                           </button>
                         ) : (
-                          <button
-                            className="btn-buy"
-                            onClick={() => buyAgent(agent)}
-                            disabled={buyingId === agent.anthropic_agent_id}
-                          >
-                            {buyingId === agent.anthropic_agent_id
-                              ? "Weiterleitung…"
-                              : `Buchen · ${agent.price_eur} €`}
-                          </button>
+                          <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
+                            <button
+                              className="btn-buy"
+                              onClick={() => buyAgent(agent)}
+                              disabled={buyingId === agent.anthropic_agent_id}
+                            >
+                              {buyingId === agent.anthropic_agent_id
+                                ? "Weiterleitung…"
+                                : `Buchen · ${agent.price_eur} €`}
+                            </button>
+                            {/* Die einmalige Einrichtung steht hier, nicht im
+                                Kleingedruckten — sie faellt beim Buchen an. */}
+                            <span className="mono-num" style={{ color: "var(--text-muted)", fontSize: 11 }}>
+                              {(() => {
+                                const st = setupVon(agent);
+                                if (st === 0) return "keine Einrichtungsgebühr";
+                                if (st === null) return "+ Einrichtung nach Aufwand";
+                                return `+ ${eur(st)} einmalig`;
+                              })()}
+                            </span>
+                          </span>
                         )}
                       </span>
                     </div>

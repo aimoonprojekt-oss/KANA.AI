@@ -3,8 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { DBAgent } from "@/lib/platform/supabase";
-import { nachAbteilung, tarifeAus, eur } from "@/lib/abteilungen";
+import { nachAbteilung, tarifeAus, setupVon, eur } from "@/lib/abteilungen";
 import KanaMark from "./KanaMark";
+import PreisBlock from "./PreisBlock";
 import { SiteNav, SiteFooter } from "./SiteChrome";
 
 interface Props { agents: DBAgent[] }
@@ -19,8 +20,8 @@ const LEISTUNGEN = [
     desc: "Ein Sessions-Kontingent pro Monat ist enthalten, darüber wird verbrauchsabhängig abgerechnet." },
   { title: "Eigener Arbeitsbereich",
     desc: "Deine Daten, Assets und Ergebnisse liegen abgetrennt und bleiben bei dir." },
-  { title: "Onboarding",
-    desc: "Ein Gespräch, danach ist der Agent innerhalb von 3–5 Tagen einsatzbereit." },
+  { title: "Einmalige Einrichtung",
+    desc: "Onboarding-Gespräch, Anbindung deiner Kanäle und Daten, Feinschliff der Vorgaben. Fällt einmal je Agent an und steht offen bei jedem Preis." },
   { title: "Monatlich kündbar",
     desc: "Kein Jahresvertrag, kein Kleingedrucktes. Abrechnung läuft über Stripe." },
 ];
@@ -30,8 +31,10 @@ const FAQ = [
     a: "Jeder Agent hat ein monatliches Sessions-Kontingent. Was darüber läuft, wird verbrauchsabhängig abgerechnet und ist im Portal unter Verbrauch jederzeit einsehbar." },
   { q: "Kann ich Agents zwischendurch tauschen?",
     a: "Ja. Du kannst zum Monatsende wechseln, dazunehmen oder abbestellen. Bestehende Sitzungen und Dateien bleiben erhalten." },
-  { q: "Was kostet das Onboarding?",
-    a: "Nichts. Das Gespräch und die Einrichtung sind im Abo enthalten, danach ist der Agent innerhalb von 3–5 Tagen einsatzbereit." },
+  { q: "Warum kommt zum Monatsbeitrag noch eine Einrichtungsgebühr?",
+    a: "Weil die Einrichtung echte Arbeit ist: Onboarding-Gespräch, Anbindung deiner Kanäle und Daten, Abstimmung der Vorgaben und Tonlage. Das passiert einmal je Agent, nicht jeden Monat — deshalb steckt es nicht im laufenden Beitrag, sondern steht offen daneben. Das Gespräch selbst kostet nichts." },
+  { q: "Kommt später noch etwas dazu?",
+    a: "Nein. Was auf dieser Seite steht, ist alles: der Monatsbeitrag je Agent und die einmalige Einrichtung. Über dem enthaltenen Sessions-Kontingent wird verbrauchsabhängig abgerechnet — was du davon genutzt hast, siehst du jederzeit im Portal unter Verbrauch." },
   { q: "Gibt es eine Mindestlaufzeit?",
     a: "Nein. Alle Abos sind monatlich kündbar, ohne Jahresvertrag." },
 ];
@@ -43,26 +46,31 @@ export default function PreiseSeite({ agents }: Props) {
   const tarife = tarifeAus(agents);
   const depts = nachAbteilung(agents).filter((d) => d.agents.length > 0);
 
-  const betrag = (n: number | null) => {
-    if (n === null) return "—";
-    return `ab ${eur(jaehrlich ? n * JAHRESFAKTOR : n)}`;
-  };
+  /* Der Jahresfaktor gilt nur fuer den laufenden Beitrag. Die Einrichtung
+     faellt einmal an und wird nicht rabattiert — alles andere waere
+     rechnerisch unsauber. */
+  const monat = (n: number | null) =>
+    n === null ? null : Math.round(jaehrlich ? n * JAHRESFAKTOR : n);
   const einheit = (was: string) => `je ${was} / Monat${jaehrlich ? ", jährlich gezahlt" : ""}`;
 
+  /* Bei Jahreszahlung ist nichts monatlich kuendbar — der Punkt muss
+     mitwandern, sonst steht auf derselben Karte zweierlei. */
+  const kuendigung = jaehrlich ? "Laufzeit ein Jahr, danach kündbar" : "Monatlich kündbar";
+
   const plans = [
-    { kicker: "Einstieg", name: "Ein Agent", hervor: false,
+    { kicker: "Einstieg", name: "Ein Agent", hervor: false, ab: true,
       desc: "Ein digitaler Mitarbeiter aus einer Abteilung deiner Wahl.",
-      preis: betrag(tarife.abEinAgent), unit: einheit("Agent"),
-      punkte: ["Ein Agent, ein Arbeitsbereich", "Sessions-Kontingent inklusive", "Chat und Dateiablage", "Monatlich kündbar"],
+      monat: monat(tarife.abEinAgent), setup: tarife.abSetup, unit: einheit("Agent"),
+      punkte: ["Ein Agent, ein Arbeitsbereich", "Sessions-Kontingent inklusive", "Chat und Dateiablage", kuendigung],
       cta: "Agent auswählen", href: "/sign-up" },
-    { kicker: "Empfohlen", name: "Abteilung", hervor: true,
+    { kicker: "Empfohlen", name: "Abteilung", hervor: true, ab: true,
       desc: "Alle Agents einer Abteilung, aufeinander abgestimmt.",
-      preis: betrag(tarife.abAbteilung), unit: einheit("Abteilung"),
+      monat: monat(tarife.abAbteilung), setup: tarife.abAbteilungSetup, unit: einheit("Abteilung"),
       punkte: ["Alle Agents der Abteilung", "Höheres Freikontingent", "Gemeinsame Vorgaben und Tonlage", "Onboarding-Gespräch inklusive"],
       cta: "Abteilung buchen", href: "/sign-up" },
-    { kicker: "Ausbau", name: "Mehrere Abteilungen", hervor: false,
+    { kicker: "Ausbau", name: "Mehrere Abteilungen", hervor: false, ab: false,
       desc: "Marketing, Vertrieb, IT und Content am selben Kern.",
-      preis: "individuell", unit: "nach Umfang",
+      monat: null, setup: null, unit: "nach Umfang", stattBetrag: "individuell",
       punkte: ["Beliebige Abteilungen kombinierbar", "Verbrauch gebündelt abgerechnet", "Feste Ansprechperson", "Auswertung im Portal"],
       cta: "Angebot anfragen", href: "mailto:hallo@kana-ai.de?subject=Angebot%20mehrere%20Abteilungen" },
   ];
@@ -84,8 +92,8 @@ export default function PreiseSeite({ agents }: Props) {
         </div>
         <span className="t-meta" style={{ color: "var(--text-muted)" }}>
           {jaehrlich
-            ? "Bei jährlicher Zahlung sind zwei Monate geschenkt"
-            : "Monatlich kündbar, keine Einrichtungsgebühr"}
+            ? "Zwei Monate geschenkt. Die einmalige Einrichtung bleibt gleich."
+            : "Monatlich kündbar, keine Mindestlaufzeit"}
         </span>
       </header>
 
@@ -101,10 +109,10 @@ export default function PreiseSeite({ agents }: Props) {
                 <span className="plan__name">{p.name}</span>
                 <p className="plan__desc">{p.desc}</p>
               </div>
-              <div className="plan__price">
-                <span className="plan__amount">{p.preis}</span>
-                <span className="plan__unit">{p.unit}</span>
-              </div>
+              <PreisBlock
+                monat={p.monat} setup={p.setup} einheit={p.unit}
+                ab={p.ab} stattBetrag={p.stattBetrag}
+              />
               <ul className="plan__list">
                 {p.punkte.map((f) => <li key={f}><span className="plan__bullet" />{f}</li>)}
               </ul>
@@ -126,26 +134,37 @@ export default function PreiseSeite({ agents }: Props) {
               </div>
               <span className="t-meta" style={{ color: "var(--text-muted)" }}>Alle Preise netto, zzgl. USt.</span>
             </div>
+            <div className="table-head katalog-zeile" style={{ paddingLeft: 26, paddingRight: 26 }}>
+              <span>Agent</span>
+              <span style={{ textAlign: "right" }}>Monatlich</span>
+              <span style={{ textAlign: "right" }}>Einrichtung</span>
+            </div>
             {depts.map((d) => (
               <div key={d.id} style={{ borderTop: "1px solid var(--hairline-soft)" }}>
                 <div style={{ padding: "14px 26px 6px" }}>
                   <span className="mono-sm" style={{ color: "var(--text-muted)" }}>{d.name}</span>
                 </div>
-                {d.agents.map((a) => (
-                  <div key={a.id} className="table-row" style={{ gridTemplateColumns: "1fr 140px", paddingLeft: 26, paddingRight: 26, borderBottom: "none" }}>
-                    <span style={{ minWidth: 0 }}>
-                      <span style={{ fontSize: 15, fontWeight: 600 }}>{a.name}</span>
-                      {a.description && (
-                        <span className="t-meta" style={{ display: "block", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {a.description}
-                        </span>
-                      )}
-                    </span>
-                    <span className="mono-num" style={{ textAlign: "right", color: "var(--text-primary)" }}>
-                      {a.price_eur > 0 ? `${eur(a.price_eur)} / Mon.` : "auf Anfrage"}
-                    </span>
-                  </div>
-                ))}
+                {d.agents.map((a) => {
+                  const setup = setupVon(a);
+                  return (
+                    <div key={a.id} className="table-row katalog-zeile" style={{ paddingLeft: 26, paddingRight: 26, borderBottom: "none" }}>
+                      <span style={{ minWidth: 0 }}>
+                        <span style={{ fontSize: 15, fontWeight: 600 }}>{a.name}</span>
+                        {a.description && (
+                          <span className="t-meta" style={{ display: "block", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {a.description}
+                          </span>
+                        )}
+                      </span>
+                      <span className="mono-num" style={{ textAlign: "right", color: "var(--text-primary)" }}>
+                        {a.price_eur > 0 ? `${eur(a.price_eur)} / Mon.` : "auf Anfrage"}
+                      </span>
+                      <span className="mono-num" style={{ textAlign: "right", color: setup ? "var(--text-primary)" : "var(--text-muted)" }}>
+                        {setup === null ? "nach Aufwand" : setup === 0 ? "keine" : eur(setup)}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             ))}
           </div>

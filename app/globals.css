@@ -344,6 +344,26 @@ p { text-wrap: pretty; }
   background: rgba(246,244,239,0.8); padding: 6px 12px;
 }
 .hero-title { font-size: 88px; font-weight: 800; letter-spacing: -0.05em; line-height: 0.98; margin: 14px 0 0; }
+/* Die erste Zeile traegt die Wortrolle und braucht etwas mehr Luft, sonst
+   schneidet der Ausschnitt die Unterlaengen ab (Marketing, g). */
+.hero-title__zeile { display: block; line-height: 1.12; }
+.hero-title__zeile2 { display: block; line-height: 0.98; }
+
+/* Bewusst in der Textfarbe, nicht in Petrol: "laeuft." ist die eine
+   Hervorhebung der Ueberschrift. Zwei Petrol-Woerter nebeneinander nehmen
+   sich gegenseitig die Wirkung — die Bewegung reicht als Blickfang. */
+.wortrolle {
+  display: inline-block; overflow: hidden; vertical-align: bottom;
+  height: 1.12em;
+  transition: width .5s cubic-bezier(.22,1,.36,1);
+}
+.wortrolle__track {
+  display: flex; flex-direction: column;
+  transition: transform .5s cubic-bezier(.22,1,.36,1);
+}
+/* width: max-content ist hier nicht kosmetisch — ohne das fuellt jedes Wort
+   die Breite des Ausschnitts, und die Messung misst sich selbst. */
+.wortrolle__wort { display: block; width: max-content; height: 1.12em; line-height: 1.12em; white-space: nowrap; }
 .hero-title .accent { color: var(--accent); }
 .hero-sub { font-size: 26px; font-weight: 500; letter-spacing: -0.02em; color: var(--text-tertiary); margin-top: 10px; }
 .hero-lead { font-size: 17px; line-height: 1.6; color: var(--text-secondary); max-width: 56ch; margin: 20px 0 0; min-height: 3.2em; }
@@ -438,6 +458,21 @@ p { text-wrap: pretty; }
 .plan__price { padding: 22px 26px 0; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .plan__amount { font-size: 40px; font-weight: 700; letter-spacing: -0.04em; }
 .plan__unit { font-size: 14px; color: var(--text-muted); }
+.preisblock { padding: 22px 26px 0; display: flex; flex-direction: column; gap: 10px; }
+.preisblock__zeile { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.preisblock__setup {
+  display: flex; align-items: baseline; gap: 8px;
+  font-size: 14px; line-height: 1.5; color: var(--text-secondary);
+}
+.preisblock__setup strong { font-family: var(--font-mono); font-weight: 500; color: var(--text-primary); }
+.preisblock__plus { font-family: var(--font-mono); color: var(--accent); flex: none; }
+.preisblock__summe {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  border-top: 1px solid var(--hairline); padding-top: 10px; margin-top: 2px;
+  font-size: 14px; font-weight: 600; color: var(--text-primary);
+}
+.preisblock__summe-wert { font-size: 16px; color: var(--accent); }
+
 .plan__list { padding: 20px 26px 0; display: flex; flex-direction: column; gap: 11px; list-style: none; }
 .plan__list li { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; line-height: 1.5; }
 .plan__bullet { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-top: 6px; flex: none; }
@@ -449,6 +484,7 @@ p { text-wrap: pretty; }
   padding: 64px 48px 40px;
   display: flex; flex-direction: column; align-items: center; gap: 14px;
 }
+.katalog-zeile { display: grid; grid-template-columns: 1fr 150px 150px; gap: 12px; }
 .leistungen { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--hairline-soft); }
 .leistung { padding: 22px 26px; border-right: 1px solid var(--hairline-soft); }
 .leistung:last-child { border-right: none; }
@@ -769,6 +805,14 @@ p { text-wrap: pretty; }
   .preise-head h1 { font-size: 34px; }
   .section-faq { padding: 0 24px 40px; }
   .leistungen { grid-template-columns: 1fr; }
+  /* Die Einrichtung wird auf schmalen Fenstern NICHT ausgeblendet — eine
+     versteckte Einmalgebuehr ist der Fehler, den diese Spalte behebt.
+     Stattdessen ruecken die beiden Betraege unter den Namen. */
+  .katalog-zeile { grid-template-columns: 1fr; gap: 4px; }
+  .katalog-zeile > span:not(:first-child) { text-align: left !important; }
+  .katalog-zeile > span:nth-child(2)::before { content: "Monatlich: "; color: var(--text-muted); }
+  .katalog-zeile > span:nth-child(3)::before { content: "Einrichtung: "; color: var(--text-muted); }
+  .table-head.katalog-zeile { display: none; }
   .leistung { border-right: none; border-bottom: 1px solid var(--hairline-soft); }
   .cta-petrol { padding: 28px; }
   .recht-tabs { padding: 28px 24px 0; }

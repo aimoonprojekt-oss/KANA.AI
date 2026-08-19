@@ -3,12 +3,18 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { DBAgent } from "@/lib/platform/supabase";
-import { nachAbteilung, tarifeAus, eur } from "@/lib/abteilungen";
+import { nachAbteilung, tarifeAus } from "@/lib/abteilungen";
 import Orbital from "./Orbital";
+import Wortrolle from "./Wortrolle";
+import PreisBlock from "./PreisBlock";
 import { KANAELE, TECHNIK, PlattformLogo } from "./PlattformLogos";
 import { SiteNav, SiteFooter } from "./SiteChrome";
 
 interface Props { agents: DBAgent[] }
+
+/* Die Woerter, die sich in der Ueberschrift drehen. Reihenfolge ist die
+   Reihenfolge der Rolle. */
+const ROLLE = ["Marketing", "Sales", "Support"];
 
 const HERO_LEAD =
   "Unser KI-Agent analysiert deinen Markt, erstellt deine Werbemittel und schaltet sie automatisch – vollständig ohne Agentur, ohne Team, ohne deinen Aufwand.";
@@ -88,25 +94,23 @@ export default function LandingPage({ agents }: Props) {
 
   const tarifKarten = [
     {
-      kicker: "Einstieg", name: "Ein Agent", hervor: false,
+      kicker: "Einstieg", name: "Ein Agent", hervor: false, ab: true,
       desc: "Ein digitaler Mitarbeiter aus einer Abteilung deiner Wahl.",
-      betrag: tarife.abEinAgent !== null ? `ab ${eur(tarife.abEinAgent)}` : "—",
-      einheit: "je Agent / Monat",
+      monat: tarife.abEinAgent, setup: tarife.abSetup, einheit: "je Agent / Monat",
       punkte: ["Ein Agent, ein Arbeitsbereich", "Sessions-Kontingent inklusive", "Chat und Dateiablage", "Monatlich kündbar"],
       cta: "Agent auswählen", href: "/preise",
     },
     {
-      kicker: "Empfohlen", name: "Abteilung", hervor: true,
+      kicker: "Empfohlen", name: "Abteilung", hervor: true, ab: true,
       desc: "Alle Agents einer Abteilung, aufeinander abgestimmt.",
-      betrag: tarife.abAbteilung !== null ? `ab ${eur(tarife.abAbteilung)}` : "—",
-      einheit: "je Abteilung / Monat",
+      monat: tarife.abAbteilung, setup: tarife.abAbteilungSetup, einheit: "je Abteilung / Monat",
       punkte: ["Alle Agents der Abteilung", "Höheres Freikontingent", "Gemeinsame Vorgaben und Tonlage", "Onboarding-Gespräch inklusive"],
       cta: "Abteilung ansehen", href: "/preise",
     },
     {
-      kicker: "Ausbau", name: "Mehrere Abteilungen", hervor: false,
+      kicker: "Ausbau", name: "Mehrere Abteilungen", hervor: false, ab: false,
       desc: "Marketing, Vertrieb, IT und Content am selben Kern.",
-      betrag: "individuell", einheit: "nach Umfang",
+      monat: null, setup: null, einheit: "nach Umfang", stattBetrag: "individuell",
       punkte: ["Beliebige Abteilungen kombinierbar", "Verbrauch gebündelt abgerechnet", "Feste Ansprechperson", "Auswertung im Portal"],
       cta: "Angebot anfragen", href: "/preise",
     },
@@ -139,8 +143,10 @@ export default function LandingPage({ agents }: Props) {
         <div className="hero-content">
           <span className="hero-badge">KI-Marketing-Agent · End-to-End</span>
           <h1 className="hero-title">
-            Dein Marketing<br />
-            <span className="accent">läuft.</span>
+            <span className="hero-title__zeile">
+              Dein <Wortrolle woerter={ROLLE} />
+            </span>
+            <span className="hero-title__zeile2 accent">läuft.</span>
           </h1>
           <p className="hero-sub">Du baust dein Business.</p>
           <p className="hero-lead">
@@ -267,10 +273,10 @@ export default function LandingPage({ agents }: Props) {
                 <span className="plan__name">{p.name}</span>
                 <p className="plan__desc">{p.desc}</p>
               </div>
-              <div className="plan__price">
-                <span className="plan__amount">{p.betrag}</span>
-                <span className="plan__unit">{p.einheit}</span>
-              </div>
+              <PreisBlock
+                monat={p.monat} setup={p.setup} einheit={p.einheit}
+                ab={p.ab} stattBetrag={p.stattBetrag}
+              />
               <ul className="plan__list">
                 {p.punkte.map((f) => (
                   <li key={f}><span className="plan__bullet" />{f}</li>
@@ -286,7 +292,8 @@ export default function LandingPage({ agents }: Props) {
         </div>
 
         <p className="t-meta" style={{ color: "var(--text-muted)", marginTop: 18 }}>
-          Alle Beträge netto, zzgl. USt.
+          Alle Beträge netto, zzgl. USt. Die Einrichtung fällt einmal je Agent an und ist in
+          jedem Preis oben ausgewiesen — es kommt später nichts dazu.
           {tarife.abteilungName && ` Der Abteilungspreis ist die Summe der Agents in ${tarife.abteilungName}.`}{" "}
           <Link href="/preise" style={{ color: "var(--accent)", fontWeight: 600 }}>Alle Details zu den Preisen →</Link>
         </p>

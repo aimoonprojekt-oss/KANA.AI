@@ -42,22 +42,41 @@ export function preisText(agent: DBAgent): string {
 }
 
 /* ─── Tarife ─────────────────────────────────────────────
-   Die Datenbank kennt heute nur einen Preis je Agent (price_eur).
-   Ein eigener Buendelpreis fuer eine ganze Abteilung existiert nicht —
-   die Abteilungsstufe wird deshalb aus der Summe der Agenten gebildet
-   und als "ab" ausgewiesen. Sobald es eine Spalte fuer Buendelpreise
-   gibt, gehoert sie hierher.                                      */
+   Zwei Betraege je Agent: price_eur laeuft monatlich, setup_eur faellt
+   einmal an. Beide werden ueberall zusammen ausgewiesen — der Betrag, der
+   den Kunden im ersten Monat tatsaechlich trifft, ist die Summe aus beiden,
+   und genau die soll er nicht selbst ausrechnen muessen.
+
+   Einen Buendelpreis fuer eine ganze Abteilung kennt die Datenbank nicht.
+   Die Abteilungsstufe wird deshalb aus der Summe der Agenten gebildet und
+   nur dann gezeigt, wenn wirklich jeder Agent der Abteilung einen Preis hat.
+   Sobald es eine Spalte fuer Buendelpreise gibt, gehoert sie hierher.      */
 
 export type Tarife = {
   abEinAgent: number | null;
+  /** Niedrigste Einrichtungsgebuehr. null = nirgends festgelegt. */
+  abSetup: number | null;
+  /** true, sobald mindestens ein Agent eine Gebuehr > 0 traegt */
+  hatSetup: boolean;
   abAbteilung: number | null;
+  abAbteilungSetup: number | null;
   /** Abteilung, aus der der Abteilungspreis stammt — fuer die Fussnote */
   abteilungName: string | null;
 };
 
+/** Einrichtungsgebuehr eines Agents. undefined (Spalte fehlt) und null
+    (noch nicht festgelegt) laufen beide auf null hinaus. */
+export function setupVon(agent: DBAgent): number | null {
+  const v = agent.setup_eur;
+  return typeof v === "number" ? v : null;
+}
+
 export function tarifeAus(agents: DBAgent[]): Tarife {
   const preise = agents.map((a) => a.price_eur).filter((p) => p > 0);
   const abEinAgent = preise.length > 0 ? Math.min(...preise) : null;
+
+  const setups = agents.map(setupVon).filter((v): v is number => v !== null && v > 0);
+  const abSetup = setups.length > 0 ? Math.min(...setups) : null;
 
   /* Ein Abteilungspreis ergibt nur Sinn, wenn JEDER Agent der Abteilung
      einen Preis hat. Sonst kaeme eine Summe heraus, die die Agenten ohne
@@ -67,6 +86,7 @@ export function tarifeAus(agents: DBAgent[]): Tarife {
     .map((d) => ({
       name: d.name,
       summe: d.agents.reduce((s, a) => s + (a.price_eur || 0), 0),
+      setup: d.agents.reduce((s, a) => s + (setupVon(a) ?? 0), 0),
       vollstaendig: d.agents.length > 1 && d.agents.every((a) => a.price_eur > 0),
     }))
     .filter((d) => d.vollstaendig)
@@ -74,7 +94,10 @@ export function tarifeAus(agents: DBAgent[]): Tarife {
 
   return {
     abEinAgent,
+    abSetup,
+    hatSetup: setups.length > 0,
     abAbteilung: summen[0]?.summe ?? null,
+    abAbteilungSetup: summen[0] ? summen[0].setup || null : null,
     abteilungName: summen[0]?.name ?? null,
   };
 }
