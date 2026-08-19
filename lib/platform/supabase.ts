@@ -48,6 +48,12 @@ export type DBAgent = {
   // Migration: docs/2026-08-19-setup-gebuehr.sql
   setup_eur?:         number | null;
 
+  // Inhalte fuer den leeren Chat: Fakten-Chips und Startprompts.
+  // Optional wie setup_eur — fehlt die Spalte, bleiben die Bloecke leer,
+  // statt dass die Seite bricht. Migration: docs/2026-08-19-chat-inhalte.sql
+  chat_fakten?:       [string, string][] | null;
+  chat_prompts?:      { kurz: string; text: string }[] | null;
+
   published:          boolean;
   featured:           boolean;
   stripe_price_id:    string | null;  // Stripe Price ID (price_xxx)

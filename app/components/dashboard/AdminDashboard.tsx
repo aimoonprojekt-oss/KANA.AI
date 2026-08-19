@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import type { DBAgent } from "@/lib/platform/supabase";
+import { KanaLogo } from "@/app/components/ui/KanaMark";
 
 interface AdminDashboardProps {
   agents: DBAgent[];
@@ -92,6 +93,7 @@ export default function AdminDashboard({ agents: initial }: AdminDashboardProps)
           published:          agent.published,
           featured:           agent.featured,
           price_eur:          agent.price_eur,
+          setup_eur:          agent.setup_eur ?? null,
           stripe_price_id:    agent.stripe_price_id ?? null,
           category:           agent.category ?? null,
         }),
@@ -112,86 +114,55 @@ export default function AdminDashboard({ agents: initial }: AdminDashboardProps)
   const ohneWs     = agents.filter((a) => !a.workspace && !a.archived).length;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F8F9FB", fontFamily: "system-ui, sans-serif" }}>
+    <div className="admin">
+      <header className="portal-header">
+        <div className="portal-header__left">
+          <KanaLogo size={22} fontSize={17} />
+          <span className="mono-sm" style={{ color: "var(--text-muted)" }}>Verwaltung</span>
+        </div>
+        <div className="portal-header__right">
+          <a href="/dashboard" className="btn btn-outline btn-sm">Zum Portal</a>
+        </div>
+      </header>
 
-      {/* ── Header ── */}
-      <div style={{ background: "#0D1F3C", padding: "16px 32px", display: "flex", alignItems: "center", gap: 16 }}>
-        <div style={{ color: "#fff", fontSize: 20, fontWeight: 700, letterSpacing: "-0.5px" }}>KANA AI</div>
-        <div style={{ color: "#637496", fontSize: 13 }}>Admin</div>
-        <div style={{ flex: 1 }} />
-        <a href="/dashboard" style={{ color: "#94A3B8", fontSize: 13, textDecoration: "none" }}>
-          → Dashboard
-        </a>
-      </div>
-
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 24px" }}>
-
-        {/* ── Stats + Sync ── */}
-        <div style={{ display: "flex", gap: 16, marginBottom: 28, alignItems: "flex-start", flexWrap: "wrap" }}>
-          <div style={{ flex: 1 }}>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: "#0D1F3C", marginBottom: 4 }}>
-              Agent-Verwaltung
-            </h1>
-            <p style={{ color: "#64748B", fontSize: 14 }}>
-              {agents.length} Agent(en) gesamt · {published} verkäuflich{archiviert > 0 ? ` · ${archiviert} archiviert` : ""}{ohneWs > 0 ? ` · ${ohneWs} ohne Workspace` : ""}
+      <div className="admin__inhalt">
+        <div className="portal-welcome" style={{ padding: "30px 0 22px" }}>
+          <div>
+            <h2>Agent-Verwaltung</h2>
+            <p>
+              {agents.length} {agents.length === 1 ? "Agent" : "Agents"} gesamt · {published} verkäuflich
+              {archiviert > 0 ? ` · ${archiviert} archiviert` : ""}
+              {ohneWs > 0 ? ` · ${ohneWs} ohne Workspace` : ""}
             </p>
           </div>
           <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             {syncResult && (
-              <div style={{
-                padding: "8px 14px",
-                borderRadius: 8,
-                fontSize: 13,
-                background: syncResult.ok ? "#D1FAE5" : "#FEE2E2",
-                color:      syncResult.ok ? "#065F46" : "#991B1B",
-                maxWidth: 320,
-              }}>
-                {syncResult.message}
-              </div>
+              <span className={`admin-meldung${syncResult.ok ? "" : " is-fehler"}`}>{syncResult.message}</span>
             )}
-            <button
-              onClick={handleSync}
-              disabled={syncing}
-              style={{
-                background: syncing ? "#94A3B8" : "#0D1F3C",
-                color: "#fff",
-                border: "none",
-                borderRadius: 8,
-                padding: "10px 20px",
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: syncing ? "not-allowed" : "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
-              {syncing ? (
-                <>
-                  <span style={{ display: "inline-block", width: 14, height: 14, border: "2px solid #fff", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
-                  Sync läuft…
-                </>
-              ) : (
-                "↻ Aus Anthropic Console syncen"
-              )}
+            <button className="btn btn-primary" onClick={handleSync} disabled={syncing}>
+              {syncing ? "Sync läuft…" : "Aus Anthropic Console syncen"}
             </button>
           </div>
         </div>
 
-        {/* ── Info Box ── */}
-        <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 10, padding: "12px 16px", marginBottom: 24, fontSize: 13, color: "#1E40AF", lineHeight: 1.6 }}>
-          <strong>Wie es funktioniert:</strong> „Sync" liest alle konfigurierten Console-Workspaces und schreibt sie hier hinein.
-          Neue Agents sind immer erst <em>unsichtbar</em> — Freigabe zum Verkauf ist eine bewusste Entscheidung.
-          Danach: „Sichtbar" einschalten, Preis und Stripe Price ID setzen, „Speichern".
-          Mit „Für mich freischalten" bekommst du den Agent ohne Zahlung ins eigene Portal, um die Kundensicht zu prüfen.
-          Agents, die in der Console nicht mehr existieren, werden <em>archiviert</em> statt gelöscht.
+        <div className="admin-hinweis">
+          <span className="mono-sm" style={{ color: "var(--accent)" }}>Wie es funktioniert</span>
+          <p>
+            „Sync" liest alle konfigurierten Console-Workspaces und schreibt sie hier hinein.
+            Neue Agents sind immer erst unsichtbar — die Freigabe zum Verkauf ist eine bewusste
+            Entscheidung. Danach: „Sichtbar" einschalten, Preise und Stripe Price ID setzen, speichern.
+            Mit „Für mich freischalten" bekommst du den Agent ohne Zahlung ins eigene Portal, um die
+            Kundensicht zu prüfen. Agents, die in der Console nicht mehr existieren, werden archiviert
+            statt gelöscht.
+          </p>
         </div>
 
         {agents.length === 0 ? (
-          <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #E2E8F0", padding: "48px 24px", textAlign: "center", color: "#94A3B8" }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>⬆</div>
-            <p style={{ fontSize: 15, fontWeight: 500, color: "#64748B" }}>Noch keine Agents synchronisiert</p>
-            <p style={{ fontSize: 13, marginTop: 6 }}>Drücke den Sync-Button oben um Agents aus der Anthropic Console zu laden.</p>
+          <div className="card-flat" style={{ textAlign: "center", padding: "56px 24px" }}>
+            <div className="portal-section-title" style={{ marginBottom: 8 }}>Noch keine Agents synchronisiert</div>
+            <p className="t-meta" style={{ color: "var(--text-muted)" }}>
+              Der Sync oben lädt die Agents aus der Anthropic Console.
+            </p>
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -209,23 +180,13 @@ export default function AdminDashboard({ agents: initial }: AdminDashboardProps)
           </div>
         )}
       </div>
-
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        input[type=number]::-webkit-inner-spin-button { opacity: 1; }
-      `}</style>
     </div>
   );
 }
 
 // ── Agent Card ────────────────────────────────────────────────────────────────
 function AgentCard({
-  agent,
-  onChange,
-  onSave,
-  onGrant,
-  granting,
-  grantMsg,
+  agent, onChange, onSave, onGrant, granting, grantMsg,
 }: {
   agent: AgentRow;
   onChange: (field: keyof AgentRow, value: unknown) => void;
@@ -234,161 +195,101 @@ function AgentCard({
   granting: boolean;
   grantMsg: { text: string; ok: boolean } | null;
 }) {
-  const inputStyle: React.CSSProperties = {
-    border: "1px solid #CBD5E1",
-    borderRadius: 6,
-    padding: "6px 10px",
-    fontSize: 13,
-    fontFamily: "inherit",
-    background: "#fff",
-    color: "#0F172A",
-    outline: "none",
-  };
+  const zustand = agent.archived ? " is-archiviert" : agent._dirty ? " is-geaendert" : "";
 
   return (
-    <div style={{
-      background: agent.archived ? "#F8FAFC" : "#fff",
-      borderRadius: 12,
-      border: agent._dirty ? "1px solid #F59E0B" : agent.archived ? "1px dashed #CBD5E1" : "1px solid #E2E8F0",
-      padding: "18px 20px",
-      opacity: agent.archived ? 0.72 : 1,
-      transition: "border-color 0.15s",
-    }}>
+    <div className={`admin-karte${zustand}`}>
       {agent.archived && (
-        <div style={{
-          background: "#FEF3C7", border: "1px solid #FDE68A", color: "#92400E",
-          borderRadius: 8, padding: "7px 12px", fontSize: 12, marginBottom: 14, lineHeight: 1.5,
-        }}>
+        <div className="admin-archiv">
           <strong>Archiviert</strong> — dieser Agent liegt nicht mehr in der Claude Console.
-          Er ist aus allen Kundenansichten verschwunden. Die Zeile bleibt erhalten, weil
-          Zugänge und Sitzungen daran hängen. Taucht er in der Console wieder auf, hebt der
-          nächste Sync das Archiv automatisch auf.
+          Er ist aus allen Kundenansichten verschwunden. Die Zeile bleibt erhalten, weil Zugänge
+          und Sitzungen daran hängen. Taucht er in der Console wieder auf, hebt der nächste Sync
+          das Archiv automatisch auf.
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
-
-        {/* Name + IDs */}
-        <div style={{ flex: "1 1 200px", minWidth: 180 }}>
-          <div style={{ fontWeight: 600, fontSize: 15, color: "#0D1F3C", marginBottom: 4, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <div className="admin-karte__zeile">
+        {/* Name und Kennungen */}
+        <div className="admin-feld" style={{ flex: "1 1 220px", minWidth: 200 }}>
+          <div className="admin-name">
             {agent.name}
-            <span style={{
-              fontSize: 10, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase",
-              padding: "2px 8px", borderRadius: 100,
-              background: agent.workspace ? "#E0E7FF" : "#FEE2E2",
-              color:      agent.workspace ? "#3730A3" : "#991B1B",
-            }}>
+            <span className={`badge ${agent.workspace ? "badge-outline" : "badge-fehlt"}`}>
               {agent.workspace ?? "kein Workspace"}
             </span>
           </div>
-          <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "monospace", marginBottom: 2 }}>
-            {agent.anthropic_agent_id}
-          </div>
-          <div style={{ fontSize: 11, color: "#94A3B8" }}>
-            /{agent.slug}
-          </div>
+          <div className="mono-num admin-kennung">{agent.anthropic_agent_id}</div>
+          <div className="mono-num admin-kennung">/{agent.slug}</div>
         </div>
 
-        {/* Kategorie */}
-        <div style={{ flex: "0 0 150px" }}>
-          <label style={{ display: "block", fontSize: 11, color: "#64748B", marginBottom: 4, fontWeight: 500 }}>KATEGORIE</label>
+        <div className="admin-feld" style={{ flex: "0 0 150px" }}>
+          <label className="form-label" htmlFor={`kat-${agent.id}`}>Kategorie</label>
           <select
+            id={`kat-${agent.id}`}
+            className="form-input"
             value={agent.category ?? ""}
             onChange={(e) => onChange("category", e.target.value || null)}
-            style={{ ...inputStyle, width: "100%" }}
           >
             <option value="">— keine —</option>
             {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
 
-        {/* Preis */}
-        <div style={{ flex: "0 0 120px" }}>
-          <label style={{ display: "block", fontSize: 11, color: "#64748B", marginBottom: 4, fontWeight: 500 }}>PREIS (€/Monat)</label>
+        <div className="admin-feld" style={{ flex: "0 0 120px" }}>
+          <label className="form-label" htmlFor={`preis-${agent.id}`}>€ / Monat</label>
           <input
-            type="number"
-            min={0}
-            step={1}
+            id={`preis-${agent.id}`} className="form-input mono-num"
+            type="number" min={0} step={1}
             value={agent.price_eur}
             onChange={(e) => onChange("price_eur", parseFloat(e.target.value) || 0)}
-            style={{ ...inputStyle, width: "100%" }}
           />
         </div>
 
-        {/* Stripe Price ID */}
-        <div style={{ flex: "1 1 220px" }}>
-          <label style={{ display: "block", fontSize: 11, color: "#64748B", marginBottom: 4, fontWeight: 500 }}>STRIPE PRICE ID</label>
+        {/* Einmalige Einrichtung — steht auf der Preisseite und im Portal
+            neben dem Monatsbeitrag. Leer heisst dort "nach Aufwand". */}
+        <div className="admin-feld" style={{ flex: "0 0 130px" }}>
+          <label className="form-label" htmlFor={`setup-${agent.id}`}>€ Einrichtung</label>
           <input
-            type="text"
-            placeholder="price_xxxxxxxxxxxxx"
+            id={`setup-${agent.id}`} className="form-input mono-num"
+            type="number" min={0} step={1} placeholder="nach Aufwand"
+            value={agent.setup_eur ?? ""}
+            onChange={(e) => onChange("setup_eur", e.target.value === "" ? null : parseFloat(e.target.value) || 0)}
+          />
+        </div>
+
+        <div className="admin-feld" style={{ flex: "1 1 220px" }}>
+          <label className="form-label" htmlFor={`stripe-${agent.id}`}>Stripe Price ID</label>
+          <input
+            id={`stripe-${agent.id}`} className="form-input mono-num"
+            type="text" placeholder="price_xxxxxxxxxxxxx"
             value={agent.stripe_price_id ?? ""}
             onChange={(e) => onChange("stripe_price_id", e.target.value || null)}
-            style={{ ...inputStyle, width: "100%", fontFamily: "monospace" }}
           />
         </div>
 
-        {/* Toggles + Save */}
-        <div style={{ flex: "0 0 auto", display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
-          <div style={{ display: "flex", gap: 12 }}>
-            <Toggle
-              label="Sichtbar"
-              checked={agent.published}
-              onChange={(v) => onChange("published", v)}
-              color="#10B981"
-            />
-            <Toggle
-              label="Featured"
-              checked={agent.featured}
-              onChange={(v) => onChange("featured", v)}
-              color="#F59E0B"
-            />
+        <div className="admin-aktionen">
+          <div style={{ display: "flex", gap: 16 }}>
+            <Toggle label="Sichtbar" checked={agent.published} onChange={(v) => onChange("published", v)} />
+            <Toggle label="Featured" checked={agent.featured} onChange={(v) => onChange("featured", v)} />
           </div>
           <button
+            className={agent._dirty ? "btn btn-primary btn-sm" : "btn btn-ghost btn-sm"}
             onClick={onSave}
             disabled={!agent._dirty || agent._saving}
-            style={{
-              background: agent._dirty ? "#0D1F3C" : "#E2E8F0",
-              color:      agent._dirty ? "#fff"    : "#94A3B8",
-              border: "none",
-              borderRadius: 7,
-              padding: "7px 18px",
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: agent._dirty && !agent._saving ? "pointer" : "not-allowed",
-              transition: "all 0.15s",
-            }}
           >
             {agent._saving ? "Speichert…" : agent._dirty ? "Speichern" : "Gespeichert"}
           </button>
-
-          {/* Ohne Zahlung fuer den eingeloggten Admin freischalten —
-              zum Pruefen der Kundensicht. */}
           <button
+            className="btn btn-outline btn-sm"
             onClick={onGrant}
             disabled={granting || !agent.published}
-            title={
-              agent.published
-                ? "Diesen Agenten ohne Zahlung fuer dich freischalten"
-                : "Erst sichtbar schalten und speichern"
-            }
-            style={{
-              background: "transparent",
-              color:      agent.published ? "#0D1F3C" : "#94A3B8",
-              border: `1px solid ${agent.published ? "#CBD5E1" : "#E2E8F0"}`,
-              borderRadius: 7,
-              padding: "6px 14px",
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: granting || !agent.published ? "not-allowed" : "pointer",
-            }}
+            title={agent.published
+              ? "Diesen Agenten ohne Zahlung für dich freischalten"
+              : "Erst sichtbar schalten und speichern"}
           >
             {granting ? "Schalte frei…" : "Für mich freischalten"}
           </button>
-
           {grantMsg && (
-            <span style={{ fontSize: 11, color: grantMsg.ok ? "#059669" : "#DC2626", maxWidth: 240, textAlign: "right" }}>
-              {grantMsg.text}
-            </span>
+            <span className={`admin-meldung${grantMsg.ok ? "" : " is-fehler"}`}>{grantMsg.text}</span>
           )}
         </div>
       </div>
@@ -396,42 +297,23 @@ function AgentCard({
   );
 }
 
-// ── Toggle ────────────────────────────────────────────────────────────────────
+// ── Umschalter ────────────────────────────────────────────────────────────────
 function Toggle({
-  label,
-  checked,
-  onChange,
-  color,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  color: string;
-}) {
+  label, checked, onChange,
+}: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, cursor: "pointer" }}>
-      <span style={{ fontSize: 10, color: "#64748B", fontWeight: 500 }}>{label.toUpperCase()}</span>
-      <div
+    <label className="admin-schalter">
+      <span className="form-label" style={{ marginBottom: 6 }}>{label}</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        className={`schalter${checked ? " is-an" : ""}`}
         onClick={() => onChange(!checked)}
-        style={{
-          width: 42, height: 24,
-          background: checked ? color : "#CBD5E1",
-          borderRadius: 12,
-          position: "relative",
-          transition: "background 0.2s",
-          cursor: "pointer",
-        }}
       >
-        <div style={{
-          position: "absolute",
-          top: 3, left: checked ? 21 : 3,
-          width: 18, height: 18,
-          background: "#fff",
-          borderRadius: "50%",
-          transition: "left 0.2s",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-        }} />
-      </div>
+        <span className="schalter__knopf" />
+      </button>
     </label>
   );
 }
