@@ -45,17 +45,28 @@ export default function Wortrolle({
          steht der ganze Satz einmal vollstaendig da. */
       aria-label={woerter.join(", ")}
     >
-      <span className="wortrolle__track" style={{ transform: `translateY(-${i * 100}%)` }}>
-        {woerter.map((w, idx) => (
-          <span
-            key={w}
-            ref={(el) => { woerterRef.current[idx] = el; }}
-            className="wortrolle__wort"
-            aria-hidden={idx !== i}
-          >
-            {w}
-          </span>
-        ))}
+      {/* Das Fenster schneidet ab, der Balken liegt darunter beim Elternteil —
+          sonst faehrt er den Unterlaengen ins Gesicht (das g von Marketing). */}
+      <span className="wortrolle__fenster">
+        {/* Verschoben wird um GENAU eine Worthoehe je Schritt. Prozent waere
+            hier falsch: die beziehen sich auf die Hoehe des ganzen Stapels,
+            bei drei Woertern also auf das Dreifache — der Ausschnitt bliebe
+            leer. --wortrolle-hoehe steht in globals.css und gilt fuer beide. */}
+        <span
+          className="wortrolle__track"
+          style={{ transform: `translateY(calc(${-i} * var(--wortrolle-hoehe)))` }}
+        >
+          {woerter.map((w, idx) => (
+            <span
+              key={w}
+              ref={(el) => { woerterRef.current[idx] = el; }}
+              className="wortrolle__wort"
+              aria-hidden={idx !== i}
+            >
+              {w}
+            </span>
+          ))}
+        </span>
       </span>
     </span>
   );

@@ -141,7 +141,9 @@ export default function LandingPage({ agents }: Props) {
         </div>
 
         <div className="hero-content">
-          <span className="hero-badge">KI-Marketing-Agent · End-to-End</span>
+          {/* Stand hier vorher "KI-Marketing-Agent". Das widersprach der Rolle
+              darunter, sobald sie auf Sales oder Support stand. */}
+          <span className="hero-badge">Digitale Mitarbeiter · End-to-End</span>
           <h1 className="hero-title">
             <span className="hero-title__zeile">
               Dein <Wortrolle woerter={ROLLE} />

@@ -353,9 +353,22 @@ p { text-wrap: pretty; }
    Hervorhebung der Ueberschrift. Zwei Petrol-Woerter nebeneinander nehmen
    sich gegenseitig die Wirkung — die Bewegung reicht als Blickfang. */
 .wortrolle {
-  display: inline-block; overflow: hidden; vertical-align: bottom;
-  height: 1.12em;
+  --wortrolle-hoehe: 1.12em;   /* eine Zeile; die Rolle verschiebt genau darum */
+  display: inline-block; position: relative; vertical-align: bottom;
+  /* Platz fuer den Balken. Das negative margin holt den groessten Teil
+     wieder heraus — es bleiben rund 10 px, damit der Balken als
+     Unterstreichung des Wortes lesbar bleibt und nicht als Trennstrich
+     zur Zeile darunter. */
+  padding-bottom: 16px; margin-bottom: -6px;
   transition: width .5s cubic-bezier(.22,1,.36,1);
+}
+.wortrolle__fenster { display: block; overflow: hidden; height: var(--wortrolle-hoehe); }
+/* Der Petrol-Balken zieht den Blick auf das wechselnde Wort, ohne dem
+   "laeuft." die Textfarbe streitig zu machen. Er wandert mit der Breite,
+   weil er am Ausschnitt haengt. */
+.wortrolle::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0;
+  height: 8px; background: var(--accent);
 }
 .wortrolle__track {
   display: flex; flex-direction: column;
@@ -363,7 +376,7 @@ p { text-wrap: pretty; }
 }
 /* width: max-content ist hier nicht kosmetisch — ohne das fuellt jedes Wort
    die Breite des Ausschnitts, und die Messung misst sich selbst. */
-.wortrolle__wort { display: block; width: max-content; height: 1.12em; line-height: 1.12em; white-space: nowrap; }
+.wortrolle__wort { display: block; width: max-content; height: var(--wortrolle-hoehe); line-height: var(--wortrolle-hoehe); white-space: nowrap; }
 .hero-title .accent { color: var(--accent); }
 .hero-sub { font-size: 26px; font-weight: 500; letter-spacing: -0.02em; color: var(--text-tertiary); margin-top: 10px; }
 .hero-lead { font-size: 17px; line-height: 1.6; color: var(--text-secondary); max-width: 56ch; margin: 20px 0 0; min-height: 3.2em; }
@@ -431,12 +444,21 @@ p { text-wrap: pretty; }
 
 /* Plattformen */
 .section-platforms {
-  padding: 48px; border-top: 1px solid var(--hairline);
+  padding: 56px 48px; border-top: 1px solid var(--hairline);
   background: var(--bg-secondary);
-  display: flex; flex-direction: column; gap: 32px;
+  display: flex; flex-direction: column; align-items: center; gap: 40px;
 }
-.platform-block { display: flex; flex-direction: column; gap: 18px; }
-.platform-row { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 32px; }
+/* Mittig gesetzt: die Leiste ist eine Aussage ueber Reichweite, keine
+   Aufzaehlung am Seitenrand. Beide Bloecke teilen dieselbe Mittelachse. */
+.platform-block {
+  display: flex; flex-direction: column; align-items: center; gap: 20px;
+  width: 100%; max-width: 980px;
+}
+.platform-block + .platform-block { border-top: 1px solid var(--hairline); padding-top: 36px; }
+.platform-row {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  gap: 18px 36px;
+}
 .plattform {
   display: inline-flex; align-items: center; gap: 10px;
   color: var(--text-secondary); opacity: 0.72; transition: opacity 0.2s, color 0.2s;

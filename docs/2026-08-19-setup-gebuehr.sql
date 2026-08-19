@@ -12,7 +12,7 @@
 -- Ausfuehren im Supabase SQL-Editor.
 
 alter table public.agents
-  add column if not exists setup_eur integer;
+  add column if not exists setup_eur numeric;   -- wie price_eur
 
 comment on column public.agents.setup_eur is
   'Einmalige Einrichtungsgebuehr in Euro. 0 = keine, NULL = nach Aufwand.';
