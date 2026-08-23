@@ -122,3 +122,12 @@ einen Ordner außerhalb des Repos. Details stehen im Skript.
 
 > Eine Sicherung, die nie wiederhergestellt wurde, ist keine Sicherung.
 > Einmal im Quartal gegen das Staging-Projekt durchspielen.
+
+## Stand und Vorgehen
+
+| Dokument | Inhalt |
+|---|---|
+| [docs/stand-2026-08-23.md](docs/stand-2026-08-23.md) | **Einstieg.** Was wo liegt, alle IDs, offene Punkte, Fallstricke |
+| [docs/speicherorte.md](docs/speicherorte.md) | Wann Supabase, wann Memory, wann Files |
+| [docs/neuer-mandant.md](docs/neuer-mandant.md) | Einen Kunden aufsetzen, zwei bis drei Stunden |
+| [docs/testlauf.md](docs/testlauf.md) | Drei Testläufe mit Symptom-Tabelle |
