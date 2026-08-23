@@ -1,0 +1,37 @@
+{
+  "name": "Sins 'n Lashes",
+  "kuerzel": "SNL",
+  "namensbedeutung": "S.I.N.S = Shine In Natural Self",
+  "branche": "Beauty",
+  "website": "https://www.sinsnlashes.com/",
+  "domain": "sinsnlashes.com",
+  "shopsystem": "Shopify",
+  "waehrung": "EUR",
+  "sprache_social": "Englisch",
+  "kanaele": {
+    "tiktok": "@sinscosmetics",
+    "instagram": "@sinsnlashes",
+    "youtube": "@sinscosmetics",
+    "pinterest": "@sinscosmetics"
+  },
+  "ausschluss": [
+    "Sins 'n Lashes",
+    "Sins n Lashes",
+    "sinsnlashes.com",
+    "@sinsnlashes",
+    "@sinscosmetics"
+  ],
+  "hero_produkt": { "name": "Wimpernserum", "preis": "36,99 EUR" },
+  "tonalitaet": {
+    "on_brand": ["feminin", "emotional", "luxurioes", "clean", "transformation-focused", "englische Social-Sprache"],
+    "off_brand": ["billig", "medizinisch-kalt", "corporate", "deutsche Captions auf Social"]
+  },
+  "such_keywords": {
+    "Wimpernserum":     ["lash serum", "wimpernserum", "eyelash growth serum", "lash growth"],
+    "Augenbrauenserum": ["brow serum", "eyebrow serum", "augenbrauenserum"],
+    "Haarserum":        ["hair serum", "haarserum", "rosemary hair serum"],
+    "Rosmarinoel":      ["rosemary oil hair", "rosmarinöl haare"],
+    "Mascara":          ["growth mascara", "lash mascara serum"],
+    "Wimpernlifting":   ["lash lift kit", "wimpernlifting"]
+  }
+}

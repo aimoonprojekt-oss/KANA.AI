@@ -16,8 +16,10 @@
  *   KANA AI          Produktkatalog. Die verkaufbaren Master-Agenten.
  *                    Nur was hier liegt, kann im Shop erscheinen.
  *
- *   Sins 'n Lashes   Bestand des Erstkunden, solange die Agenten noch
- *                    hartcodiert sind. Erscheint NICHT im Katalog.
+ *   Sins 'n Lashes   Bestand des Erstkunden. Erscheint NICHT im Katalog.
+ *                    Seit 23.08.2026 sind es Kopien der neutralen Master —
+ *                    nicht mehr hartcodierte Sonderfassungen. Was die Marke
+ *                    ausmacht, steht in marke.json im Speicher des Workspace.
  *
  * Langfristig gilt weiter: ein Master-Agent je Produkt, Mandantentrennung
  * zur Laufzeit über den übergebenen Kontext. Kundenworkspaces sind ein

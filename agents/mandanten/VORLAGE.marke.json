@@ -1,0 +1,24 @@
+{
+  "_hinweis": "Vorlage fuer einen neuen Mandanten. Kopieren, ausfuellen, als /marke.json in den Speicher kana-wissen des Kundenworkspace legen. Alle Felder sind Pflicht ausser namensbedeutung.",
+  "name": "<Markenname, wie er in Texten erscheint>",
+  "kuerzel": "<2-4 Buchstaben, in Berichten als Kurzform>",
+  "namensbedeutung": "",
+  "branche": "<z.B. Beauty, Fitness, Haushalt>",
+  "website": "https://<domain>/",
+  "domain": "<domain ohne Protokoll — wird fuer den Selbstausschluss gebraucht>",
+  "shopsystem": "<Shopify | WooCommerce | eigenes>",
+  "waehrung": "EUR",
+  "sprache_social": "<Deutsch | Englisch>",
+  "kanaele": { "tiktok": "@", "instagram": "@", "youtube": "@", "pinterest": "@" },
+  "ausschluss": [
+    "<Markenname>",
+    "<Schreibvariante>",
+    "<domain>",
+    "@<handle>"
+  ],
+  "hero_produkt": { "name": "<Hauptprodukt>", "preis": "<Betrag> EUR" },
+  "tonalitaet": { "on_brand": ["<...>"], "off_brand": ["<...>"] },
+  "such_keywords": {
+    "<Produktkategorie>": ["<begriff 1>", "<begriff 2>", "<begriff 3>", "<begriff 4>"]
+  }
+}
