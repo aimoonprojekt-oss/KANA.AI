@@ -21,7 +21,7 @@ export default function SupportChatWidget() {
     if (open && messages.length === 0) {
       setMessages([{
         role: "assistant",
-        content: "Hallo! Wie kann ich Ihnen heute helfen?",
+        content: "Hallo! Ich bin der KI-Assistent von KANA AI. Meine Antworten werden automatisch erzeugt und können Fehler enthalten — bei etwas Wichtigem melde dich gern unter hallo@kana-ai.de. Womit kann ich helfen?",
       }]);
     }
     if (open) setTimeout(() => inputRef.current?.focus(), 100);
@@ -126,9 +126,12 @@ export default function SupportChatWidget() {
               }}>S</div>
               <div>
                 <div style={{ fontWeight: 600, fontSize: 14 }}>Support</div>
-                <div style={{ fontSize: 11, opacity: .8, display: "flex", alignItems: "center", gap: 5 }}>
+                {/* "Online" allein liess offen, ob am anderen Ende ein Mensch
+                    sitzt. Art. 50 Abs. 1 KI-VO verlangt, dass die Maschine
+                    als solche erkennbar ist — deshalb steht es im Kopf. */}
+                <div style={{ fontSize: 11, opacity: .85, display: "flex", alignItems: "center", gap: 5 }}>
                   <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#48bb78", display: "inline-block" }} />
-                  Online
+                  KI-Assistent · antwortet automatisch
                 </div>
               </div>
             </div>

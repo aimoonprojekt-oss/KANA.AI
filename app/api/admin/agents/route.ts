@@ -17,7 +17,8 @@ export async function GET() {
 /**
  * PATCH /api/admin/agents
  * Body: { anthropic_agent_id: string; published?: boolean; featured?: boolean;
- *         price_eur?: number; stripe_price_id?: string; category?: string }
+ *         price_eur?: number; setup_eur?: number; stripe_price_id?: string;
+ *         category?: string }
  *
  * Aktualisiert ein oder mehrere Felder eines Agents.
  * Felder die NICHT im Body stehen bleiben unverändert.
@@ -34,8 +35,11 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "anthropic_agent_id fehlt" }, { status: 400 });
   }
 
-  // Nur erlaubte Felder zulassen
-  const allowed = ["published", "featured", "price_eur", "stripe_price_id", "category"];
+  // Nur erlaubte Felder zulassen.
+  // setup_eur kam am 19.08. dazu: die einmalige Einrichtungsgebuehr wird auf
+  // Landingpage, Preisseite und im Portal ausgewiesen. Ohne den Eintrag hier
+  // liesse sie sich nur per SQL setzen.
+  const allowed = ["published", "featured", "price_eur", "setup_eur", "stripe_price_id", "category"];
   const update: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in fields) update[key] = fields[key];

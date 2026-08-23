@@ -39,6 +39,26 @@ export type DBAgent = {
   category:           string | null;
   thumbnail_url:      string | null;
   price_eur:          number;
+
+  // Einmalige Einrichtungsgebuehr je Agent, in Euro. Wird auf Landingpage,
+  // Preisseite und im Portal offen neben dem Monatsbeitrag ausgewiesen —
+  // versteckte Einmalkosten sind der haeufigste Grund fuer Rueckfragen.
+  // Optional, weil die Spalte in aelteren Datenbanken fehlen kann; dann
+  // liefert select("*") sie nicht mit und der Wert ist undefined.
+  // Migration: docs/2026-08-19-setup-gebuehr.sql
+  setup_eur?:         number | null;
+
+  // Inhalte fuer den leeren Chat: Fakten-Chips und Startprompts.
+  // Bewusst als unknown getypt und NICHT als fertige Liste: die Spalten sind
+  // jsonb und werden von Hand befuellt, dort kann alles stehen. Wer sie
+  // liest, muss durch faktenAus()/promptsAus() aus lib/chat-inhalte — der
+  // Typ erzwingt das. Vorher stand hier eine Liste, der Code rief .map()
+  // direkt darauf auf, und eine abweichende Form hat die Chatseite mit
+  // "map is not a function" abgeraeumt.
+  // Migration: docs/2026-08-19-chat-inhalte.sql
+  chat_fakten?:       unknown;
+  chat_prompts?:      unknown;
+
   published:          boolean;
   featured:           boolean;
   stripe_price_id:    string | null;  // Stripe Price ID (price_xxx)
@@ -794,11 +814,21 @@ export type UsageStat = {
   sessionsLastWeek: number;
 };
 
+/** Ein Tag im Verlaufsdiagramm: summierte Arbeitszeit aller Agents. */
+export type VerlaufPunkt = {
+  tag:        string;   // YYYY-MM-DD
+  minuten:    number;   // Summe aus last_message_at - created_at
+  sitzungen:  number;
+};
+
 export type UsageOverview = {
   stats:           UsageStat[];
   totalThisMonth:  number;
   totalLastMonth:  number;
   recentSessions:  (Session & { agentName: string })[];
+  /** Letzte 30 Tage, lueckenlos — Tage ohne Sitzung stehen mit 0 drin,
+      sonst zieht die Linie ueber Luecken hinweg und taeuscht Betrieb vor. */
+  verlauf:         VerlaufPunkt[];
 };
 
 export async function getUserUsageStats(userId: string): Promise<UsageOverview> {
@@ -848,6 +878,39 @@ export async function getUserUsageStats(userId: string): Promise<UsageOverview> 
     return d >= startOfLastMonth && d < startOfThisMonth;
   }).length;
 
+  /* ── Verlauf der letzten 30 Tage ──
+     Arbeitszeit einer Sitzung = last_message_at - created_at. Fehlt
+     last_message_at, ist die Sitzung nie beantwortet worden und zaehlt mit
+     0 Minuten; eine geschaetzte Dauer waere hier eine erfundene Zahl.
+     Ausreisser ueber 4 Stunden werden gekappt — das sind Sitzungen, die
+     jemand offen liegen gelassen hat, keine Arbeitszeit.               */
+  const TAGE = 30;
+  const KAPPUNG_MIN = 4 * 60;
+
+  const heute = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const proTag = new Map<string, { minuten: number; sitzungen: number }>();
+  for (let i = TAGE - 1; i >= 0; i--) {
+    const d = new Date(heute);
+    d.setDate(heute.getDate() - i);
+    proTag.set(d.toISOString().slice(0, 10), { minuten: 0, sitzungen: 0 });
+  }
+
+  for (const s of sessions ?? []) {
+    const tag = new Date(s.created_at).toISOString().slice(0, 10);
+    const eintrag = proTag.get(tag);
+    if (!eintrag) continue;               // aelter als 30 Tage
+    eintrag.sitzungen++;
+    if (!s.last_message_at) continue;
+    const dauer = (new Date(s.last_message_at).getTime() - new Date(s.created_at).getTime()) / 60000;
+    if (dauer > 0) eintrag.minuten += Math.min(dauer, KAPPUNG_MIN);
+  }
+
+  const verlauf: VerlaufPunkt[] = Array.from(proTag.entries()).map(([tag, v]) => ({
+    tag,
+    minuten: Math.round(v.minuten),
+    sitzungen: v.sitzungen,
+  }));
+
   return {
     stats:          Array.from(agentStats.values()),
     totalThisMonth,
@@ -856,5 +919,6 @@ export async function getUserUsageStats(userId: string): Promise<UsageOverview> 
       ...s,
       agentName: agentMap.get(s.agent_id) ?? "Unbekannt",
     })),
+    verlauf,
   };
 }
