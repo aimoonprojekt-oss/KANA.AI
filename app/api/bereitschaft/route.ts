@@ -28,8 +28,9 @@
  * ja funktioniert.
  */
 
+import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { getSupabaseAdmin } from "@/lib/platform/supabase";
+import { getSupabaseAdmin, isAdminUser } from "@/lib/platform/supabase";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,20 @@ type Befund = {
 const gesetzt = (name: string) => (process.env[name] ?? "").length > 0;
 
 export async function GET() {
+  // Nur fuer Betreiber. Die Antwort nennt Agentennamen, Workspaces, Speicher-
+  // inhalte und den Konfigurationszustand — Betriebswissen, das einen Kunden
+  // nichts angeht.
+  //
+  // Die Middleware schuetzt diese Route bereits vor Anonymen. Hier trotzdem
+  // erneut pruefen, und zwar auf Admin statt nur auf eingeloggt: eine Zeile in
+  // der Middleware ist beim naechsten Umbau zu leicht verloren, und "irgendwer
+  // ist eingeloggt" ist hier das falsche Kriterium.
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ message: "Nicht eingeloggt" }, { status: 401 });
+  if (!isAdminUser(userId)) {
+    return NextResponse.json({ message: "Kein Zugriff — nur Admins." }, { status: 403 });
+  }
+
   const befunde: Befund[] = [];
   const notiere = (bereich: string, pruefung: string,
                    ergebnis: Befund["ergebnis"], hinweis?: string) =>

@@ -71,6 +71,9 @@ Nach dem Deploy im Browser aufrufen:
 https://kana-ai.vercel.app/api/bereitschaft
 ```
 
+Erreichbar nur fuer Admins (ADMIN_USER_IDS) — die Antwort nennt Agentennamen,
+Workspaces und Speicherinhalte.
+
 Der Endpunkt prueft in einem Aufruf, ob ein Lauf ueberhaupt gelingen kann:
 welche Umgebungsvariablen gesetzt sind (nur ja/nein, nie Werte), ob die
 Speicher erreichbar sind und die erwarteten Dateien enthalten, ob ein Roster
