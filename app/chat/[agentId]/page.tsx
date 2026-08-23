@@ -9,7 +9,11 @@ import CreativeStrategist from "@/app/components/agents/CreativeStrategist";
 import CreativeAnalyst from "@/app/components/agents/CreativeAnalyst";
 
 type Message = { role: "user" | "assistant"; content: string };
-type OutputFile = { id: string; filename: string };
+// Seit 23.08.2026 liefert /api/chat einen fertigen, zeitlich begrenzten Link
+// statt einer file_id: die Datei wird nach dem Lauf aus der Files API in
+// Supabase Storage uebernommen und dort geloescht. Ein Proxy ueber
+// /api/files/<id> ginge deshalb ins Leere.
+type OutputFile = { filename: string; url: string | null; bytes?: number };
 
 /* ─── Inline Markdown Parser ─────────────────────────────────────────────── */
 function parseInline(text: string): React.ReactNode {
@@ -428,9 +432,9 @@ function ChatPageInner() {
                 Erstellte Dateien
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {outputFiles.map(f => (
-                  <a key={f.id}
-                    href={`/api/files/${f.id}?session=${encodeURIComponent(sessionId ?? "")}`}
+                {outputFiles.filter(f => f.url).map(f => (
+                  <a key={f.url}
+                    href={f.url ?? undefined}
                     download={f.filename}
                     style={{
                       display: "flex", alignItems: "center", gap: 10,

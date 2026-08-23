@@ -9,6 +9,12 @@ import {
   sessionGehoertNutzer,
 } from "@/lib/platform/supabase";
 import { sessionDateienAnhaengen } from "@/lib/agents/sessionRessourcen";
+import {
+  wissenProjizieren,
+  analysenUebernehmen,
+  wissenUebernehmen,
+  lieferungenUebernehmen,
+} from "@/lib/agents/speicherProjektion";
 import { anthropicFuerNutzer } from "@/lib/anthropic/mandant";
 import { laufzielFuerKunden } from "@/lib/anthropic/kundenkopie";
 
@@ -97,9 +103,21 @@ export async function POST(req: NextRequest) {
   // read_only ist Absicht: Nur der Datenpfleger schreibt hinein, und zwar
   // über das Backend mit Validierung. Ein Agent, der die Wissensbasis eines
   // Mandanten überschreiben kann, ist ein Agent zu viel.
-  const memoryStoreIds = agentDef?.memory_store_ids?.length
-    ? agentDef.memory_store_ids
-    : umgebungsListe("ANTHROPIC_MEMORY_STORE_IDS");
+  // Zwei Speicher mit unterschiedlichem Zugriff — die Trennung ist der Grund,
+  // warum es zwei sind und nicht einer:
+  //
+  //   kana-wissen      read_only   Markenwissen, Referenzen, Werkzeuge
+  //   kana-ergebnisse  read_write  Analysen und Guides des Laufs
+  //
+  // Ein Agent, der die Wissensbasis eines Mandanten ueberschreiben kann, ist
+  // ein Agent zu viel. Deshalb bekommt er Schreibrecht nur dort, wo seine
+  // eigenen Ergebnisse landen. Siehe docs/speicherorte.md.
+  const wissensStoreId =
+    process.env.ANTHROPIC_WISSENS_STORE_ID ??
+    agentDef?.memory_store_ids?.[0] ??
+    umgebungsListe("ANTHROPIC_MEMORY_STORE_IDS")[0] ??
+    "";
+  const ergebnisStoreId = process.env.ANTHROPIC_ERGEBNIS_STORE_ID ?? "";
 
   // ── 5. Anthropic Managed Agents API aufrufen ───────────────────────────────
   // Modell A: der Client gehoert dem Workspace DIESES Kunden. Wirft, wenn ein
@@ -169,11 +187,37 @@ export async function POST(req: NextRequest) {
         (kontext ?? {}) as Record<string, unknown>
       );
 
-      const memoryRessourcen = memoryStoreIds.map((id) => ({
-        type: "memory_store" as const,
-        memory_store_id: id,
-        access: "read_only" as const,
-      }));
+      // Vor der Sitzung: Markenwissen und offene Breakdowns aus Supabase in
+      // den Wissensspeicher schreiben. Der Agent hat keinen Datenbankzugang —
+      // was er nicht hier vorfindet, sieht er nicht.
+      //
+      // Ein Fehlschlag bricht den Lauf NICHT ab: der Agent meldet selbst, wenn
+      // ihm eine Datei fehlt, und diese Meldung ist fuer den Nutzer
+      // verstaendlicher als ein 500er aus dem Backend.
+      if (wissensStoreId) {
+        try {
+          await wissenProjizieren(beta, wissensStoreId, (kontext ?? {}) as Record<string, unknown>);
+        } catch (fehler) {
+          console.warn("[chat] Projektion fehlgeschlagen:", fehler);
+        }
+      }
+
+      const memoryRessourcen = [
+        ...(wissensStoreId
+          ? [{
+              type: "memory_store" as const,
+              memory_store_id: wissensStoreId,
+              access: "read_only" as const,
+            }]
+          : []),
+        ...(ergebnisStoreId
+          ? [{
+              type: "memory_store" as const,
+              memory_store_id: ergebnisStoreId,
+              access: "read_write" as const,
+            }]
+          : []),
+      ];
 
       const ressourcen = [...memoryRessourcen, ...dateiRessourcen];
 
@@ -184,7 +228,17 @@ export async function POST(req: NextRequest) {
         ...(ressourcen.length ? { resources: ressourcen } : {}),
         // Harter Kostendeckel je Lauf, in ganzen CENT als String.
         // Ohne ihn ist eine Endlosschleife im Agenten ein unbegrenztes
-        // Kostenrisiko. Gemessen: ein Strategy Guide mit 20 Briefs = 40 Cent.
+        // Kostenrisiko.
+        //
+        // Gemessene Laeufe Strategy Guide mit 20 Briefs (sonnet-4-6/medium):
+        //   17.08. 40 · 61 · 85 · 117 Cent   21.08. 68 Cent
+        // Seit 23.08. laeuft der Strategist auf claude-opus-5 mit effort high.
+        // Opus 5 kostet rund das 1,7-fache je Token und denkt laenger, der
+        // teuerste bekannte Lauf landet damit grob bei 250-300 Cent — genau am
+        // alten Deckel. Default deshalb auf 800 angehoben.
+        //
+        // Beim ersten Lauf auf Opus 5 die tatsaechlichen Kosten aus
+        // session.usage.list_cost ablesen und diesen Wert hier nachziehen.
         //
         // OFFEN (18.08.2026): `budget` kommt im SDK-Typ SessionCreateParams
         // (@anthropic-ai/sdk 0.95.2) NICHT vor — die ganze Datei geht ueber
@@ -196,7 +250,7 @@ export async function POST(req: NextRequest) {
         budget: {
           type: "limit",
           max_list_cost: {
-            amount: process.env.ANTHROPIC_MAX_LIST_COST_CENT ?? "300",
+            amount: process.env.ANTHROPIC_MAX_LIST_COST_CENT ?? "800",
             currency: "USD",
           },
         },
@@ -273,18 +327,47 @@ export async function POST(req: NextRequest) {
 
         // Dateiabholung. Wird an mehreren Stellen aufgerufen und darf deshalb
         // unter keinen Umstaenden werfen.
+        //
+        // Frueher wurden hier nur die file_ids ans Chatfenster gemeldet — der
+        // Browser kann damit nichts anfangen, er hat keinen API-Schluessel.
+        // Jetzt laden wir die Dateien herunter, legen sie mandantengetrennt in
+        // Supabase Storage ab und schicken einen signierten Link. Die Files API
+        // ist eine Schleuse, kein Ablageort: sie wird danach geleert.
+        let dateienGeholt = false;
         const dateienSenden = async () => {
+          if (dateienGeholt) return;
           try {
-            const liste = await beta.files.list({ scope_id: activeSessionId });
-            const dateien = (liste?.data ?? []).map(
-              (f: { id: string; filename?: string }) => ({
-                id: f.id,
-                filename: f.filename ?? f.id,
-              })
+            const lieferungen = await lieferungenUebernehmen(
+              beta,
+              activeSessionId,
+              mandant.organizationId,
+              runId || activeSessionId
             );
-            if (dateien.length) sende({ files: dateien });
+            if (lieferungen.length) {
+              dateienGeholt = true;
+              sende({
+                files: lieferungen.map((l) => ({
+                  filename: l.dateiname,
+                  url: l.url,
+                  bytes: l.bytes,
+                })),
+              });
+            }
           } catch (fehler) {
-            console.warn("Files API:", fehler);
+            console.warn("Lieferungen:", fehler);
+          }
+        };
+
+        // Ergebnisse des Analysten aus dem Ergebnisspeicher nach Supabase.
+        // Getrennt von den Lieferungen: das eine sind Daten, das andere sind
+        // Dateien fuer den Kunden.
+        const analysenSichern = async () => {
+          if (!ergebnisStoreId) return;
+          try {
+            await analysenUebernehmen(beta, ergebnisStoreId);
+            await wissenUebernehmen(beta, ergebnisStoreId);
+          } catch (fehler) {
+            console.warn("Ergebnisuebernahme:", fehler);
           }
         };
 
@@ -394,6 +477,7 @@ export async function POST(req: NextRequest) {
 
           // Dateien IMMER holen — auch nach Zeitueberschreitung.
           await dateienSenden();
+          await analysenSichern();
 
           if (abgelaufen) {
             sende({
@@ -421,6 +505,7 @@ export async function POST(req: NextRequest) {
           // Auch im Fehlerfall zuerst die Dateien retten — sie sind das
           // Ergebnis, der Fehler ist nur der Transportweg.
           await dateienSenden();
+          await analysenSichern();
           if (runId) await completeRun(runId, "ERROR").catch(() => {});
           const msg = streamError instanceof Error ? streamError.message : "Stream-Fehler";
           sende({ error: msg });
