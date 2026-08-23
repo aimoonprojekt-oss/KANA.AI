@@ -9,16 +9,50 @@
   "shopsystem": "<Shopify | WooCommerce | eigenes>",
   "waehrung": "EUR",
   "sprache_social": "<Deutsch | Englisch>",
-  "kanaele": { "tiktok": "@", "instagram": "@", "youtube": "@", "pinterest": "@" },
+  "kanaele": {
+    "tiktok": "@",
+    "instagram": "@",
+    "youtube": "@",
+    "pinterest": "@"
+  },
+  "quellen": {
+    "bewertungen": "<Trustpilot-, Google- oder Shop-Bewertungsseite>",
+    "community": "<Forum oder Portal, wo ueber die Kategorie gesprochen wird>"
+  },
+  "wettbewerber": [
+    {
+      "name": "<Wettbewerber 1>",
+      "website": "https://<domain>"
+    },
+    {
+      "name": "<Wettbewerber 2>",
+      "website": null
+    }
+  ],
   "ausschluss": [
     "<Markenname>",
     "<Schreibvariante>",
     "<domain>",
     "@<handle>"
   ],
-  "hero_produkt": { "name": "<Hauptprodukt>", "preis": "<Betrag> EUR" },
-  "tonalitaet": { "on_brand": ["<...>"], "off_brand": ["<...>"] },
+  "hero_produkt": {
+    "name": "<Hauptprodukt>",
+    "preis": "<Betrag> EUR"
+  },
+  "tonalitaet": {
+    "on_brand": [
+      "<...>"
+    ],
+    "off_brand": [
+      "<...>"
+    ]
+  },
   "such_keywords": {
-    "<Produktkategorie>": ["<begriff 1>", "<begriff 2>", "<begriff 3>", "<begriff 4>"]
+    "<Produktkategorie>": [
+      "<begriff 1>",
+      "<begriff 2>",
+      "<begriff 3>",
+      "<begriff 4>"
+    ]
   }
 }

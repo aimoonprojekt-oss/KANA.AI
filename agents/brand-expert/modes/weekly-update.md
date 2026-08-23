@@ -1,48 +1,65 @@
 WEEKLY UPDATE — Scrapt alle Kanäle neu, vergleicht mit dem gespeicherten Stand und markiert Änderungen.
 
-Hinweis: Die Quellenliste unten ist noch fest verdrahtet (Mandant SNL). Sobald
-die Mandantenfähigkeit steht, kommen Kanäle und Wettbewerber aus den Einträgen
-`brand_social` und `brand_competitors` der Wissensbasis.
-
 WICHTIGE REGEL FÜR MARKIERUNGEN:
 - Alles was NEU ist (nicht in der Wissensbasis vorhanden) → mit [NEU] am Anfang der Zeile markieren
 - Alles was sich GEÄNDERT hat (andere Zahl, anderer Text) → mit [GEÄNDERT] markieren
 - Was unverändert ist → normal ausgeben, kein Tag
-- Beispiel: "[NEU] TikTok Follower: 312.000 (war: 302.300)"
-- Beispiel: "[GEÄNDERT] Preis Wimpernserum: €39,99 (war: €36,99)"
+- Beispiel: "[GEÄNDERT] TikTok Follower: 312.000 (war: 302.300)"
+- Beispiel: "[GEÄNDERT] Preis Hauptprodukt: 39,99 EUR (war: 36,99 EUR)"
+
+═══ PHASE 0: QUELLEN BESTIMMEN ═══
+
+Die Quellen stehen in /mnt/memory/kana-wissen/marke.json, die Wettbewerber
+zusätzlich im Eintrag `brand_competitors` der Wissensbasis — dort stehen auch
+die, die seit dem Setup dazugekommen sind.
+
+    jq -r '.website, .domain, .name' /mnt/memory/kana-wissen/marke.json
+    jq -r '.kanaele | to_entries[] | "\(.key): \(.value)"' /mnt/memory/kana-wissen/marke.json
+    jq -r '.quellen | to_entries[] | "\(.key): \(.value)"' /mnt/memory/kana-wissen/marke.json
+    jq -r '.wettbewerber[] | "\(.name) \(.website // "")"' /mnt/memory/kana-wissen/marke.json
+
+Fehlt marke.json, melde "Keine Markendaten gefunden." und stoppe.
 
 ═══ PHASE 1: BASELINE LADEN ═══
 
-Schritt 1 — /workspace/wissensbasis.json ist die Vergleichs-Baseline. Sie liegt
-bereits im Container; du musst sie nicht abrufen.
-Lies gezielt mit jq, statt alles in den Kontext zu ziehen:
+Der gespeicherte Stand liegt im Wissensspeicher und ist deine Vergleichsgrundlage:
 
-    jq -r '.[] | select(.key=="brand_social") | .content' /workspace/wissensbasis.json
+    jq -r '.[] | select(.key=="brand_social") | .content' /mnt/memory/kana-wissen/wissensbasis.json
+    jq -r '.[] | select(.key=="brand_competitors") | .content' /mnt/memory/kana-wissen/wissensbasis.json
 
-Merke dir die wichtigsten Zahlen: Follower TikTok/IG, Preise, Lagerstand, aktive Ads.
-Fehlt die Datei, gibt es keine Baseline — dann ist alles [NEU], und du sagst das
-im Report deutlich.
+Lies gezielt mit jq, statt alles in den Kontext zu ziehen. Merke dir die
+wichtigsten Zahlen: Follower je Kanal, Preise, Lagerstand, aktive Ads.
+
+Fehlt die Datei oder ist sie leer, gibt es keine Baseline — dann ist alles [NEU],
+und du sagst das im Report deutlich. Ein Weekly Update ohne Baseline ist
+faktisch ein Setup; weise darauf hin, dass BRAND SETUP der passendere Modus wäre.
 
 ═══ PHASE 2: NEU SCRAPEN ═══
 
-Schritt 2 — web_fetch https://www.sinsnlashes.com/ — Lagerstand (Button-Text!), Preise, Offers
-Schritt 3 — Apify RAG Browser https://www.tiktok.com/@sinscosmetics — Neue Follower-Zahl
-Schritt 4 — Apify RAG Browser https://www.instagram.com/sinsnlashes/ — Neue Follower-Zahl
-Schritt 5 — Apify Ad Library "sinsnlashes" — Neue/gestoppte Ads, Laufzeiten
-Schritt 6 — Apify RAG Browser https://www.trustpilot.com/review/sinsnlashes.com — Neue Bewertungen
-Schritt 7 — Apify Ad Library "Orphica" — Konkurrenz-Änderungen
-Schritt 8 — Apify Ad Library "nanolash" — Konkurrenz-Änderungen
-Schritt 9 — Apify RAG Browser gutefrage.net "sins n lashes" — Neue Community-Stimmen
+Dieselben Quellen wie beim Setup, `<…>` steht für einen Wert aus marke.json:
 
-Erkenntnisse mit [NEU]/[GEÄNDERT] Tags in die betroffenen Einträge einarbeiten und
-je Eintrag eine Datei nach /mnt/session/outputs/wissensbasis/<key>.json schreiben.
-`content` enthält den vollständigen neuen Text, nicht nur die Änderung.
-Jede Datei anschließend mit `jq . <datei>` prüfen.
+ 1. web_fetch <website> — Lagerstand (Button-Text!), Preise, Offers
+ 2. Apify RAG Browser https://www.tiktok.com/<kanaele.tiktok> — Neue Follower-Zahl
+ 3. Apify RAG Browser https://www.instagram.com/<kanaele.instagram ohne @>/ — Neue Follower-Zahl
+ 4. Apify Ad Library "<name>" — Neue und gestoppte Ads, Laufzeiten
+ 5. Apify RAG Browser <quellen.bewertungen> — Neue Bewertungen
+ 6. Je Wettbewerber: Apify Ad Library "<wettbewerber.name>" — Konkurrenz-Änderungen
+ 7. Apify RAG Browser <quellen.community> mit dem Markennamen — Neue Community-Stimmen
+
+Kanäle, die in marke.json leer sind, überspringst du wortlos.
+
+Erkenntnisse mit [NEU]/[GEÄNDERT] in die betroffenen Einträge einarbeiten und je
+Eintrag eine Datei nach /mnt/memory/kana-ergebnisse/wissen/<key>.json schreiben.
+`content` enthält den vollständigen neuen Text, nicht nur die Änderung — der
+Eintrag ersetzt den alten, er ergänzt ihn nicht.
+Jede Datei anschliessend mit `jq . <datei>` prüfen.
 
 ═══ PHASE 3: UPDATE-REPORT (EXAKT dieses Format) ═══
 
+`<MARKENNAME>` ist `.name` aus marke.json, in Versalien; Kastenbreite unverändert.
+
 ╔══════════════════════════════════════════════════════╗
-║     SINS 'N LASHES — WEEKLY UPDATE REPORT           ║
+║     <MARKENNAME> — WEEKLY UPDATE REPORT             ║
 ║     KW [aktuelle KW] — [Datum TT.MM.YYYY]           ║
 ╚══════════════════════════════════════════════════════╝
 
@@ -53,16 +70,12 @@ Aktive Offers: [Details]
 Lagerstand: [Welche Produkte verfügbar / OOS — Änderungen markiert]
 
 ─── SOCIAL MEDIA ─────────────────────────────────────
-TikTok (@sinscosmetics):
-  Follower: [Zahl] (Quelle: Scrape [Datum])
-  Wachstum: [+/- X seit letztem Update]
-  Top Post der Woche: [Hook] — [Views] Views
-  Engagement Trend: ↑ steigend / ↓ fallend / → stabil
-
-Instagram (@sinsnlashes):
-  Follower: [Zahl] (Quelle: Scrape [Datum])
-  Wachstum: [+/- X seit letztem Update]
-  Top Post: [Details]
+[Je Kanal aus marke.json ein Block:]
+  Plattform (Handle):
+    Follower: [Zahl] (Quelle: Scrape [Datum])
+    Wachstum: [+/- X seit letztem Update]
+    Top Post: [Hook] — [Kennzahl]
+    Engagement Trend: ↑ steigend / ↓ fallend / → stabil
 
 ─── META ADS (Top 3 nach Laufzeit) ───────────────────
 #1: "[Hook/Headline]" — [X Tage aktiv] — [Format]
@@ -72,13 +85,12 @@ Instagram (@sinsnlashes):
 Ad-Muster diese Woche: [Was haben Top-Ads gemeinsam?]
 
 ─── KONKURRENZ ────────────────────────────────────────
-Orphica: [Neue Ads / Aktivität]
-Nanolash: [Neue Ads / Aktivität]
+[Je Wettbewerber eine Zeile: Name: Neue Ads / Aktivität]
 Neue Threats: [Details oder "Keine"]
 Neue Chancen: [Details oder "Keine"]
 
 ─── ZIELGRUPPE & KUNDENSTIMMEN ───────────────────────
-Trustpilot: [X.X Sterne / X Reviews]
+Bewertungen: [X.X Sterne / X Reviews, Quelle]
 Neue positive Stimmen: [Zitat]
 Kaufblocker / Einwände: [Zitat]
 Community-Stimmung: [positiv/neutral/negativ + Grund]
