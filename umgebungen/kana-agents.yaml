@@ -1,14 +1,31 @@
-# Fuer den Brand Expert. Drei Hosts, seit Weg C ohne Supabase.
+# Umgebung aller KANA-Agenten.
 # ACHTUNG beim Anlegen ueber die Console-Oberflaeche: allowed_hosts ist dort
-# EIN Eingabefeld. Mehrere Hosts durch KOMMA trennen, keine Zeilenumbrueche:
-#   api.apify.com, www.sinsnlashes.com, www.facebook.com
+# EIN Eingabefeld. Mehrere Hosts durch KOMMA trennen, keine Zeilenumbrueche.
+#
+# Wer braucht was:
+#   api.apify.com                      Creative Researcher, Brand Expert
+#   sinsnlashes.com / www....          Brand Expert, Lagerstand
+#   generativelanguage.googleapis.com  Creative Researcher, Video-Breakdown ueber Gemini
+#   fbcdn.net                          Creative Researcher, Video-Download
+#
+# UNGEPRUEFT: ob "fbcdn.net" die tatsaechlichen Video-Hosts abdeckt. Facebook
+# liefert Videos ueber wechselnde Subdomains der Form
+# video-<region>-<n>.xx.fbcdn.net. Deckt die Plattform Subdomains nicht mit ab,
+# scheitert der Download und die Ad wird ohne Breakdown gespeichert — der Agent
+# faengt das ab, aber der Breakdown fehlt dann immer.
+#
+# allow_package_managers bleibt aus: reportlab ist im Image (gemessen 23.08.2026),
+# mehr braucht keiner der Agenten.
 name: kana-agents
 config:
   type: cloud
   networking:
     type: limited
+    allow_mcp_servers: true
     allow_package_managers: false
     allowed_hosts:
       - api.apify.com
+      - sinsnlashes.com
       - www.sinsnlashes.com
-      - www.facebook.com
+      - generativelanguage.googleapis.com
+      - fbcdn.net
