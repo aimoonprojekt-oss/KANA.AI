@@ -280,9 +280,25 @@ function AgentCard({
             }}>
               {agent.workspace ?? "kein Workspace"}
             </span>
+            {/* Master oder Kundenkopie. Seit alle Kopien exakt wie ihr Master
+                heissen, ist der Name allein nicht mehr unterscheidend. */}
+            <span style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase",
+              padding: "2px 8px", borderRadius: 100,
+              background: agent.master_agent_id ? "#FEF3C7" : "#DCFCE7",
+              color:      agent.master_agent_id ? "#92400E" : "#166534",
+            }}>
+              {agent.master_agent_id ? "Kundenkopie" : "Master"}
+            </span>
           </div>
           <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "monospace", marginBottom: 2 }}>
             {agent.anthropic_agent_id}
+          </div>
+          {/* Die Umgebung trennt zwei gleichnamige Agenten zuverlaessiger als
+              der Workspace-Name — sie steht in jeder Session, die er startet. */}
+          <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "monospace", marginBottom: 2 }}
+               title="Environment, in dem dieser Agent laeuft">
+            env {agent.environment_id ?? "—"}
           </div>
           <div style={{ fontSize: 11, color: "#94A3B8" }}>
             /{agent.slug}

@@ -5,6 +5,7 @@ import {
   upsertAgent,
   archiviereVerschwundeneAgenten,
   isAdminUser,
+  getSupabaseAdmin,
 } from "@/lib/platform/supabase";
 import { konfigurierteWorkspaces } from "@/lib/anthropic/workspaces";
 
@@ -67,6 +68,20 @@ export async function POST() {
     }, { status: 500 });
   }
 
+  // Welche Console-Agenten sind bei uns bereits als Kundenkopie vermerkt?
+  // Einmal vorab laden statt je Agent zu fragen.
+  const bekannteKopien = new Set<string>();
+  try {
+    const { data } = await getSupabaseAdmin()
+      .from("agents")
+      .select("anthropic_agent_id")
+      .not("master_agent_id", "is", null);
+    for (const z of data ?? []) bekannteKopien.add(String(z.anthropic_agent_id));
+  } catch (e) {
+    // Kein Abbruch: ohne die Liste greift immer noch metadata.master_agent_id.
+    console.warn("[sync-agents] Kopienliste nicht lesbar:", e);
+  }
+
   const synced:  { id: string; name: string; workspace: string }[] = [];
   const skipped: string[] = [];
   const errors:  string[] = [];
@@ -92,13 +107,40 @@ export async function POST() {
     proWorkspace[ws.name] = liste.length;
     console.log(`[sync-agents] ${ws.name}: ${liste.length} Agent(en) geladen`);
 
-    // Kundenkopien und Testagenten überspringen
-    const master = liste.filter((agent) => {
+    // Kundenkopien und Testagenten überspringen.
+    //
+    // Frueher reichte das Namensmuster " — user_xyz": Kopien wurden beim
+    // ersten Chat angelegt und trugen die Nutzer-ID im Namen. Seit
+    // scripts/mandant-einrichten.mjs heissen Kopien exakt wie ihr Master —
+    // dieselben sechs Namen in jedem Kundenworkspace. Das Muster greift dann
+    // nicht mehr, und der Sync wuerde eine Kopie als eigenstaendigen
+    // Katalogeintrag fuehren und ihren Slug ueberschreiben.
+    //
+    // Zwei zuverlaessigere Merkmale, in dieser Reihenfolge:
+    //   1. metadata.master_agent_id am Console-Agenten — setzt das
+    //      Migrationsskript beim Anlegen.
+    //   2. master_agent_id in unserer Datenbank — greift auch bei Kopien,
+    //      die vor dem Skript entstanden sind.
+    const master: Record<string, unknown>[] = [];
+    for (const agent of liste) {
       const name = (agent.name ?? agent.display_name ?? "") as string;
-      const ueberspringen = / — user_\w+/.test(name) || name.startsWith("TEST_COPY_DELETE_ME");
-      if (ueberspringen) skipped.push(`${name} (${ws.name})`);
-      return !ueberspringen;
-    });
+      const id = (agent.id ?? agent.agent_id ?? "") as string;
+      const metadata = (agent.metadata ?? {}) as Record<string, unknown>;
+
+      const istKopie =
+        / — user_\w+/.test(name) ||
+        name.startsWith("TEST_COPY_DELETE_ME") ||
+        Boolean(metadata.master_agent_id) ||
+        (id ? bekannteKopien.has(id) : false);
+
+      if (istKopie) {
+        skipped.push(`${name} (${ws.name})`);
+        // Als gesehen vermerken, sonst archiviert der Aufraeumschritt sie.
+        if (id) gesehen.push(id);
+      } else {
+        master.push(agent);
+      }
+    }
 
     const fallbackEnvId =
       process.env.ANTHROPIC_ENVIRONMENT_ID ??
@@ -158,7 +200,7 @@ export async function POST() {
     message: [
       `${synced.length} Agent(en) synchronisiert (${wsZusammenfassung}).`,
       archiviert.length > 0 ? `${archiviert.length} archiviert (nicht mehr in der Console).` : "",
-      skipped.length    > 0 ? `${skipped.length} Kundenkopie(n) übersprungen.` : "",
+      skipped.length    > 0 ? `${skipped.length} Kundenkopie(n) übersprungen — sie gehören keinem Katalog an.` : "",
       errors.length     > 0 ? `${errors.length} Fehler.` : "",
     ].filter(Boolean).join(" "),
     workspaces: erfolgreicheWorkspaces,

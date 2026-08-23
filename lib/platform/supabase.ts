@@ -61,6 +61,18 @@ export type DBAgent = {
   // entsteht aus dem Console-Anzeigenamen ("Creative Strategist (Test Modus 20)")
   // und aendert sich beim Umbenennen. Gesetzt beim Ausrollen.
   repo_ordner:        string | null;
+
+  // Master oder Kundenkopie? Der Check-Constraint agents_master_oder_kopie
+  // erzwingt, dass beide Felder gemeinsam gesetzt oder gemeinsam leer sind:
+  //
+  //   beide NULL     Master im Katalog-Workspace. Verkaeuflich.
+  //   beide gesetzt  Kopie im Workspace eines Kunden. Nie veroeffentlicht.
+  //
+  // Seit die Kopien exakt wie ihr Master heissen (scripts/mandant-einrichten.mjs),
+  // ist master_agent_id das einzige verlaessliche Unterscheidungsmerkmal —
+  // der Name taugt nicht mehr dafuer.
+  master_agent_id:    string | null;
+  organization_id:    string | null;
 };
 
 /** Organisation — ein User hat genau eine Organisation */
