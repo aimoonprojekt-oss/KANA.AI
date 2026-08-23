@@ -13,6 +13,11 @@ const nextConfig: NextConfig = {
   // dazu. Ohne diesen Eintrag laeuft es lokal und schlaegt auf Vercel fehl.
   outputFileTracingIncludes: {
     "/api/chat": ["./agents/**/werkzeuge/**"],
+    // Next packt nur ein, was es ueber Importe erreicht. Ein fs.readFile auf
+    // einen zusammengesetzten Pfad erreicht es nicht -- ohne diese Zeile ist
+    // katalog.json im Lambda nicht vorhanden, und jeder gesyncte Agent kaeme
+    // wieder ohne Preis in den Katalog.
+    "/api/admin/sync-agents": ["./agents/katalog.json"],
   },
 };
 

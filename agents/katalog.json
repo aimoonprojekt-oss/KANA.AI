@@ -1,0 +1,90 @@
+{
+  "_hinweis": "Produktdaten der Master-Agenten. Der Sync traegt sie ein, auch bei einem neu angelegten Agenten -- deshalb muss ein Preis nie von Hand nachgetragen werden. Schluessel ist der Slug des Masters. Betraege in Euro. Kundenkopien bekommen nie einen Preis und werden nie veroeffentlicht; sie erben Fakten und Startprompts von ihrem Master.",
+
+  "creative-researcher": {
+    "category": "Marketing",
+    "published": true,
+    "price_eur": 2800,
+    "setup_eur": 1800,
+    "chat_fakten": [
+      ["Liefert", "Competitor-Ads mit Video-Breakdown, gefiltert und gerankt"],
+      ["Braucht", "Produkt, Anzahl und Format"],
+      ["Typische Laufzeit", "10 bis 25 Minuten"]
+    ],
+    "chat_prompts": [
+      { "kurz": "10 Videos", "text": "Suche 10 Video-Ads zu unserem Hauptprodukt, Land DE. Nur aktive Anzeigen." },
+      { "kurz": "5 Bilder",  "text": "Suche 5 Image-Ads zu unserem Hauptprodukt, Land DE." },
+      { "kurz": "Testlauf",  "text": "Suche 3 Video-Ads zu unserem Hauptprodukt, Land DE. Kleiner Testlauf, damit ich das Ergebnis ansehen kann." },
+      { "kurz": "Zeitraum",  "text": "Suche 10 Video-Ads zu unserem Hauptprodukt, die seit mindestens 30 Tagen laufen. Lange Laufzeit heisst meist: die Anzeige funktioniert." }
+    ]
+  },
+
+  "creative-analyst": {
+    "category": "Marketing",
+    "published": true,
+    "price_eur": 2800,
+    "setup_eur": 1800,
+    "chat_fakten": [
+      ["Liefert", "K1-K6-Bewertung je Ad mit Staerken, Schwaechen und Empfehlung"],
+      ["Braucht", "Gesammelte Ads aus der Recherche"],
+      ["Typische Laufzeit", "5 bis 15 Minuten"]
+    ],
+    "chat_prompts": [
+      { "kurz": "Alle offenen", "text": "Analysiere alle offenen Breakdowns." },
+      { "kurz": "Nur Videos",   "text": "Analysiere nur die offenen Video-Ads. Bild-Ads ueberspringen." },
+      { "kurz": "Top-Ads",      "text": "Analysiere die offenen Breakdowns und nenne mir zum Schluss die drei staerksten Hooks mit Begruendung." }
+    ]
+  },
+
+  "creative-strategist": {
+    "category": "Marketing",
+    "published": true,
+    "price_eur": 2800,
+    "setup_eur": 1800,
+    "chat_fakten": [
+      ["Liefert", "Ad-Strategy-Guide ueber 5 Awareness-Stages, als PDF"],
+      ["Braucht", "Markenwissen und Analysen"],
+      ["Typische Laufzeit", "8 bis 20 Minuten"]
+    ],
+    "chat_prompts": [
+      { "kurz": "20 Briefs", "text": "AUFTRAG\nAnzahl: 20 Creative Briefs\nKopfzeile fuer die Kastengrafik: 5 Stages · 20 Creative Briefs\nVerteilung: je Stage 2 Image-Briefs und 2 Video-Briefs." },
+      { "kurz": "10 Briefs", "text": "AUFTRAG\nAnzahl: 10 Creative Briefs\nKopfzeile fuer die Kastengrafik: 5 Stages · 10 Creative Briefs\nVerteilung: je Stage 1 Image-Brief und 1 Video-Brief." },
+      { "kurz": "4 Briefs",  "text": "AUFTRAG\nAnzahl: 4 Creative Briefs\nKopfzeile fuer die Kastengrafik: 2 Stages · 4 Creative Briefs\nVerteilung: Stage 1 zwei Image-Briefs, Stage 2 zwei Video-Briefs." },
+      { "kurz": "Ohne PDF",  "text": "AUFTRAG\nAnzahl: 10 Creative Briefs\nKopfzeile fuer die Kastengrafik: 5 Stages · 10 Creative Briefs\nVerteilung: je Stage 1 Image-Brief und 1 Video-Brief.\n\nKein PDF setzen lassen -- ich will erst den Text sehen." }
+    ]
+  },
+
+  "brand-expert": {
+    "category": "Marketing",
+    "published": true,
+    "price_eur": 2800,
+    "setup_eur": 1800,
+    "chat_fakten": [
+      ["Liefert", "Gepflegte Wissensbasis: Identitaet, Zielgruppe, Produkte, Claims"],
+      ["Braucht", "Website und Social-Profile der Marke"],
+      ["Typische Laufzeit", "10 bis 30 Minuten"]
+    ],
+    "chat_prompts": [
+      { "kurz": "Aufbau",     "text": "Erhebe die Wissensbasis von Grund auf. Beginne mit brand_identity, brand_audience und brand_claims -- die brauchen die anderen Agenten zuerst." },
+      { "kurz": "Nachtragen", "text": "Ergaenze die Wissensbasis um die Schluessel, die noch fehlen. Sag mir vorher, welche das sind." },
+      { "kurz": "On-Brand?",  "text": "Pruefe den folgenden Entwurf auf Markenkonformitaet und Claims:\n\n[Text hier einfuegen]" },
+      { "kurz": "Wochenlage", "text": "Scrape die Kanaele neu, vergleiche mit dem gespeicherten Stand und melde nur, was sich geaendert hat." }
+    ]
+  },
+
+  "sub-dokumentenbauer": {
+    "category": "Content",
+    "published": false,
+    "price_eur": 0,
+    "setup_eur": 0,
+    "_warum_kein_preis": "Laeuft ausschliesslich als Unteragent des Strategisten. Nichts, was ein Kunde einzeln kauft."
+  },
+
+  "sub-datenpfleger": {
+    "category": "IT",
+    "published": false,
+    "price_eur": 0,
+    "setup_eur": 0,
+    "_warum_kein_preis": "Werkzeug fuer Erstbefuellung und Handeingriffe. Steht nicht im Laufpfad."
+  }
+}

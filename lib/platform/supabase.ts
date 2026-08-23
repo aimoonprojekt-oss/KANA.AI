@@ -341,6 +341,15 @@ export async function upsertAgent(agent: {
   description?:       string;
   category?:          string;
   workspace?:         string;   // Console-Workspace, aus dem der Agent stammt
+  /** Produktdaten aus agents/katalog.json. Siehe katalogEintrag(). */
+  katalog?: {
+    category?:     string;
+    published?:    boolean;
+    price_eur?:    number;
+    setup_eur?:    number;
+    chat_fakten?:  unknown;
+    chat_prompts?: unknown;
+  };
 }): Promise<void> {
   const db = getSupabaseAdmin();
   const jetzt = new Date().toISOString();
@@ -352,8 +361,9 @@ export async function upsertAgent(agent: {
     .maybeSingle();
 
   if (existing) {
-    // Update — published/featured/price_eur/category bleiben unangetastet
-    // category wird NUR überschrieben wenn Anthropic explizit einen Wert liefert
+    // Update — published/featured/price_eur/category bleiben unangetastet,
+    // AUSSER der Katalog sagt etwas dazu. Er ist die Quelle fuer Produktdaten:
+    // was dort steht, gilt. Was dort fehlt, bleibt wie im Admin eingestellt.
     const updatePayload: Record<string, unknown> = {
       environment_id: agent.environment_id,
       name:           agent.name,
@@ -369,22 +379,40 @@ export async function upsertAgent(agent: {
     if (agent.workspace !== undefined) {
       updatePayload.workspace = agent.workspace;
     }
+    for (const [feld, wert] of Object.entries(agent.katalog ?? {})) {
+      if (wert !== undefined) updatePayload[feld] = wert;
+    }
     const { error } = await db
       .from("agents")
       .update(updatePayload)
       .eq("anthropic_agent_id", agent.anthropic_agent_id);
     if (error) throw new Error(`Update fehlgeschlagen: ${error.message}`);
   } else {
+    // Preis und Freigabe kommen aus dem Katalog, nicht aus Handarbeit.
+    //
+    // Frueher stand hier fest price_eur: 0 und published: false. Jeder neu
+    // gesyncte Agent kam damit ohne Preis in den Katalog, und jemand musste
+    // ihn im Admin nachtragen -- bei jedem neuen Agenten und nach jedem
+    // Neuanlegen in der Console erneut. Steht der Preis in
+    // agents/katalog.json, ist er versioniert, im Pull Request sichtbar und
+    // geht nicht verloren.
+    //
+    // published bleibt nur dann false, wenn der Katalog nichts sagt: eine
+    // Freigabe zum Verkauf soll kein Nebeneffekt eines Syncs sein.
+    const { katalog, ...basis } = agent;
     const { error } = await db
       .from("agents")
       .insert({
-        ...agent,
+        ...basis,
         description:  agent.description ?? null,
-        category:     agent.category ?? null,
+        category:     katalog?.category ?? agent.category ?? null,
         workspace:    agent.workspace ?? null,
-        published:    false,
+        published:    katalog?.published ?? false,
         featured:     false,
-        price_eur:    0,
+        price_eur:    katalog?.price_eur ?? 0,
+        setup_eur:    katalog?.setup_eur ?? 0,
+        chat_fakten:  katalog?.chat_fakten ?? null,
+        chat_prompts: katalog?.chat_prompts ?? null,
         archived:     false,
         last_seen_at: jetzt,
       });

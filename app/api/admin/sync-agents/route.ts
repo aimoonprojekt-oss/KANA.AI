@@ -8,8 +8,50 @@ import {
   getSupabaseAdmin,
 } from "@/lib/platform/supabase";
 import { konfigurierteWorkspaces } from "@/lib/anthropic/workspaces";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 
 export const runtime = "nodejs";
+
+/**
+ * Produktdaten je Master-Slug aus agents/katalog.json.
+ *
+ * Preis, Setup-Gebuehr, Kategorie, Freigabe sowie Fakten und Startprompts
+ * fuers Chatfenster stehen versioniert im Repo statt nur in der Datenbank.
+ * Grund: Ein neu gesyncter Agent kam bisher mit price_eur 0 in den Katalog
+ * und musste im Admin nachgetragen werden -- bei jedem neuen Agenten erneut.
+ *
+ * Einmal je Sync gelesen, nicht je Agent.
+ *
+ * ACHTUNG Vercel: outputFileTracingIncludes in next.config.ts muss
+ * agents/katalog.json einschliessen, sonst liegt die Datei im Lambda nicht vor.
+ */
+type Katalogeintrag = {
+  category?: string;
+  published?: boolean;
+  price_eur?: number;
+  setup_eur?: number;
+  chat_fakten?: unknown;
+  chat_prompts?: unknown;
+};
+
+async function katalogLaden(): Promise<Record<string, Katalogeintrag>> {
+  try {
+    const roh = await fs.readFile(
+      path.join(process.cwd(), "agents", "katalog.json"),
+      "utf8"
+    );
+    const daten = JSON.parse(roh) as Record<string, unknown>;
+    // Schluessel mit fuehrendem _ sind Hinweise fuer Menschen, keine Agenten.
+    return Object.fromEntries(
+      Object.entries(daten).filter(([k]) => !k.startsWith("_"))
+    ) as Record<string, Katalogeintrag>;
+  } catch (e) {
+    // Kein Abbruch: ohne Katalog verhaelt sich der Sync wie vorher.
+    console.warn("[sync-agents] katalog.json nicht lesbar:", e);
+    return {};
+  }
+}
 
 function slugify(name: string): string {
   return name
@@ -61,6 +103,7 @@ export async function POST() {
   if (!isAdminUser(userId)) return NextResponse.json({ message: "Kein Zugriff — nur Admins." }, { status: 403 });
 
   const workspaces = konfigurierteWorkspaces();
+  const katalog = await katalogLaden();
 
   if (workspaces.length === 0) {
     return NextResponse.json({
@@ -170,6 +213,7 @@ export async function POST() {
             (agent.category as string) ??
             undefined,
           workspace:          ws.name,
+          katalog:            katalog[slugify(agentName)],
         });
         synced.push({ id: agentId, name: agentName, workspace: ws.name });
       } catch (e) {
@@ -190,6 +234,17 @@ export async function POST() {
     } catch (e) {
       errors.push(`Archivierung fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`);
     }
+  }
+
+  // Master ohne Katalogeintrag haetten keinen Preis -- genau der Zustand, den
+  // der Katalog abschaffen soll. Deshalb sichtbar machen statt still lassen.
+  const ohneKatalog = synced
+    .map((a) => a.name)
+    .filter((n) => !katalog[slugify(n)]);
+  if (ohneKatalog.length) {
+    errors.push(
+      `Ohne Eintrag in agents/katalog.json (kein Preis, keine Startprompts): ${ohneKatalog.join(", ")}`
+    );
   }
 
   const wsZusammenfassung = Object.entries(proWorkspace)

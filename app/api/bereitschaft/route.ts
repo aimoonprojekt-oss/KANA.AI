@@ -171,7 +171,7 @@ export async function GET() {
     // Hier wird nachgesehen, ob das auch wirklich so im Bestand steht.
     const { data: alleAgenten } = await db
       .from("agents")
-      .select("name, workspace, published, master_agent_id, organization_id, archived")
+      .select("name, workspace, published, master_agent_id, organization_id, archived, price_eur, chat_prompts")
       .eq("archived", false);
     const agenten = alleAgenten ?? [];
     const kopien = agenten.filter((a) => a.master_agent_id);
@@ -188,6 +188,24 @@ export async function GET() {
     notiere("Mandantentrennung", "Workspace zugeordnet",
       ohneWorkspace.length ? "warnung" : "ok",
       ohneWorkspace.length ? `ohne Workspace: ${ohneWorkspace.join(", ")}` : `${agenten.length} Agenten zugeordnet`);
+
+    // Produktdaten. Ein veroeffentlichter Agent ohne Preis ist im Shop ein
+    // Agent fuer 0 Euro -- der Zustand, den agents/katalog.json abschafft.
+    const ohnePreis = agenten
+      .filter((a) => a.published && !a.master_agent_id && Number(a.price_eur ?? 0) <= 0)
+      .map((a) => a.name);
+    notiere("Katalog", "Preis gesetzt", ohnePreis.length ? "fehlt" : "ok",
+      ohnePreis.length
+        ? `veroeffentlicht ohne Preis: ${ohnePreis.join(", ")} — Eintrag in agents/katalog.json fehlt`
+        : undefined);
+
+    const ohnePrompts = agenten
+      .filter((a) => a.published && !a.master_agent_id && !a.chat_prompts)
+      .map((a) => a.name);
+    notiere("Katalog", "Startprompts gesetzt", ohnePrompts.length ? "warnung" : "ok",
+      ohnePrompts.length
+        ? `ohne Startprompts: ${ohnePrompts.join(", ")} — das Chatfenster bleibt beim leeren Start ohne Angebot`
+        : undefined);
 
     const { data: buckets } = await db.storage.listBuckets();
     const lieferungen = (buckets ?? []).find((b) => b.name === "lieferungen");
