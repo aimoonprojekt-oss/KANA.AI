@@ -1,34 +1,53 @@
 /* ═══════════════════════════════════════════════════════════════
-   KANA AI — Corporate Design für PDF-Dokumente
+   KANA AI — Corporate Design für Dokumente
    ───────────────────────────────────────────────────────────────
-   Abgeleitet aus app/globals.css der Plattform, Commit acc7607.
-   Farbwerte, Schrift und Wortmarke sind unverändert übernommen.
+   Abgeleitet aus dem Design-Handoff „KANA AI — Relaunch", Stand
+   18. August 2026. Helle Welt, Petrol als einzige Akzentfarbe,
+   Archivo / Familjen Grotesk / JetBrains Mono, quadratische Formen,
+   Hairlines statt Schatten.
 
-   BEWUSSTE ABWEICHUNG VON DER WEBSITE:
-   Die Website ist dunkel. Ein dunkles PDF ist für ein 30-seitiges
-   Dokument die falsche Wahl — es ist am Bildschirm ermüdend, beim
-   Ausdrucken unbrauchbar und verbraucht Toner ohne Nutzen.
-   Deshalb: Deckblatt dunkel wie die Website, Inhalt hell.
-   Die Wiedererkennung trägt das Deckblatt, die Lesbarkeit den Rest.
+   VERHÄLTNIS ZUR WEBSITE:
+   Die helle Welt der Website ist hier unverändert übernommen —
+   anders als früher, wo die Website dunkel war und das PDF davon
+   abweichen musste. Nur der Chat bleibt im Produkt dunkel; für
+   Dokumente spielt das keine Rolle.
 
-   Änderungen am Erscheinungsbild passieren HIER, nicht im Prompt
-   eines Agenten.
+   Das Deckblatt trägt das Orbital als Hintergrundmotiv, wie das
+   Hero-Band der Landingpage.
+
+   Änderungen am Erscheinungsbild passieren HIER und in kana_pdf.py,
+   nie im Prompt eines Agenten.
    ═══════════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Familjen+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  --accent:        #6366F1;   /* Indigo, Primärakzent */
-  --accent-light:  #818CF8;
-  --accent-bright: #A5B4FC;
-  --dark:          #060A13;   /* Deckblatt-Hintergrund */
-  --dark-2:        #0C1220;
-  --ink:           #16202F;   /* Fließtext, nicht reines Schwarz */
-  --ink-soft:      #4A5A6E;
-  --ink-mute:      #7A8FA6;
-  --line:          #E2E8F0;
-  --tint:          #F4F5FF;   /* Indigo, stark aufgehellt */
-  --success:       #34D399;
+  /* Flächen — drei Stufen, alle hell */
+  --page:          #E8E5DE;   /* Arbeitsfläche außen */
+  --surface:       #FBFAF7;   /* Seitenfläche, Karten */
+  --surface-2:     #F6F4EF;   /* abgesetzte Abschnitte, Deckblatt */
+  --surface-3:     #F1EFE9;   /* Musterflächen, Tabellenkopf */
+
+  /* Akzent — Petrol, einzige Akzentfarbe */
+  --accent:        #1F4B45;
+  --accent-dark:   #14312D;
+  --accent-soft:   rgba(31,75,69,0.08);
+  --accent-border: rgba(31,75,69,0.30);
+
+  /* Text — vier Stufen */
+  --ink:           #14181A;   /* Überschriften, Fließtext */
+  --ink-soft:      #4A5250;   /* Unterzeilen */
+  --ink-tertiary:  #5A6260;   /* Beschreibungen */
+  --ink-mute:      #5F6866;   /* Meta, Mono-Labels — nie heller (≈ 5:1) */
+
+  --hairline:      rgba(20,24,26,0.10);
+  --hairline-soft: rgba(20,24,26,0.06);
+  --red:           #8C3A32;
+
+  /* Schriftrollen */
+  --font-display:  'Archivo', sans-serif;
+  --font-text:     'Familjen Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono:     'JetBrains Mono', ui-monospace, monospace;
 }
 
 /* ── Seite ────────────────────────────────────────────────────── */
@@ -39,17 +58,16 @@
 
   @bottom-right {
     content: counter(page);
-    font-family: 'Inter', sans-serif;
-    font-size: 8.5pt;
-    color: #7A8FA6;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7.5pt;
+    color: #5F6866;
   }
   @bottom-left {
     content: "KANA AI";
-    font-family: 'Inter', sans-serif;
-    font-size: 8.5pt;
-    font-weight: 700;
-    letter-spacing: -0.2px;
-    color: #7A8FA6;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7.5pt;
+    letter-spacing: 0.12em;
+    color: #5F6866;
   }
 }
 
@@ -58,143 +76,229 @@
 html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font-text);
   font-size: 10.5pt;
   line-height: 1.62;
   color: var(--ink);
-  background: #FFFFFF;
+  background: var(--surface);
   hyphens: auto;
+  text-wrap: pretty;
 }
+
+/* ── Signet und Wortmarke ─────────────────────────────────────── */
+/* Drei Kreise, kein SVG. Der Bogen ist ein Kreis mit zwei
+   durchsichtigen Rändern, um 45° gedreht — dadurch liegt die
+   Öffnung rechts und der sichtbare Bogen links neben dem Kern.
+   rotate(135deg) legt ihn fälschlich nach oben. */
+
+.signet {
+  position: relative;
+  width: 26px; height: 26px;
+  border: 2px solid var(--accent);
+  border-top-color: transparent;
+  border-right-color: transparent;
+  border-radius: 50%;
+  box-sizing: border-box;
+  transform: rotate(45deg);
+  flex: none;
+}
+.signet::before {                    /* Innenring, 60 % */
+  content: "";
+  position: absolute; inset: 20%;
+  border: 1px solid rgba(20,24,26,0.20);
+  border-radius: 50%;
+}
+.signet::after {                     /* Kern, 28 % */
+  content: "";
+  position: absolute; inset: 36%;
+  background: var(--accent);
+  border-radius: 50%;
+}
+.signet.klein { width: 18px; height: 18px; border-width: 1.5px; }
+.signet.klein::before { display: none; }   /* unter 20 px weglassen */
+
+.wortmarke {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 15pt;
+  letter-spacing: -0.035em;
+  color: var(--ink);
+}
+.wortmarke .ai { color: var(--accent); }
 
 /* ── Deckblatt ────────────────────────────────────────────────── */
 
 .deckblatt {
   page: first;
   page-break-after: always;
-  background: var(--dark);
-  color: #F1F5F9;
+  background: var(--surface-2);
+  color: var(--ink);
   height: 297mm;
-  padding: 45mm 24mm 24mm 24mm;
+  padding: 42mm 24mm 24mm 24mm;
   position: relative;
+  overflow: hidden;
 }
 
-/* Wortmarke: Punkt + Schriftzug, wie in der Navigation der Website */
-.wortmarke {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font-weight: 900;
-  font-size: 15pt;
-  letter-spacing: -0.5px;
-  color: #F1F5F9;
+/* Orbital als Hintergrundmotiv — konzentrische Bahnen, zurückgenommen.
+   Im PDF-Weg (kana_pdf.py) wird dasselbe Motiv gezeichnet, dort mit
+   Speichen und Knoten. Hier reicht die Andeutung. */
+.deckblatt .orbital {
+  position: absolute;
+  right: -34mm; top: 62mm;
+  width: 132mm; height: 132mm;
+  opacity: 0.38;
+  pointer-events: none;
 }
-.wortmarke::before {
-  content: "";
-  width: 9px; height: 9px;
+.deckblatt .orbital .bahn {
+  position: absolute; inset: 0;
+  border: 0.5px solid rgba(20,24,26,0.16);
+  border-radius: 50%;
+}
+.deckblatt .orbital .bahn.innen { inset: 20.5%; }
+.deckblatt .orbital .bogen {
+  position: absolute; inset: -9%;
+  border: 1.6px solid var(--accent);
+  border-top-color: transparent;
+  border-right-color: transparent;
+  border-radius: 50%;
+  transform: rotate(45deg);
+}
+.deckblatt .orbital .kern {
+  position: absolute; inset: 42.25%;
   background: var(--accent);
   border-radius: 50%;
-  box-shadow: 0 0 16px var(--accent);
 }
 
 .deckblatt .titel {
+  position: relative;
   margin-top: 62mm;
+  max-width: 66%;
+  font-family: var(--font-display);
   font-size: 30pt;
   font-weight: 800;
   line-height: 1.18;
-  letter-spacing: -0.8px;
+  letter-spacing: -0.05em;
 }
 .deckblatt .untertitel {
+  position: relative;
   margin-top: 7mm;
+  max-width: 66%;
   font-size: 12.5pt;
   font-weight: 400;
-  color: #B8C5D6;
+  color: var(--ink-soft);
 }
 .deckblatt .streifen {
+  position: relative;
   margin-top: 14mm;
-  width: 54mm; height: 4px;
-  border-radius: 2px;
-  background: linear-gradient(135deg, #6366F1, #818CF8);
+  width: 54mm; height: 2px;
+  background: var(--accent);       /* kein Verlauf, kein Radius */
 }
 .deckblatt .fuss {
   position: absolute;
   bottom: 24mm; left: 24mm; right: 24mm;
-  font-size: 9pt;
-  color: #7A8FA6;
-  border-top: 1px solid rgba(255,255,255,0.10);
+  font-family: var(--font-mono);
+  font-size: 7.5pt;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  border-top: 1px solid var(--hairline);
   padding-top: 5mm;
 }
 
 /* ── Überschriften ────────────────────────────────────────────── */
 
 h1 {
-  font-size: 19pt; font-weight: 800; letter-spacing: -0.5px;
+  font-family: var(--font-display);
+  font-size: 19pt; font-weight: 800; letter-spacing: -0.05em;
   color: var(--ink);
-  margin: 0 0 6mm 0; padding-bottom: 3mm;
-  border-bottom: 2px solid var(--accent);
-  page-break-before: always;   /* jedes Hauptkapitel auf neuer Seite */
+  margin: 0 0 4mm 0;
+  padding-bottom: 3mm;
+  border-bottom: 1.2px solid var(--accent);
+  page-break-before: always;
   page-break-after: avoid;
 }
 h1:first-of-type { page-break-before: avoid; }
 
 h2 {
-  font-size: 13.5pt; font-weight: 700; letter-spacing: -0.3px;
+  font-family: var(--font-display);
+  font-size: 13pt; font-weight: 700; letter-spacing: -0.04em;
   color: var(--ink);
-  margin: 9mm 0 3mm 0;
+  margin: 7mm 0 2.5mm 0;
   page-break-after: avoid;
-}
-h2::before {                    /* schmaler Akzentstrich links */
-  content: ""; display: inline-block;
-  width: 3px; height: 0.92em;
-  background: var(--accent);
-  margin-right: 3.5mm;
-  vertical-align: -0.1em;
-  border-radius: 2px;
 }
 
 h3 {
-  font-size: 11pt; font-weight: 700;
+  font-size: 10.5pt; font-weight: 600; letter-spacing: -0.025em;
   color: var(--accent);
-  margin: 6mm 0 2mm 0;
+  margin: 5mm 0 1.8mm 0;
   page-break-after: avoid;
 }
 
-h4 { font-size: 10.5pt; font-weight: 600; color: var(--ink-soft); margin: 4mm 0 1.5mm 0; }
+h4 {
+  font-size: 10pt; font-weight: 600;
+  color: var(--ink-soft);
+  margin: 4mm 0 1.5mm 0;
+  page-break-after: avoid;
+}
 
 /* ── Fließtext ────────────────────────────────────────────────── */
 
 p { margin: 0 0 3.2mm 0; orphans: 3; widows: 3; }
 strong { font-weight: 700; color: var(--ink); }
-em { font-style: italic; color: var(--ink-soft); }
+em { font-style: italic; color: var(--ink-tertiary); }
 
 ul, ol { margin: 0 0 3.5mm 0; padding-left: 6mm; }
 li { margin-bottom: 1.3mm; }
 li::marker { color: var(--accent); }
 
 hr {
-  border: none; height: 1px;
-  background: var(--line);
-  margin: 7mm 0;
+  border: none;
+  border-top: 1px solid var(--hairline);
+  margin: 6mm 0;
 }
 
 a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent-dark); }
+
+/* Mono-Rolle: Zahlen, Labels, Zeitstempel, Dateigrößen */
+.mono, .kennzahl, time {
+  font-family: var(--font-mono);
+  font-size: 9pt;
+  font-variant-numeric: tabular-nums;
+}
+.label {
+  font-family: var(--font-mono);
+  font-size: 7.5pt;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
 
 /* ── Titelflächen (ersetzen die ASCII-Kästen der Quelle) ──────── */
 
 .titelflaeche {
-  background: var(--tint);
-  border-left: 4px solid var(--accent);
-  border-radius: 0 8px 8px 0;
+  background: var(--surface-2);
+  border-left: 2.5px solid var(--accent);
+  border-radius: 0;                /* Handoff: Standard ist quadratisch */
   padding: 6mm 7mm;
   margin: 6mm 0 8mm 0;
   page-break-inside: avoid;
 }
 .titelflaeche .zeile-1 {
-  font-size: 15pt; font-weight: 800; letter-spacing: -0.4px;
+  font-family: var(--font-display);
+  font-size: 15pt; font-weight: 700; letter-spacing: -0.04em;
   color: var(--ink);
 }
 .titelflaeche .zeile-2 {
-  margin-top: 1.5mm;
-  font-size: 10pt; font-weight: 500;
+  margin-top: 2mm;
+  font-family: var(--font-mono);
+  font-size: 8pt; font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   color: var(--accent);
 }
 
@@ -202,12 +306,13 @@ a { color: var(--accent); text-decoration: none; }
 .abschnitt {
   display: flex; align-items: center; gap: 4mm;
   margin: 9mm 0 4mm 0;
-  font-size: 12pt; font-weight: 700; letter-spacing: -0.2px;
+  font-family: var(--font-display);
+  font-size: 12pt; font-weight: 700; letter-spacing: -0.035em;
   color: var(--ink);
   page-break-after: avoid;
 }
 .abschnitt::after {
-  content: ""; flex: 1; height: 1px; background: var(--line);
+  content: ""; flex: 1; height: 1px; background: var(--hairline);
 }
 
 /* ── Tabellen ─────────────────────────────────────────────────── */
@@ -215,78 +320,81 @@ a { color: var(--accent); text-decoration: none; }
 table {
   width: 100%;
   border-collapse: collapse;
-  margin: 4mm 0 6mm 0;
+  margin: 3mm 0 5mm 0;
   font-size: 9.5pt;
   page-break-inside: avoid;
 }
 thead th {
-  background: var(--tint);
-  color: var(--ink);
-  font-weight: 700;
+  background: var(--surface-3);
+  border-bottom: 1px solid var(--accent);
+  font-family: var(--font-mono);
+  font-size: 7.5pt; font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
   text-align: left;
-  padding: 2.6mm 3mm;
-  border-bottom: 2px solid var(--accent);
+  padding: 2.4mm 3mm;
 }
 tbody td {
+  border-bottom: 0.5px solid var(--hairline-soft);
   padding: 2.4mm 3mm;
-  border-bottom: 1px solid var(--line);
   vertical-align: top;
 }
-tbody tr:last-child td { border-bottom: none; }
+tbody tr:last-child td { border-bottom: 1px solid var(--hairline); }
+/* Zahlenspalten laufen in der Mono und stehen dadurch untereinander */
+td.zahl, th.zahl {
+  font-family: var(--font-mono);
+  font-size: 9pt;
+  font-variant-numeric: tabular-nums;
+}
+tr.summe td { background: rgba(31,75,69,0.04); font-weight: 600; }
 
 /* ── Belegkette: [ANALYST: ...] und [ABGELEITET] ──────────────── */
 /* Diese Markierungen sind kein Arbeitsrest, sondern zeigen dem
-   Kunden, was belegt und was abgeleitet ist. Sie werden sichtbar
-   ausgezeichnet, nicht versteckt.                                */
+   Kunden, worauf eine Aussage beruht. Sie bleiben sichtbar. */
 
 .beleg {
-  display: inline-block;
-  font-size: 8.2pt; font-weight: 600;
-  padding: 0.4mm 1.8mm;
-  border-radius: 4px;
-  background: var(--tint);
   color: var(--accent);
-  border: 1px solid rgba(99,102,241,0.28);
-  white-space: nowrap;
+  font-weight: 600;
 }
 .beleg-abgeleitet {
-  background: #F8FAFC;
+  font-family: var(--font-mono);
+  font-size: 8.5pt;
   color: var(--ink-mute);
-  border-color: var(--line);
 }
 .hinweis-entwurf {
-  font-size: 8.8pt; font-style: italic; color: var(--ink-mute);
+  font-style: italic;
+  color: var(--ink-mute);
 }
 
 /* ── Codeblöcke und Monospace ─────────────────────────────────── */
 
 code {
-  font-family: 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+  font-family: var(--font-mono);
   font-size: 9pt;
-  background: #F4F6F9;
-  padding: 0.3mm 1.2mm;
-  border-radius: 3px;
-  color: var(--ink);
+  background: var(--surface-3);
+  padding: 0.4mm 1.2mm;
+  border-radius: 0;
 }
 pre {
-  font-family: 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
-  font-size: 8.8pt; line-height: 1.5;
-  background: #F7F9FC;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 8.5pt;
+  line-height: 1.5;
+  background: var(--surface-3);
+  border: 0.5px solid var(--hairline);
+  border-radius: 0;
   padding: 4mm 5mm;
-  margin: 3mm 0 5mm 0;
-  overflow-wrap: break-word;
-  white-space: pre-wrap;
+  margin: 2mm 0 4mm 0;
+  overflow-x: auto;
   page-break-inside: avoid;
 }
 pre code { background: none; padding: 0; }
 
 blockquote {
   margin: 4mm 0;
-  padding: 1mm 0 1mm 5mm;
-  border-left: 3px solid var(--accent-bright);
-  color: var(--ink-soft);
+  padding: 1.5mm 0 1.5mm 4mm;
+  border-left: 1px solid var(--accent-border);
+  color: var(--ink-tertiary);
 }
 
 /* ── Inhaltsverzeichnis ───────────────────────────────────────── */
@@ -297,13 +405,23 @@ blockquote {
 .inhalt li {
   display: flex; align-items: baseline; gap: 2mm;
   padding: 1.6mm 0;
-  border-bottom: 1px dotted var(--line);
+  border-bottom: 0.5px solid var(--hairline-soft);
   font-size: 10pt;
 }
-.inhalt li .nr { color: var(--accent); font-weight: 700; min-width: 8mm; }
-.inhalt li .seite { margin-left: auto; color: var(--ink-mute); font-size: 9pt; }
+.inhalt li .nr {
+  font-family: var(--font-mono);
+  color: var(--accent); font-weight: 500; min-width: 8mm;
+}
+.inhalt li .seite {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  color: var(--ink-mute); font-size: 8.5pt;
+}
 
 /* ── Checklisten ──────────────────────────────────────────────── */
+/* Die Legende des Portals übertragen: gefüllter Punkt = erledigt,
+   hohler Punkt = offen. Keine Kästchen — ☐ und ☑ fehlen den
+   CI-Schriften und setzen als leere Kästen. */
 
 .checkliste { list-style: none; padding-left: 0; }
 .checkliste li {
@@ -313,11 +431,31 @@ blockquote {
 }
 .checkliste li::before {
   content: "";
-  position: absolute; left: 0; top: 0.35em;
-  width: 3.6mm; height: 3.6mm;
-  border: 1.5px solid var(--accent);
-  border-radius: 3px;
+  position: absolute; left: 0; top: 0.42em;
+  width: 2.4mm; height: 2.4mm;
+  border: 1px solid var(--accent-border);
+  border-radius: 50%;
+  box-sizing: border-box;
 }
+.checkliste li.erledigt::before {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ── Zustandsabzeichen ────────────────────────────────────────── */
+
+.abzeichen {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 7.5pt;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.6mm 2mm;
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+}
+.abzeichen.gefuellt { background: var(--accent); color: var(--surface-2); border-color: var(--accent); }
+.abzeichen.negativ  { color: var(--red); border-color: rgba(140,58,50,0.3); }
 
 /* ── Umbruchsteuerung ─────────────────────────────────────────── */
 
